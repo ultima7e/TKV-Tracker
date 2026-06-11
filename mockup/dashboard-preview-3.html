@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tamakoshi-V Dashboard — UI Preview (List / Scrolling Report)</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+  :root{
+    --bg:#f4f6fb; --card:#ffffff; --ink:#152238; --muted:#73809a; --line:#e7ecf4;
+    --teal:#0ea5a3; --indigo:#4f5bd5; --sky:#2f9be0; --green:#22a06b; --amber:#e89b16; --red:#e0524b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);scroll-behavior:smooth}
+
+  /* sticky header with section quick-jump */
+  .header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--line);
+    box-shadow:0 2px 14px rgba(21,34,56,.05)}
+  .header .top{display:flex;align-items:center;justify-content:space-between;padding:13px 28px}
+  .brand{display:flex;align-items:center;gap:12px}
+  .brand .logo{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-weight:800;font-size:13px;color:#fff;
+    background:linear-gradient(135deg,var(--teal),var(--indigo))}
+  .brand b{font-size:15px;letter-spacing:.4px} .brand small{display:block;font-size:10.5px;color:var(--muted);letter-spacing:1.5px}
+  .top-right{display:flex;align-items:center;gap:16px;font-size:12.5px;color:var(--muted)}
+  .btn-refresh{background:linear-gradient(135deg,var(--teal),var(--indigo));color:#fff;border:none;padding:9px 17px;border-radius:8px;
+    font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;transition:.2s}
+  .btn-refresh:hover{transform:translateY(-1px);filter:brightness(1.06)}
+  .btn-refresh.spin .ic{animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+  .jump{display:flex;gap:6px;padding:0 28px 11px;overflow-x:auto}
+  .jump a{font-size:12px;color:var(--muted);text-decoration:none;padding:6px 12px;border-radius:20px;white-space:nowrap;transition:.15s}
+  .jump a:hover{background:var(--bg);color:var(--ink)}
+  .jump a.on{background:rgba(14,165,163,.12);color:var(--teal);font-weight:600}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:24px 28px 60px}
+  section{margin-bottom:30px;scroll-margin-top:96px}
+  .sec-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .sec-head .bar{width:5px;height:20px;border-radius:3px;background:linear-gradient(180deg,var(--teal),var(--indigo))}
+  .sec-head h2{font-size:16px;font-weight:700}
+  .sec-head .count{margin-left:auto;font-size:11px;color:var(--muted);background:#fff;border:1px solid var(--line);
+    padding:4px 11px;border-radius:20px}
+
+  .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:22px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 15px}
+  .kpi h4{font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:700;margin-bottom:8px}
+  .kpi .val{font-size:21px;font-weight:800;color:var(--ink)} .kpi .sub{font-size:10.5px;color:var(--muted);margin-top:2px}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .two{display:grid;grid-template-columns:1.3fr 1fr;gap:16px}
+  .chart{width:100%;height:230px}
+
+  /* the LIST / TABLE styling — the focus of this sample */
+  table.list{width:100%;border-collapse:collapse;font-size:12.5px}
+  table.list thead th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);
+    font-weight:700;padding:9px 12px;border-bottom:2px solid var(--line);background:#fafbfe}
+  table.list tbody td{padding:10px 12px;border-bottom:1px solid var(--line);color:#33415c}
+  table.list tbody tr{transition:.12s} table.list tbody tr:hover{background:#f7faff}
+  table.list tbody tr:last-child td{border-bottom:none}
+  .pill{font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap}
+  .pill.paid{background:rgba(34,160,107,.13);color:var(--green)}
+  .pill.prog{background:rgba(47,155,224,.13);color:var(--sky)}
+  .pill.rev{background:rgba(232,155,22,.15);color:var(--amber)}
+  .pill.rej{background:rgba(224,82,75,.13);color:var(--red)}
+  .pill.ok{background:rgba(34,160,107,.13);color:var(--green)}
+  .num-cell{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)}
+
+  /* inline mini progress used in list rows */
+  .mini{display:flex;align-items:center;gap:9px}
+  .mini .track{flex:1;height:7px;background:#eef2f8;border-radius:5px;overflow:hidden;min-width:80px}
+  .mini .track>i{display:block;height:100%;width:0;border-radius:5px;background:linear-gradient(90deg,var(--teal),var(--indigo));
+    transition:width 1.2s cubic-bezier(.2,.8,.2,1)}
+  .mini b{font-size:12px;color:var(--ink);width:38px;text-align:right}
+
+  .preview-flag{position:fixed;bottom:14px;right:16px;background:#152238;color:#fff;font-size:11px;padding:6px 12px;border-radius:20px;opacity:.85;z-index:9}
+  .muted{color:var(--muted)}
+</style>
+</head>
+<body>
+  <header class="header">
+    <div class="top">
+      <div class="brand"><div class="logo">TV</div><div><b>TAMAKOSHI-V</b><small>HYDROELECTRIC PROJECT · LOT-1</small></div></div>
+      <div class="top-right"><span>10 Jun 2026</span><button class="btn-refresh" id="refresh"><span class="ic">⟳</span>Refresh</button></div>
+    </div>
+    <nav class="jump" id="jump">
+      <a href="#exec" class="on">Overview</a>
+      <a href="#ipc">IPC List</a>
+      <a href="#tunnel">Tunnel</a>
+      <a href="#milestones">Milestones</a>
+      <a href="#claims">Claims Register</a>
+      <a href="#safety">Safety</a>
+    </nav>
+  </header>
+
+  <div class="wrap">
+    <!-- OVERVIEW -->
+    <section id="exec">
+      <div class="sec-head"><span class="bar"></span><h2>Project Overview</h2><span class="count">As on 10 Jun 2026</span></div>
+      <div class="kpis">
+        <div class="kpi"><h4>Contract</h4><div class="val">NPR <span class="num" data-to="98.67" data-dec="2">0</span></div><div class="sub">Bn</div></div>
+        <div class="kpi"><h4>Financial</h4><div class="val"><span class="num" data-to="68.45" data-dec="2">0</span>%</div><div class="sub">progress</div></div>
+        <div class="kpi"><h4>Physical</h4><div class="val"><span class="num" data-to="72.30" data-dec="2">0</span>%</div><div class="sub">progress</div></div>
+        <div class="kpi"><h4>Earned Value</h4><div class="val">NPR <span class="num" data-to="67.46" data-dec="2">0</span></div><div class="sub">Bn</div></div>
+        <div class="kpi"><h4>SPI</h4><div class="val"><span class="num" data-to="1.05" data-dec="2">0</span></div><div class="sub">schedule</div></div>
+        <div class="kpi"><h4>CPI</h4><div class="val"><span class="num" data-to="1.02" data-dec="2">0</span></div><div class="sub">cost</div></div>
+      </div>
+      <div class="two">
+        <div class="card"><h4 class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">S-Curve — Planned vs Actual (%)</h4><div id="l-scurve" class="chart"></div></div>
+        <div class="card"><h4 class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Cost Breakdown</h4><div id="l-cost" class="chart"></div></div>
+      </div>
+    </section>
+
+    <!-- IPC LIST (the list focus) -->
+    <section id="ipc">
+      <div class="sec-head"><span class="bar"></span><h2>IPC Tracker</h2><span class="count">8 invoices</span></div>
+      <div class="card" style="padding:4px 4px 2px">
+        <table class="list">
+          <thead><tr><th>IPC No.</th><th>Submitted</th><th>Amount (NPR Bn)</th><th>Certified</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>IPC-08</td><td>12-Dec-25</td><td class="num-cell">6.21</td><td class="num-cell">6.18</td><td><span class="pill paid">Paid</span></td></tr>
+            <tr><td>IPC-09</td><td>14-Jan-26</td><td class="num-cell">6.58</td><td class="num-cell">6.50</td><td><span class="pill paid">Paid</span></td></tr>
+            <tr><td>IPC-10</td><td>16-Feb-26</td><td class="num-cell">6.74</td><td class="num-cell">6.71</td><td><span class="pill paid">Paid</span></td></tr>
+            <tr><td>IPC-11</td><td>15-Mar-26</td><td class="num-cell">6.92</td><td class="num-cell">6.80</td><td><span class="pill prog">In Progress</span></td></tr>
+            <tr><td>IPC-12</td><td>14-Apr-26</td><td class="num-cell">6.21</td><td class="num-cell">—</td><td><span class="pill rev">Submitted</span></td></tr>
+            <tr><td>IPC-13</td><td>15-May-26</td><td class="num-cell">6.40</td><td class="num-cell">—</td><td><span class="pill prog">In Review</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TUNNEL as a list with inline bars -->
+    <section id="tunnel">
+      <div class="sec-head"><span class="bar"></span><h2>Tunnel Progress</h2><span class="count">5 headings</span></div>
+      <div class="card" style="padding:4px 4px 2px">
+        <table class="list">
+          <thead><tr><th>Tunnel / Shaft</th><th>Length (m)</th><th>Completed (m)</th><th style="width:230px">Progress</th></tr></thead>
+          <tbody>
+            <tr><td>Headrace Tunnel</td><td class="num-cell">7,519</td><td class="num-cell">6,300</td><td><div class="mini"><div class="track"><i data-w="84"></i></div><b>84%</b></div></td></tr>
+            <tr><td>Surge Shaft</td><td class="num-cell">566</td><td class="num-cell">408</td><td><div class="mini"><div class="track"><i data-w="72"></i></div><b>72%</b></div></td></tr>
+            <tr><td>Pressure Shaft</td><td class="num-cell">385</td><td class="num-cell">240</td><td><div class="mini"><div class="track"><i data-w="62"></i></div><b>62%</b></div></td></tr>
+            <tr><td>Access Tunnel</td><td class="num-cell">1,200</td><td class="num-cell">860</td><td><div class="mini"><div class="track"><i data-w="71"></i></div><b>71%</b></div></td></tr>
+            <tr><td>Tailrace Tunnel</td><td class="num-cell">1,302</td><td class="num-cell">1,186</td><td><div class="mini"><div class="track"><i data-w="91"></i></div><b>91%</b></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- MILESTONES list -->
+    <section id="milestones">
+      <div class="sec-head"><span class="bar"></span><h2>Critical Milestones</h2><span class="count">5 tracked</span></div>
+      <div class="card" style="padding:4px 4px 2px">
+        <table class="list">
+          <thead><tr><th>Milestone</th><th>Baseline</th><th>Forecast</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Tunnel Breakthrough</td><td>30-Apr-25</td><td>05-Jun-25</td><td><span class="pill rev">Delayed</span></td></tr>
+            <tr><td>Reservoir Impoundment</td><td>30-Sep-25</td><td>10-Oct-25</td><td><span class="pill rev">At Risk</span></td></tr>
+            <tr><td>First Unit Generation</td><td>30-May-25</td><td>27-Jun-25</td><td><span class="pill rev">Delayed</span></td></tr>
+            <tr><td>Commercial Operation Date</td><td>30-Jun-25</td><td>20-Jul-25</td><td><span class="pill rev">At Risk</span></td></tr>
+            <tr><td>Electromechanical Works</td><td>15-Mar-25</td><td>15-Mar-25</td><td><span class="pill ok">On Track</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- CLAIMS register -->
+    <section id="claims">
+      <div class="sec-head"><span class="bar"></span><h2>Claim Register</h2><span class="count">5 claims</span></div>
+      <div class="card" style="padding:4px 4px 2px">
+        <table class="list">
+          <thead><tr><th>Ref.</th><th>Title</th><th>Type</th><th>Amount (NPR Bn)</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>CL-01</td><td>Geological Conditions (Differing)</td><td>Time &amp; Cost</td><td class="num-cell">1.85</td><td><span class="pill prog">Under Review</span></td></tr>
+            <tr><td>CL-02</td><td>Fuel Price Escalation</td><td>Cost</td><td class="num-cell">1.25</td><td><span class="pill prog">Under Review</span></td></tr>
+            <tr><td>CL-03</td><td>Extra Overburden Excavation</td><td>Cost</td><td class="num-cell">0.90</td><td><span class="pill rev">Submitted</span></td></tr>
+            <tr><td>CL-04</td><td>Delay in Drawing Approval</td><td>Time</td><td class="num-cell">0.95</td><td><span class="pill ok">Approved</span></td></tr>
+            <tr><td>CL-05</td><td>Unforeseen Water Inflow</td><td>Time &amp; Cost</td><td class="num-cell">0.75</td><td><span class="pill prog">Under Review</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SAFETY summary list + chart -->
+    <section id="safety">
+      <div class="sec-head"><span class="bar"></span><h2>Safety</h2><span class="count">this year</span></div>
+      <div class="two">
+        <div class="card" style="padding:4px 4px 2px">
+          <table class="list">
+            <thead><tr><th>Indicator</th><th>Value</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td>Lost-Time Injuries (LTI)</td><td class="num-cell">0</td><td><span class="pill ok">Good</span></td></tr>
+              <tr><td>LTIFR</td><td class="num-cell">0.00</td><td><span class="pill ok">Good</span></td></tr>
+              <tr><td>Near Misses</td><td class="num-cell">14</td><td><span class="pill rev">Monitor</span></td></tr>
+              <tr><td>Unsafe Acts</td><td class="num-cell">23</td><td><span class="pill rev">Monitor</span></td></tr>
+              <tr><td>Days Without LTI</td><td class="num-cell">245</td><td><span class="pill ok">Good</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card"><h4 class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Incident Trend</h4><div id="l-safety" class="chart"></div></div>
+      </div>
+    </section>
+  </div>
+  <div class="preview-flag">UI PREVIEW · list / report layout · mock data</div>
+
+<script>
+const C={teal:'#0ea5a3',indigo:'#4f5bd5',sky:'#2f9be0',green:'#22a06b',amber:'#e89b16',red:'#e0524b',muted:'#73809a',grid:'#eef2f8'};
+const txt={color:C.muted,fontSize:10};
+let charts={};
+function animateNums(){
+  document.querySelectorAll('.num').forEach(el=>{
+    const to=parseFloat(el.dataset.to),dec=+(el.dataset.dec||0);let s=null,d=1100;
+    function step(t){if(!s)s=t;const p=Math.min((t-s)/d,1);const e=1-Math.pow(1-p,3);el.textContent=(to*e).toFixed(dec);if(p<1)requestAnimationFrame(step);}requestAnimationFrame(step);
+  });
+  document.querySelectorAll('.mini .track>i').forEach(b=>b.style.width=(b.dataset.w||0)+'%');
+}
+function scurve(){const c=echarts.init(document.getElementById('l-scurve'));charts.s=c;
+  c.setOption({grid:{left:36,right:14,top:24,bottom:24},legend:{right:0,top:0,textStyle:{fontSize:11,color:C.muted}},tooltip:{trigger:'axis'},
+    xAxis:{type:'category',data:['May23','Aug23','Nov23','Feb24','May24','Aug24','Nov24','Feb25','May25'],axisLine:{lineStyle:{color:'#d6deec'}},axisLabel:txt},
+    yAxis:{type:'value',max:100,splitLine:{lineStyle:{color:C.grid}},axisLabel:txt},
+    series:[{name:'Planned',type:'line',smooth:true,symbol:'none',data:[5,14,26,40,55,70,82,92,100],lineStyle:{width:3,color:C.indigo},areaStyle:{color:'rgba(79,91,213,.08)'}},
+      {name:'Actual',type:'line',smooth:true,symbol:'circle',symbolSize:5,data:[4,12,24,38,52,66,72,null,null],lineStyle:{width:3,color:C.teal},itemStyle:{color:C.teal}}]});}
+function cost(){const c=echarts.init(document.getElementById('l-cost'));charts.c=c;
+  c.setOption({tooltip:{trigger:'item'},legend:{orient:'vertical',right:0,top:'center',textStyle:{fontSize:11,color:C.muted}},
+    series:[{type:'pie',radius:['54%','80%'],center:['36%','50%'],label:{show:false},labelLine:{show:false},
+      data:[{value:58,name:'Civil Works',itemStyle:{color:C.indigo}},{value:18,name:'Mechanical',itemStyle:{color:C.teal}},
+        {value:12,name:'Electrical',itemStyle:{color:C.green}},{value:8,name:'Temporary',itemStyle:{color:C.amber}},
+        {value:4,name:'Others',itemStyle:{color:C.muted}}]}]});}
+function safety(){const c=echarts.init(document.getElementById('l-safety'));charts.sf=c;
+  c.setOption({grid:{left:30,right:14,top:24,bottom:24},legend:{right:0,top:0,textStyle:{fontSize:11,color:C.muted}},tooltip:{trigger:'axis'},
+    xAxis:{type:'category',data:['Dec','Jan','Feb','Mar','Apr','May'],axisLabel:txt,axisLine:{lineStyle:{color:'#d6deec'}}},
+    yAxis:{type:'value',splitLine:{lineStyle:{color:C.grid}},axisLabel:txt},
+    series:[{name:'LTI',type:'line',smooth:true,data:[1,0,0,1,0,0],lineStyle:{color:C.red,width:3},itemStyle:{color:C.red},symbolSize:5},
+      {name:'Near Miss',type:'line',smooth:true,data:[2,3,2,4,3,4],lineStyle:{color:C.teal,width:3},itemStyle:{color:C.teal},symbolSize:5}]});}
+
+scurve();cost();safety();animateNums();
+window.addEventListener('resize',()=>Object.values(charts).forEach(c=>c&&c.resize()));
+
+// scroll-spy for the jump nav
+const links=[...document.querySelectorAll('.jump a')];
+const secs=links.map(a=>document.querySelector(a.getAttribute('href')));
+new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){
+  const id='#'+e.target.id;links.forEach(a=>a.classList.toggle('on',a.getAttribute('href')===id));}});},
+  {rootMargin:'-90px 0px -70% 0px'}).observe?.(secs[0]);
+secs.forEach(s=>new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){
+  const id='#'+e.target.id;links.forEach(a=>a.classList.toggle('on',a.getAttribute('href')===id));}});},
+  {rootMargin:'-90px 0px -70% 0px'}).observe(s));
+
+document.getElementById('refresh').addEventListener('click',function(){
+  this.classList.add('spin');setTimeout(()=>{this.classList.remove('spin');animateNums();
+    Object.values(charts).forEach(c=>c&&c.resize());},900);
+});
+</script>
+</body>
+</html>

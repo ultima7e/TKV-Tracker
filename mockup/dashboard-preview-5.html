@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tamakoshi-V — Site Ledger (Claude's Design)</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f7f5f0; --paper-2:#fffdf9; --ink:#171511; --ink-2:#4a463d; --faint:#8e887a;
+    --rule:#d9d4c8; --rule-dark:#171511;
+    --orange:#e8501a; --green:#2e7d4f; --amber:#c98a12; --red:#c0392b; --blue:#27536b;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);
+    background-image:radial-gradient(rgba(23,21,17,.035) 1px, transparent 1px);background-size:22px 22px}
+
+  .frame{max-width:1240px;margin:0 auto;padding:0 34px 80px}
+
+  /* ── masthead ───────────────────────────── */
+  .masthead{padding:30px 0 0}
+  .kicker{display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:11px;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);padding-bottom:12px;border-bottom:1px solid var(--rule-dark)}
+  .kicker .left b{color:var(--orange)}
+  .title-row{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding:22px 0 20px;border-bottom:3px solid var(--rule-dark)}
+  h1.masttitle{font-family:'Fraunces',serif;font-weight:900;font-size:52px;line-height:.98;letter-spacing:-.015em}
+  h1.masttitle em{font-style:normal;color:var(--orange)}
+  .mast-side{text-align:right;flex-shrink:0}
+  .mast-side .stamp{display:inline-flex;align-items:center;gap:9px;border:1.5px solid var(--ink);padding:8px 14px;
+    font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+  .stamp .dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:blink 2s infinite}
+  @keyframes blink{50%{opacity:.35}}
+  .btn{margin-top:10px;display:inline-flex;align-items:center;gap:8px;background:var(--ink);color:var(--paper);border:none;
+    font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;padding:11px 20px;cursor:pointer;transition:.18s}
+  .btn:hover{background:var(--orange)}
+  .btn.spin .ic{display:inline-block;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* section index — like a contents line */
+  .toc{display:flex;gap:0;border-bottom:1px solid var(--rule);overflow-x:auto}
+  .toc a{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);
+    text-decoration:none;padding:13px 18px 12px;border-bottom:2px solid transparent;white-space:nowrap;transition:.15s}
+  .toc a:first-child{padding-left:2px}
+  .toc a:hover{color:var(--ink)}
+  .toc a.on{color:var(--orange);border-bottom-color:var(--orange);font-weight:600}
+
+  /* ── stat band ──────────────────────────── */
+  .statband{display:grid;grid-template-columns:repeat(6,1fr);border-bottom:1px solid var(--rule)}
+  .stat{padding:26px 18px 24px;border-left:1px solid var(--rule)}
+  .stat:first-child{border-left:none;padding-left:2px}
+  .stat .lab{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin-bottom:10px}
+  .stat .big{font-family:'Fraunces',serif;font-weight:700;font-size:34px;line-height:1;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+  .stat .big small{font-size:15px;font-weight:500;color:var(--ink-2)}
+  .stat .delta{font-family:var(--mono);font-size:10.5px;margin-top:9px;display:inline-block;padding:2px 0}
+  .delta.up{color:var(--green)} .delta.dn{color:var(--red)} .delta.fl{color:var(--blue)}
+
+  /* ── sections ───────────────────────────── */
+  section{padding:44px 0 6px;scroll-margin-top:20px}
+  .sec-rule{display:flex;align-items:baseline;gap:16px;border-bottom:2px solid var(--rule-dark);padding-bottom:10px;margin-bottom:26px}
+  .sec-num{font-family:var(--mono);font-size:12px;color:var(--orange);font-weight:600}
+  .sec-rule h2{font-family:'Fraunces',serif;font-weight:700;font-size:26px;letter-spacing:-.01em}
+  .sec-rule .note{margin-left:auto;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+
+  .cols{display:grid;gap:30px}
+  .c-2-1{grid-template-columns:1.6fr 1fr}
+  .c-1-1{grid-template-columns:1fr 1fr}
+
+  .panel{background:var(--paper-2);border:1px solid var(--rule);padding:20px 20px 16px;position:relative}
+  .panel::before{content:'';position:absolute;top:-1px;left:-1px;width:34px;height:34px;
+    border-top:2px solid var(--ink);border-left:2px solid var(--ink)}
+  .panel h3{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-2);margin-bottom:14px}
+  .chart{width:100%;height:250px}
+
+  /* ledger rows (tunnel) */
+  .ledger .row{display:grid;grid-template-columns:1.1fr auto 1.6fr auto;align-items:center;gap:14px;
+    padding:13px 0;border-bottom:1px dashed var(--rule)}
+  .ledger .row:last-child{border-bottom:none}
+  .ledger .name{font-size:13.5px;font-weight:600}
+  .ledger .meta{font-family:var(--mono);font-size:11px;color:var(--faint);white-space:nowrap}
+  .gauge-line{height:10px;background:transparent;border:1px solid var(--ink);position:relative}
+  .gauge-line>i{position:absolute;inset:1px auto 1px 1px;width:0;background:var(--ink);transition:width 1.4s cubic-bezier(.2,.85,.25,1)}
+  .gauge-line>i.hot{background:var(--orange)}
+  .ledger .pct{font-family:var(--mono);font-size:13px;font-weight:600;width:48px;text-align:right;font-variant-numeric:tabular-nums}
+
+  /* dispatch log */
+  .log li{list-style:none;display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--rule);font-size:13px;align-items:baseline;color:var(--ink-2)}
+  .log li:last-child{border-bottom:none}
+  .log .t{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;
+    padding:3px 8px;border:1px solid currentColor}
+  .log .ok{color:var(--green)} .log .warn{color:var(--amber)} .log .bad{color:var(--red)}
+  .log b{color:var(--ink)}
+
+  .footnote{margin-top:60px;padding-top:14px;border-top:1px solid var(--rule-dark);display:flex;justify-content:space-between;
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+  .preview-flag{position:fixed;bottom:16px;right:18px;background:var(--ink);color:var(--paper);font-family:var(--mono);
+    font-size:10px;letter-spacing:.12em;text-transform:uppercase;padding:7px 13px;z-index:9}
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <!-- MASTHEAD -->
+  <header class="masthead">
+    <div class="kicker">
+      <span class="left"><b>NO. 042</b> · DAILY SITE LEDGER</span>
+      <span>WED · 10 JUN 2026 · LOT-1</span>
+    </div>
+    <div class="title-row">
+      <h1 class="masttitle">Tamakoshi-V<br><em>Hydroelectric.</em></h1>
+      <div class="mast-side">
+        <div class="stamp"><span class="dot"></span>Data: Nutstore · Live</div><br>
+        <button class="btn" id="refresh"><span class="ic">⟳</span>Refresh ledger</button>
+      </div>
+    </div>
+    <nav class="toc" id="toc">
+      <a href="#sum" class="on">01 · Summary</a>
+      <a href="#curve">02 · Progress Curve</a>
+      <a href="#tunnel">03 · Tunnels</a>
+      <a href="#advance">04 · Advance</a>
+      <a href="#dispatch">05 · Dispatches</a>
+    </nav>
+  </header>
+
+  <!-- STAT BAND -->
+  <section id="sum" style="padding-top:0">
+    <div class="statband">
+      <div class="stat"><div class="lab">Contract Sum</div><div class="big">₨<span class="num" data-to="98.67" data-dec="2">0</span><small> bn</small></div><span class="delta fl">— fixed</span></div>
+      <div class="stat"><div class="lab">Financial Prog.</div><div class="big"><span class="num" data-to="68.45" data-dec="2">0</span><small> %</small></div><span class="delta up">▲ +2.1 / mo</span></div>
+      <div class="stat"><div class="lab">Physical Prog.</div><div class="big"><span class="num" data-to="72.30" data-dec="2">0</span><small> %</small></div><span class="delta up">▲ ahead of plan</span></div>
+      <div class="stat"><div class="lab">Earned Value</div><div class="big">₨<span class="num" data-to="67.46" data-dec="2">0</span><small> bn</small></div><span class="delta up">▲ EV &gt; PV</span></div>
+      <div class="stat"><div class="lab">SPI</div><div class="big"><span class="num" data-to="1.05" data-dec="2">0</span></div><span class="delta up">▲ schedule</span></div>
+      <div class="stat"><div class="lab">CPI</div><div class="big"><span class="num" data-to="1.02" data-dec="2">0</span></div><span class="delta fl">► cost steady</span></div>
+    </div>
+  </section>
+
+  <!-- S-CURVE -->
+  <section id="curve">
+    <div class="sec-rule"><span class="sec-num">02</span><h2>Progress Curve</h2><span class="note">planned vs actual · cumulative %</span></div>
+    <div class="cols c-2-1">
+      <div class="panel"><h3>S-Curve</h3><div id="x-scurve" class="chart"></div></div>
+      <div class="panel"><h3>Cost Apportionment</h3><div id="x-cost" class="chart"></div></div>
+    </div>
+  </section>
+
+  <!-- TUNNEL LEDGER -->
+  <section id="tunnel">
+    <div class="sec-rule"><span class="sec-num">03</span><h2>Tunnel Ledger</h2><span class="note">5 headings · metres driven</span></div>
+    <div class="panel ledger">
+      <h3>Excavation status</h3>
+      <div class="row"><span class="name">Headrace Tunnel</span><span class="meta">6,300 / 7,519 m</span><div class="gauge-line"><i data-w="84"></i></div><span class="pct">84%</span></div>
+      <div class="row"><span class="name">Surge Shaft</span><span class="meta">408 / 566 m</span><div class="gauge-line"><i data-w="72"></i></div><span class="pct">72%</span></div>
+      <div class="row"><span class="name">Pressure Shaft</span><span class="meta">240 / 385 m</span><div class="gauge-line"><i class="hot" data-w="62"></i></div><span class="pct">62%</span></div>
+      <div class="row"><span class="name">Access Tunnel</span><span class="meta">860 / 1,200 m</span><div class="gauge-line"><i data-w="71"></i></div><span class="pct">71%</span></div>
+      <div class="row"><span class="name">Tailrace Tunnel</span><span class="meta">1,186 / 1,302 m</span><div class="gauge-line"><i data-w="91"></i></div><span class="pct">91%</span></div>
+    </div>
+  </section>
+
+  <!-- ADVANCE -->
+  <section id="advance">
+    <div class="sec-rule"><span class="sec-num">04</span><h2>Monthly Advance</h2><span class="note">metres per month · rock class</span></div>
+    <div class="cols c-1-1">
+      <div class="panel"><h3>Advance (m)</h3><div id="x-advance" class="chart"></div></div>
+      <div class="panel"><h3>Geology encountered</h3><div id="x-geo" class="chart"></div></div>
+    </div>
+  </section>
+
+  <!-- DISPATCH LOG -->
+  <section id="dispatch">
+    <div class="sec-rule"><span class="sec-num">05</span><h2>Dispatches</h2><span class="note">site notes · this week</span></div>
+    <div class="panel">
+      <h3>Log</h3>
+      <ul class="log">
+        <li><span class="t ok">On Track</span><span><b>Tunnel excavation</b> — 7,620 of 9,124 m driven; programme holding.</span></li>
+        <li><span class="t ok">Progress</span><span><b>Main civil works</b> proceeding to plan across all fronts.</span></li>
+        <li><span class="t warn">Watch</span><span><b>Powerhouse excavation</b> running 12 days behind; recovery plan issued.</span></li>
+        <li><span class="t bad">Alert</span><span><b>Two claims</b> (₨5.40 bn) awaiting Engineer's determination.</span></li>
+        <li><span class="t ok">Safety</span><span><b>245 days</b> without a lost-time incident — 245,600 man-hours this month.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="footnote">
+    <span>Compiled from site records · refreshed on demand</span>
+    <span>Tamakoshi-V · Lot-1 · p.1/1</span>
+  </div>
+</div>
+<div class="preview-flag">Preview · Claude's design · mock data</div>
+
+<script>
+const INK='#171511',INK2='#4a463d',FAINT='#8e887a',RULE='#d9d4c8',OR='#e8501a',GR='#2e7d4f',AM='#c98a12',RD='#c0392b',BL='#27536b';
+const MONO="'IBM Plex Mono',monospace";
+const ax={axisLine:{lineStyle:{color:RULE}},axisLabel:{color:FAINT,fontSize:10,fontFamily:MONO},axisTick:{show:false}};
+let charts={};
+
+function animateNums(){
+  document.querySelectorAll('.num').forEach(el=>{const to=parseFloat(el.dataset.to),dec=+(el.dataset.dec||0);let s=null,d=1200;
+    function st(t){if(!s)s=t;const p=Math.min((t-s)/d,1);const e=1-Math.pow(1-p,3);el.textContent=(to*e).toFixed(dec);if(p<1)requestAnimationFrame(st);}requestAnimationFrame(st);});
+  document.querySelectorAll('.gauge-line>i').forEach(b=>{requestAnimationFrame(()=>b.style.width='calc('+(b.dataset.w||0)+'% - 2px)');});
+}
+
+function scurve(){const c=echarts.init(document.getElementById('x-scurve'));charts.s=c;
+ c.setOption({grid:{left:38,right:16,top:30,bottom:26},
+  legend:{right:0,top:0,icon:'rect',itemWidth:14,itemHeight:3,textStyle:{fontSize:10,fontFamily:MONO,color:INK2}},
+  tooltip:{trigger:'axis',backgroundColor:'#fffdf9',borderColor:INK,textStyle:{color:INK,fontSize:11,fontFamily:MONO}},
+  xAxis:{type:'category',data:['M23','A23','N23','F24','M24','A24','N24','F25','M25'],...ax},
+  yAxis:{type:'value',max:100,splitLine:{lineStyle:{color:RULE,type:'dashed'}},axisLabel:ax.axisLabel},
+  series:[
+   {name:'PLANNED',type:'line',data:[5,14,26,40,55,70,82,92,100],symbol:'none',lineStyle:{width:2,color:INK,type:'dashed'}},
+   {name:'ACTUAL',type:'line',data:[4,12,24,38,52,66,72,null,null],symbol:'circle',symbolSize:6,
+    lineStyle:{width:3,color:OR},itemStyle:{color:OR,borderColor:'#f7f5f0',borderWidth:2},
+    areaStyle:{color:'rgba(232,80,26,.07)'}}]});}
+
+function cost(){const c=echarts.init(document.getElementById('x-cost'));charts.c=c;
+ c.setOption({tooltip:{trigger:'item',backgroundColor:'#fffdf9',borderColor:INK,textStyle:{color:INK,fontSize:11,fontFamily:MONO}},
+  legend:{orient:'vertical',right:0,top:'center',icon:'rect',itemWidth:11,itemHeight:11,textStyle:{fontSize:10,fontFamily:MONO,color:INK2}},
+  series:[{type:'pie',radius:['46%','74%'],center:['33%','50%'],label:{show:false},
+   itemStyle:{borderColor:'#fffdf9',borderWidth:2},
+   data:[{value:58,name:'CIVIL',itemStyle:{color:INK}},{value:18,name:'MECH',itemStyle:{color:OR}},
+    {value:12,name:'ELEC',itemStyle:{color:BL}},{value:8,name:'TEMP',itemStyle:{color:AM}},
+    {value:4,name:'MISC',itemStyle:{color:FAINT}}]}]});}
+
+function advance(){const c=echarts.init(document.getElementById('x-advance'));charts.a=c;
+ c.setOption({grid:{left:40,right:14,top:22,bottom:26},
+  tooltip:{trigger:'axis',backgroundColor:'#fffdf9',borderColor:INK,textStyle:{color:INK,fontSize:11,fontFamily:MONO}},
+  xAxis:{type:'category',data:['NOV','DEC','JAN','FEB','MAR','APR','MAY'],...ax},
+  yAxis:{type:'value',splitLine:{lineStyle:{color:RULE,type:'dashed'}},axisLabel:ax.axisLabel},
+  series:[{type:'bar',data:[168,185,190,220,205,215,{value:235,itemStyle:{color:OR}}],barWidth:'46%',itemStyle:{color:INK}}]});}
+
+function geo(){const c=echarts.init(document.getElementById('x-geo'));charts.g=c;
+ c.setOption({grid:{left:90,right:30,top:14,bottom:26},
+  tooltip:{trigger:'axis',backgroundColor:'#fffdf9',borderColor:INK,textStyle:{color:INK,fontSize:11,fontFamily:MONO}},
+  xAxis:{type:'value',max:35,splitLine:{lineStyle:{color:RULE,type:'dashed'}},axisLabel:ax.axisLabel},
+  yAxis:{type:'category',data:['V · V.POOR','IV · POOR','III · FAIR','II · GOOD','I · V.GOOD'],...ax},
+  series:[{type:'bar',data:[{value:7,itemStyle:{color:RD}},{value:19,itemStyle:{color:AM}},{value:30,itemStyle:{color:INK}},
+    {value:28,itemStyle:{color:BL}},{value:16,itemStyle:{color:GR}}],barWidth:'52%',
+    label:{show:true,position:'right',fontFamily:MONO,fontSize:10,color:INK2,formatter:'{c}%'}}]});}
+
+scurve();cost();advance();geo();animateNums();
+window.addEventListener('resize',()=>Object.values(charts).forEach(c=>c&&c.resize()));
+
+// scroll-spy
+const links=[...document.querySelectorAll('.toc a')];
+links.map(a=>document.querySelector(a.getAttribute('href'))).forEach(sec=>{
+  new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){
+    const id='#'+e.target.id;links.forEach(a=>a.classList.toggle('on',a.getAttribute('href')===id));}}),
+    {rootMargin:'-15% 0px -65% 0px'}).observe(sec);});
+
+document.getElementById('refresh').addEventListener('click',function(){
+  this.classList.add('spin');
+  setTimeout(()=>{this.classList.remove('spin');animateNums();Object.values(charts).forEach(c=>c&&c.resize());},900);
+});
+</script>
+</body>
+</html>

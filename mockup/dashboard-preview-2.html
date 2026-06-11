@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tamakoshi-V Dashboard — UI Preview (Dark / Command Center)</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+  :root{
+    --bg:#0b1220; --bg2:#0f1a2e; --panel:#121f38; --panel-2:#16263f;
+    --line:#22324d; --ink:#e7eefb; --muted:#8497b6;
+    --cyan:#27e0c4; --blue:#3b82f6; --violet:#8b7bf0; --amber:#f6b03a; --red:#ff5d6c; --green:#33d69f;
+    --glow:0 0 0 1px rgba(39,224,196,.18), 0 8px 30px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:
+     radial-gradient(1200px 600px at 70% -10%, rgba(59,130,246,.10), transparent 60%),
+     radial-gradient(900px 500px at -10% 110%, rgba(39,224,196,.08), transparent 55%), var(--bg);
+     color:var(--ink);overflow-x:hidden;min-height:100vh}
+
+  .topbar{position:sticky;top:0;z-index:5;backdrop-filter:blur(8px);
+    background:linear-gradient(180deg,rgba(11,18,32,.95),rgba(11,18,32,.78));
+    border-bottom:1px solid var(--line);padding:12px 26px}
+  .topbar .row1{display:flex;align-items:center;justify-content:space-between}
+  .brand{display:flex;align-items:center;gap:12px;font-weight:700;letter-spacing:1.5px;font-size:15px}
+  .brand .logo{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-weight:800;font-size:13px;
+    background:linear-gradient(135deg,var(--cyan),var(--blue));color:#04121f;box-shadow:0 0 18px rgba(39,224,196,.45)}
+  .brand small{display:block;font-size:10px;letter-spacing:2px;color:var(--muted);font-weight:600}
+  .topright{display:flex;align-items:center;gap:18px;font-size:12.5px;color:var(--muted)}
+  .live{display:flex;align-items:center;gap:7px;color:var(--cyan);font-weight:600}
+  .live .pulse{width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 0 0 rgba(39,224,196,.6);animation:pulse 1.8s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(39,224,196,.55)}70%{box-shadow:0 0 0 9px rgba(39,224,196,0)}100%{box-shadow:0 0 0 0 rgba(39,224,196,0)}}
+  .btn-refresh{background:linear-gradient(135deg,var(--cyan),#1bb6cf);color:#04121f;border:none;padding:8px 16px;border-radius:8px;
+    font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;transition:.2s;box-shadow:0 0 16px rgba(39,224,196,.35)}
+  .btn-refresh:hover{transform:translateY(-1px);filter:brightness(1.06)}
+  .btn-refresh.spin .ic{animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .tabs{display:flex;gap:4px;margin-top:12px;overflow-x:auto;padding-bottom:2px}
+  .tab{padding:9px 15px;font-size:12.5px;color:var(--muted);cursor:pointer;border-radius:8px 8px 0 0;
+    white-space:nowrap;border-bottom:2px solid transparent;transition:.18s}
+  .tab:hover{color:var(--ink);background:rgba(255,255,255,.03)}
+  .tab.active{color:var(--cyan);border-bottom-color:var(--cyan);background:rgba(39,224,196,.07);font-weight:600}
+
+  .wrap{padding:22px 26px 50px}
+  .view{display:none;animation:fade .45s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+  .grid{display:grid;gap:16px}
+  .kpis{grid-template-columns:repeat(6,1fr)}
+  .row-2{grid-template-columns:1.5fr 1fr}
+  .row-3{grid-template-columns:repeat(3,1fr)}
+
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--line);
+    border-radius:14px;padding:16px;position:relative;overflow:hidden}
+  .card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:.4}
+  .card h3{font-size:10.5px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:700;margin-bottom:10px}
+  .kpi .val{font-size:24px;font-weight:800;color:#fff;line-height:1.05;text-shadow:0 0 18px rgba(39,224,196,.25)}
+  .kpi .val.cy{color:var(--cyan)} .kpi .val.bl{color:#6ea8ff} .kpi .val.gr{color:var(--green)}
+  .kpi .sub{font-size:10.5px;color:var(--muted);margin-top:4px}
+  .kpi .bar{height:5px;border-radius:6px;background:#0b1424;margin-top:11px;overflow:hidden}
+  .kpi .bar>i{display:block;height:100%;width:0;border-radius:6px;transition:width 1.3s cubic-bezier(.2,.8,.2,1)}
+  .chart{width:100%;height:235px}
+
+  .gauge-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:6px}
+  .gauge{position:relative;width:150px;height:150px;border-radius:50%;display:grid;place-items:center;
+    background:conic-gradient(var(--cyan) 0 72%, #15233b 72% 100%);box-shadow:0 0 30px rgba(39,224,196,.25)}
+  .gauge::after{content:'';position:absolute;inset:14px;border-radius:50%;background:var(--panel)}
+  .gauge .g-in{position:relative;z-index:1;text-align:center}
+  .gauge .g-in b{font-size:20px;color:var(--cyan)} .gauge .g-in span{font-size:10px;color:var(--muted);display:block}
+
+  .highlights li{list-style:none;font-size:12.5px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05);
+    display:flex;gap:9px;align-items:center;color:#c4d2ea}
+  .highlights li:last-child{border-bottom:none}
+  .tag{font-size:9.5px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap}
+  .tag.ok{background:rgba(51,214,159,.16);color:var(--green)} .tag.warn{background:rgba(246,176,58,.16);color:var(--amber)} .tag.bad{background:rgba(255,93,108,.16);color:var(--red)}
+
+  .pbar{margin:12px 0}
+  .pbar .lab{display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;color:#c4d2ea}
+  .pbar .track{height:8px;background:#0b1424;border-radius:6px;overflow:hidden}
+  .pbar .track>i{display:block;height:100%;width:0;border-radius:6px;
+    background:linear-gradient(90deg,var(--cyan),var(--blue));transition:width 1.3s cubic-bezier(.2,.8,.2,1);box-shadow:0 0 10px rgba(39,224,196,.4)}
+  .muted{color:var(--muted);font-size:12px;line-height:1.6}
+  .preview-flag{position:fixed;bottom:14px;right:16px;background:rgba(39,224,196,.14);color:var(--cyan);font-size:11px;
+    padding:6px 12px;border-radius:20px;border:1px solid rgba(39,224,196,.3);z-index:9}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="row1">
+      <div class="brand"><div class="logo">TV</div><div>TAMAKOSHI-V<small>HYDROELECTRIC · LOT-1</small></div></div>
+      <div class="topright">
+        <span class="live"><span class="pulse"></span>LIVE</span>
+        <span>10 Jun 2026</span>
+        <button class="btn-refresh" id="refresh"><span class="ic">⟳</span>Refresh</button>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <div class="tab active" data-v="exec">Executive</div>
+      <div class="tab" data-v="fin">Financial</div>
+      <div class="tab" data-v="sched">Schedule</div>
+      <div class="tab" data-v="tunnel">Tunnel</div>
+      <div class="tab" data-v="claims">Claims</div>
+      <div class="tab" data-v="inv">Inventory</div>
+      <div class="tab" data-v="man">Manpower</div>
+      <div class="tab" data-v="equip">Equipment</div>
+      <div class="tab" data-v="safety">Safety</div>
+    </nav>
+  </header>
+
+  <div class="wrap">
+    <!-- EXEC -->
+    <section class="view active" id="exec">
+      <div class="grid kpis" style="margin-bottom:16px">
+        <div class="card kpi"><h3>Contract Amount</h3><div class="val">NPR <span class="num" data-to="98.67" data-dec="2">0</span></div><div class="sub">Bn</div><div class="bar"><i style="background:linear-gradient(90deg,var(--blue),var(--cyan))" data-w="100"></i></div></div>
+        <div class="card kpi"><h3>Financial Progress</h3><div class="val cy"><span class="num" data-to="68.45" data-dec="2">0</span>%</div><div class="bar"><i style="background:var(--cyan)" data-w="68"></i></div></div>
+        <div class="card kpi"><h3>Physical Progress</h3><div class="val gr"><span class="num" data-to="72.30" data-dec="2">0</span>%</div><div class="bar"><i style="background:var(--green)" data-w="72"></i></div></div>
+        <div class="card kpi"><h3>Earned Value</h3><div class="val bl">NPR <span class="num" data-to="67.46" data-dec="2">0</span></div><div class="sub">Bn</div><div class="bar"><i style="background:var(--blue)" data-w="68"></i></div></div>
+        <div class="card kpi"><h3>SPI</h3><div class="val cy"><span class="num" data-to="1.05" data-dec="2">0</span></div><div class="sub">Schedule Perf.</div></div>
+        <div class="card kpi"><h3>CPI</h3><div class="val gr"><span class="num" data-to="1.02" data-dec="2">0</span></div><div class="sub">Cost Perf.</div></div>
+      </div>
+      <div class="grid row-3" style="margin-bottom:16px">
+        <div class="card">
+          <h3>Overall Status</h3>
+          <div class="gauge-wrap">
+            <div class="gauge"><div class="g-in"><b>ON TRACK</b><span>72.3% complete</span></div></div>
+            <div class="muted">As on 10 Jun 2026</div>
+          </div>
+        </div>
+        <div class="card" style="grid-column:span 2">
+          <h3>S-Curve — Planned vs Actual (%)</h3>
+          <div id="d-scurve" class="chart"></div>
+        </div>
+      </div>
+      <div class="grid row-2">
+        <div class="card"><h3>Cost Breakdown by Work Package</h3><div id="d-cost" class="chart"></div></div>
+        <div class="card"><h3>Key Highlights</h3>
+          <ul class="highlights">
+            <li><span class="tag ok">ON TRACK</span> Tunnel excavation 7,620 / 9,124 m</li>
+            <li><span class="tag ok">PROGRESS</span> Main civil works as planned</li>
+            <li><span class="tag warn">WATCH</span> Powerhouse excavation +12 days</li>
+            <li><span class="tag bad">ALERT</span> 2 claims awaiting approval</li>
+            <li><span class="tag ok">SAFETY</span> 245 days without LTI</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- TUNNEL -->
+    <section class="view" id="tunnel">
+      <div class="grid row-2" style="margin-bottom:16px">
+        <div class="card"><h3>Tunnel Progress (% complete)</h3>
+          <div class="pbar"><div class="lab"><span>Headrace Tunnel</span><span>84%</span></div><div class="track"><i data-w="84"></i></div></div>
+          <div class="pbar"><div class="lab"><span>Surge Shaft</span><span>72%</span></div><div class="track"><i data-w="72"></i></div></div>
+          <div class="pbar"><div class="lab"><span>Pressure Shaft</span><span>62%</span></div><div class="track"><i data-w="62"></i></div></div>
+          <div class="pbar"><div class="lab"><span>Access Tunnel</span><span>71%</span></div><div class="track"><i data-w="71"></i></div></div>
+          <div class="pbar"><div class="lab"><span>Tailrace Tunnel</span><span>91%</span></div><div class="track"><i data-w="91"></i></div></div>
+        </div>
+        <div class="card"><h3>Geological Summary</h3><div id="d-geo" class="chart"></div></div>
+      </div>
+      <div class="grid row-2">
+        <div class="card"><h3>Monthly Advance (m)</h3><div id="d-advance" class="chart"></div></div>
+        <div class="card"><h3>Drill &amp; Blast Statistics</h3>
+          <div class="pbar"><div class="lab"><span>No. of Blasts (this month)</span><span>42</span></div><div class="track"><i data-w="70"></i></div></div>
+          <div class="pbar"><div class="lab"><span>Avg. advance / blast (m)</span><span>5.1</span></div><div class="track"><i data-w="51"></i></div></div>
+          <div class="pbar"><div class="lab"><span>Powder factor (kg/m³)</span><span>0.38</span></div><div class="track"><i data-w="38"></i></div></div>
+          <div class="pbar"><div class="lab"><span>Avg. overbreak (%)</span><span>8.5</span></div><div class="track"><i data-w="42"></i></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="fin"><div class="card"><h3>Financial</h3><p class="muted">IPC tracker, certified vs paid, monthly revenue, cost breakdown — from your finance sheet.</p></div></section>
+    <section class="view" id="sched"><div class="card"><h3>Schedule</h3><p class="muted">Milestone tracker, critical milestones, planned vs actual phasing — from your schedule sheet.</p></div></section>
+    <section class="view" id="claims"><div class="card"><h3>Claims</h3><p class="muted">Claims & variations, EOT summary, claim register — from your claims sheet.</p></div></section>
+    <section class="view" id="inv"><div class="card"><h3>Inventory</h3><p class="muted">Material & explosives stock, consumption, blast summary — from your inventory/purchase sheets.</p></div></section>
+    <section class="view" id="man"><div class="card"><h3>Manpower</h3><p class="muted">Workforce by category & nationality, attendance, productivity — from your manpower sheet.</p></div></section>
+    <section class="view" id="equip"><div class="card"><h3>Equipment</h3><p class="muted">Status, utilization, fuel, top equipment by hours — from your equipment sheet.</p></div></section>
+    <section class="view" id="safety"><div class="card"><h3>Safety</h3><p class="muted">LTI/LTIFR, near misses, man-hours, incident trend, risk heat-map — from your NCR/safety sheet.</p></div></section>
+  </div>
+  <div class="preview-flag">● UI PREVIEW · dark theme · mock data</div>
+
+<script>
+const C={cyan:'#27e0c4',blue:'#3b82f6',violet:'#8b7bf0',green:'#33d69f',amber:'#f6b03a',red:'#ff5d6c',muted:'#8497b6',grid:'#1c2c46'};
+const txt={color:C.muted,fontSize:10};
+let charts={};
+
+function animateNums(scope){
+  scope.querySelectorAll('.num').forEach(el=>{
+    const to=parseFloat(el.dataset.to),dec=+(el.dataset.dec||0);let start=null,dur=1100;
+    function step(t){if(!start)start=t;const p=Math.min((t-start)/dur,1);const e=1-Math.pow(1-p,3);
+      el.textContent=(to*e).toFixed(dec);if(p<1)requestAnimationFrame(step);}requestAnimationFrame(step);
+  });
+  scope.querySelectorAll('.bar>i,.track>i').forEach(b=>b.style.width=(b.dataset.w||0)+'%');
+}
+function dscurve(){const c=echarts.init(document.getElementById('d-scurve'));charts.s=c;
+  c.setOption({backgroundColor:'transparent',grid:{left:36,right:14,top:26,bottom:24},legend:{right:0,top:0,textStyle:{color:C.muted,fontSize:11}},tooltip:{trigger:'axis'},
+    xAxis:{type:'category',data:['May23','Aug23','Nov23','Feb24','May24','Aug24','Nov24','Feb25','May25'],axisLine:{lineStyle:{color:C.grid}},axisLabel:txt},
+    yAxis:{type:'value',max:100,splitLine:{lineStyle:{color:C.grid}},axisLabel:txt},
+    series:[{name:'Planned',type:'line',smooth:true,symbol:'none',data:[5,14,26,40,55,70,82,92,100],lineStyle:{width:3,color:C.blue},areaStyle:{color:'rgba(59,130,246,.12)'}},
+      {name:'Actual',type:'line',smooth:true,symbol:'circle',symbolSize:6,data:[4,12,24,38,52,66,72,null,null],lineStyle:{width:3,color:C.cyan},itemStyle:{color:C.cyan}}]});}
+function dcost(){const c=echarts.init(document.getElementById('d-cost'));charts.c=c;
+  c.setOption({backgroundColor:'transparent',tooltip:{trigger:'item'},legend:{orient:'vertical',right:0,top:'center',textStyle:{color:C.muted,fontSize:11}},
+    series:[{type:'pie',radius:['54%','80%'],center:['36%','50%'],label:{show:false},labelLine:{show:false},
+      data:[{value:58,name:'Civil Works',itemStyle:{color:C.blue}},{value:18,name:'Mechanical',itemStyle:{color:C.cyan}},
+        {value:12,name:'Electrical',itemStyle:{color:C.green}},{value:8,name:'Temporary',itemStyle:{color:C.amber}},
+        {value:4,name:'Comp & Others',itemStyle:{color:C.violet}}]}]});}
+function dgeo(){const c=echarts.init(document.getElementById('d-geo'));charts.g=c;
+  c.setOption({backgroundColor:'transparent',tooltip:{trigger:'item'},legend:{orient:'vertical',right:0,top:'center',textStyle:{color:C.muted,fontSize:11}},
+    series:[{type:'pie',radius:['52%','78%'],center:['36%','50%'],label:{show:false},
+      data:[{value:16,name:'I – Very Good',itemStyle:{color:C.green}},{value:28,name:'II – Good',itemStyle:{color:C.cyan}},
+        {value:30,name:'III – Fair',itemStyle:{color:C.blue}},{value:19,name:'IV – Poor',itemStyle:{color:C.amber}},
+        {value:7,name:'V – Very Poor',itemStyle:{color:C.red}}]}]});}
+function dadvance(){const c=echarts.init(document.getElementById('d-advance'));charts.a=c;
+  c.setOption({backgroundColor:'transparent',grid:{left:38,right:12,top:18,bottom:24},tooltip:{trigger:'axis'},
+    xAxis:{type:'category',data:['Nov','Dec','Jan','Feb','Mar','Apr','May'],axisLabel:txt,axisLine:{lineStyle:{color:C.grid}}},
+    yAxis:{type:'value',splitLine:{lineStyle:{color:C.grid}},axisLabel:txt},
+    series:[{type:'bar',data:[168,185,190,220,205,215,235],barWidth:'52%',
+      itemStyle:{borderRadius:[5,5,0,0],color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:C.cyan},{offset:1,color:C.blue}])}}]});}
+
+const builders={exec:[dscurve,dcost],tunnel:[dgeo,dadvance]};const done={};
+function buildFor(v){if(done[v])return;(builders[v]||[]).forEach(fn=>fn());done[v]=true;}
+
+document.getElementById('tabs').addEventListener('click',e=>{
+  const t=e.target.closest('.tab');if(!t)return;
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');
+  const v=t.dataset.v;document.querySelectorAll('.view').forEach(s=>s.classList.remove('active'));
+  const view=document.getElementById(v);view.classList.add('active');
+  buildFor(v);animateNums(view);setTimeout(()=>Object.values(charts).forEach(c=>c&&c.resize()),60);
+});
+document.getElementById('refresh').addEventListener('click',function(){
+  this.classList.add('spin');
+  setTimeout(()=>{this.classList.remove('spin');animateNums(document.querySelector('.view.active'));
+    Object.values(charts).forEach(c=>c&&c.resize());},900);
+});
+window.addEventListener('resize',()=>Object.values(charts).forEach(c=>c&&c.resize()));
+buildFor('exec');animateNums(document.getElementById('exec'));
+</script>
+</body>
+</html>

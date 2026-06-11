@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tamakoshi-V Dashboard — UI Preview</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+  :root{
+    --navy:#0f2a4a; --navy-2:#15355d; --navy-3:#1d4373;
+    --accent:#2f7de1; --accent-2:#36c5a8; --amber:#f5a623; --red:#e5554e;
+    --green:#36b37e; --bg:#eef2f7; --card:#ffffff; --ink:#1f2d3d; --muted:#7b8aa0;
+    --line:#e3e9f2;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);overflow:hidden}
+  .app{display:flex;height:100vh}
+
+  /* ---- Sidebar ---- */
+  .sidebar{width:208px;background:linear-gradient(180deg,var(--navy),var(--navy-2));color:#cdd9ea;
+    display:flex;flex-direction:column;flex-shrink:0}
+  .brand{padding:18px 16px;font-weight:700;letter-spacing:1px;color:#fff;display:flex;align-items:center;gap:10px;
+    border-bottom:1px solid rgba(255,255,255,.08)}
+  .brand .logo{width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    display:grid;place-items:center;font-size:13px;font-weight:800}
+  .nav{padding:10px 0;overflow-y:auto;flex:1}
+  .nav-item{display:flex;align-items:center;gap:11px;padding:11px 18px;font-size:13.5px;cursor:pointer;
+    border-left:3px solid transparent;transition:.18s;white-space:nowrap}
+  .nav-item .ic{width:18px;text-align:center;opacity:.85}
+  .nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+  .nav-item.active{background:rgba(47,125,225,.22);border-left-color:var(--accent);color:#fff;font-weight:600}
+  .nav-foot{padding:14px 18px;font-size:11px;color:#7e90ac;border-top:1px solid rgba(255,255,255,.08)}
+
+  /* ---- Main ---- */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .topbar{background:var(--navy);color:#fff;padding:13px 22px;display:flex;align-items:center;justify-content:space-between;
+    box-shadow:0 2px 12px rgba(0,0,0,.12);z-index:2}
+  .topbar h1{font-size:15px;font-weight:600;letter-spacing:.3px;display:flex;align-items:center;gap:10px}
+  .topbar .dot{width:9px;height:9px;border-radius:50%;background:var(--accent-2);box-shadow:0 0 0 4px rgba(54,197,168,.25)}
+  .topbar .right{display:flex;align-items:center;gap:16px;font-size:12.5px;color:#b9c7dc}
+  .btn-refresh{background:linear-gradient(135deg,var(--accent),#2563c9);color:#fff;border:none;padding:8px 16px;border-radius:7px;
+    font-size:12.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;transition:.2s}
+  .btn-refresh:hover{filter:brightness(1.08);transform:translateY(-1px)}
+  .btn-refresh.spin .ic{animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .content{flex:1;overflow-y:auto;padding:20px 22px}
+  .view{display:none;animation:fade .45s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  .grid{display:grid;gap:16px}
+  .kpis{grid-template-columns:repeat(6,1fr)}
+  .row-2{grid-template-columns:1.4fr 1fr}
+  .row-3{grid-template-columns:repeat(3,1fr)}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 16px 14px;
+    box-shadow:0 1px 3px rgba(16,42,74,.05);position:relative}
+  .card h3{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:700;margin-bottom:10px}
+  .kpi .val{font-size:23px;font-weight:800;color:var(--navy);line-height:1.1}
+  .kpi .sub{font-size:11px;color:var(--muted);margin-top:3px}
+  .kpi .bar{height:5px;border-radius:4px;background:#eef2f7;margin-top:10px;overflow:hidden}
+  .kpi .bar > i{display:block;height:100%;border-radius:4px;width:0;transition:width 1.2s cubic-bezier(.2,.8,.2,1)}
+  .chart{width:100%;height:230px}
+  .chart.sm{height:200px}
+
+  .status-badge{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;height:100%}
+  .ring{width:120px;height:120px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:800;font-size:17px;
+    background:conic-gradient(var(--green) 0 72%, #e9eef5 72% 100%);position:relative}
+  .ring::after{content:'';position:absolute;inset:11px;border-radius:50%;background:#fff}
+  .ring span{position:relative;z-index:1;color:var(--green);font-size:16px}
+
+  .highlights li{list-style:none;font-size:12.5px;padding:9px 0;border-bottom:1px dashed var(--line);display:flex;gap:9px;color:#41506a}
+  .highlights li:last-child{border-bottom:none}
+  .tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;color:#fff;white-space:nowrap}
+  .tag.ok{background:var(--green)} .tag.warn{background:var(--amber)} .tag.bad{background:var(--red)}
+
+  .pbar{margin:11px 0}
+  .pbar .lab{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px;color:#41506a}
+  .pbar .track{height:9px;background:#eef2f7;border-radius:6px;overflow:hidden}
+  .pbar .track>i{display:block;height:100%;width:0;border-radius:6px;
+    background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width 1.3s cubic-bezier(.2,.8,.2,1)}
+  .section-title{font-size:13px;font-weight:700;color:var(--navy);margin:4px 2px 12px;display:flex;align-items:center;gap:8px}
+  .section-title::before{content:'';width:4px;height:15px;border-radius:3px;background:var(--accent)}
+  .muted{color:var(--muted);font-size:11.5px}
+  .preview-flag{position:fixed;bottom:14px;right:16px;background:#1f2d3d;color:#fff;font-size:11px;padding:6px 12px;
+    border-radius:20px;opacity:.85;z-index:9}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand"><div class="logo">TV</div><div>TAMAKOSHI-V</div></div>
+    <nav class="nav" id="nav">
+      <div class="nav-item active" data-v="exec"><span class="ic">▰</span>Executive Summary</div>
+      <div class="nav-item" data-v="fin"><span class="ic">₿</span>Financial</div>
+      <div class="nav-item" data-v="sched"><span class="ic">◷</span>Schedule &amp; Progress</div>
+      <div class="nav-item" data-v="tunnel"><span class="ic">⛏</span>Tunnel</div>
+      <div class="nav-item" data-v="claims"><span class="ic">§</span>Claims &amp; Variations</div>
+      <div class="nav-item" data-v="inv"><span class="ic">⛁</span>Inventory &amp; Explosives</div>
+      <div class="nav-item" data-v="man"><span class="ic">☷</span>Manpower</div>
+      <div class="nav-item" data-v="equip"><span class="ic">⚙</span>Equipment</div>
+      <div class="nav-item" data-v="safety"><span class="ic">⛨</span>Safety</div>
+    </nav>
+    <div class="nav-foot">Data source: Nutstore<br>Last refresh: just now</div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <header class="topbar">
+      <h1><span class="dot"></span>TAMAKOSHI-V HYDROELECTRIC PROJECT</h1>
+      <div class="right">
+        <span>10 Jun 2026</span>
+        <button class="btn-refresh" id="refresh"><span class="ic">⟳</span>Refresh</button>
+      </div>
+    </header>
+
+    <div class="content">
+      <!-- ===== EXECUTIVE SUMMARY ===== -->
+      <section class="view active" id="exec">
+        <div class="grid kpis" style="margin-bottom:16px">
+          <div class="card kpi"><h3>Contract Amount</h3><div class="val">NPR <span class="num" data-to="98.67" data-dec="2">0</span> Bn</div><div class="bar"><i style="background:var(--accent)" data-w="100"></i></div></div>
+          <div class="card kpi"><h3>Financial Progress</h3><div class="val"><span class="num" data-to="68.45" data-dec="2">0</span>%</div><div class="bar"><i style="background:var(--accent-2)" data-w="68"></i></div></div>
+          <div class="card kpi"><h3>Physical Progress</h3><div class="val"><span class="num" data-to="72.30" data-dec="2">0</span>%</div><div class="bar"><i style="background:var(--green)" data-w="72"></i></div></div>
+          <div class="card kpi"><h3>Earned Value (EV)</h3><div class="val">NPR <span class="num" data-to="67.46" data-dec="2">0</span> Bn</div><div class="bar"><i style="background:var(--accent)" data-w="68"></i></div></div>
+          <div class="card kpi"><h3>SPI</h3><div class="val"><span class="num" data-to="1.05" data-dec="2">0</span></div><div class="sub">Schedule Performance</div></div>
+          <div class="card kpi"><h3>CPI</h3><div class="val"><span class="num" data-to="1.02" data-dec="2">0</span></div><div class="sub">Cost Performance</div></div>
+        </div>
+
+        <div class="grid row-3" style="margin-bottom:16px">
+          <div class="card">
+            <h3>Project Overall Status</h3>
+            <div class="status-badge">
+              <div class="ring"><span>ON TRACK</span></div>
+              <div class="muted">As on 10 Jun 2026</div>
+            </div>
+          </div>
+          <div class="card" style="grid-column:span 2">
+            <h3>S-Curve — Planned vs Actual (%)</h3>
+            <div id="ch-scurve" class="chart"></div>
+          </div>
+        </div>
+
+        <div class="grid row-2">
+          <div class="card">
+            <h3>Cost Breakdown by Work Package</h3>
+            <div id="ch-cost" class="chart"></div>
+          </div>
+          <div class="card">
+            <h3>Key Highlights</h3>
+            <ul class="highlights">
+              <li><span class="tag ok">ON&nbsp;TRACK</span> Tunnel excavation 7,620 / 9,124 m as per plan</li>
+              <li><span class="tag ok">PROGRESS</span> Main civil works progressing as planned</li>
+              <li><span class="tag warn">WATCH</span> Powerhouse excavation delayed by 12 days</li>
+              <li><span class="tag bad">ALERT</span> 2 claims awaiting approval (NPR 5.40 Bn)</li>
+              <li><span class="tag ok">SAFETY</span> 245 days without lost-time incident</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== TUNNEL ===== -->
+      <section class="view" id="tunnel">
+        <div class="section-title">Tunnel Progress Overview</div>
+        <div class="grid row-2" style="margin-bottom:16px">
+          <div class="card">
+            <h3>Tunnel Progress (% complete)</h3>
+            <div class="pbar"><div class="lab"><span>Headrace Tunnel</span><span>84%</span></div><div class="track"><i data-w="84"></i></div></div>
+            <div class="pbar"><div class="lab"><span>Surge Shaft</span><span>72%</span></div><div class="track"><i data-w="72"></i></div></div>
+            <div class="pbar"><div class="lab"><span>Pressure Shaft</span><span>62%</span></div><div class="track"><i data-w="62"></i></div></div>
+            <div class="pbar"><div class="lab"><span>Access Tunnel</span><span>71%</span></div><div class="track"><i data-w="71"></i></div></div>
+            <div class="pbar"><div class="lab"><span>Tailrace Tunnel</span><span>91%</span></div><div class="track"><i data-w="91"></i></div></div>
+          </div>
+          <div class="card">
+            <h3>Geological Summary (rock class)</h3>
+            <div id="ch-geo" class="chart"></div>
+          </div>
+        </div>
+        <div class="grid row-2">
+          <div class="card">
+            <h3>Monthly Advance (m)</h3>
+            <div id="ch-advance" class="chart"></div>
+          </div>
+          <div class="card">
+            <h3>Drill &amp; Blast Statistics</h3>
+            <div class="pbar"><div class="lab"><span>No. of Blasts (this month)</span><span>42</span></div><div class="track"><i data-w="70"></i></div></div>
+            <div class="pbar"><div class="lab"><span>Avg. advance / blast (m)</span><span>5.1</span></div><div class="track"><i data-w="51"></i></div></div>
+            <div class="pbar"><div class="lab"><span>Powder factor (kg/m³)</span><span>0.38</span></div><div class="track"><i data-w="38"></i></div></div>
+            <div class="pbar"><div class="lab"><span>Avg. overbreak (%)</span><span>8.5</span></div><div class="track"><i data-w="42"></i></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== PLACEHOLDER VIEWS ===== -->
+      <section class="view" id="fin"><div class="card"><h3>Financial Dashboard</h3><p class="muted">This panel will show IPC tracker, certified vs paid amounts, monthly revenue and cost breakdown — wired to your Excel's finance sheet.</p></div></section>
+      <section class="view" id="sched"><div class="card"><h3>Schedule &amp; Progress</h3><p class="muted">Milestone tracker, critical milestones table, and planned-vs-actual time phasing — from your schedule sheet.</p></div></section>
+      <section class="view" id="claims"><div class="card"><h3>Claims &amp; Variations</h3><p class="muted">Claims submitted/approved/rejected, variations, EOT summary and claim register — from your claims sheet.</p></div></section>
+      <section class="view" id="inv"><div class="card"><h3>Inventory &amp; Explosives</h3><p class="muted">Material inventory, explosives stock, consumption trend and blast summary — from your inventory / purchase sheets.</p></div></section>
+      <section class="view" id="man"><div class="card"><h3>Manpower</h3><p class="muted">Total workforce, category &amp; nationality split, attendance and productivity — from your manpower sheet.</p></div></section>
+      <section class="view" id="equip"><div class="card"><h3>Equipment</h3><p class="muted">Equipment status, utilization %, fuel consumption and top equipment by hours — from your equipment sheet.</p></div></section>
+      <section class="view" id="safety"><div class="card"><h3>Safety</h3><p class="muted">LTI/LTIFR, near misses, man-hours, incident trend and the risk heat-map — from your NCR / safety sheet.</p></div></section>
+    </div>
+  </div>
+</div>
+<div class="preview-flag">UI PREVIEW · mock data</div>
+
+<script>
+const COL={accent:'#2f7de1',accent2:'#36c5a8',green:'#36b37e',amber:'#f5a623',red:'#e5554e',navy:'#0f2a4a',grid:'#eef2f7',muted:'#7b8aa0'};
+let charts={};
+
+function animateNums(scope){
+  scope.querySelectorAll('.num').forEach(el=>{
+    const to=parseFloat(el.dataset.to), dec=+(el.dataset.dec||0); let start=null,dur=1100;
+    function step(t){ if(!start)start=t; const p=Math.min((t-start)/dur,1);
+      const e=1-Math.pow(1-p,3); el.textContent=(to*e).toFixed(dec); if(p<1)requestAnimationFrame(step);}
+    requestAnimationFrame(step);
+  });
+  scope.querySelectorAll('.bar > i, .track > i').forEach(b=>{ b.style.width=(b.dataset.w||0)+'%'; });
+}
+
+function scurve(){
+  const c=echarts.init(document.getElementById('ch-scurve')); charts.scurve=c;
+  c.setOption({grid:{left:36,right:14,top:24,bottom:24},legend:{right:0,top:0,textStyle:{fontSize:11}},
+    tooltip:{trigger:'axis'},
+    xAxis:{type:'category',data:['May23','Aug23','Nov23','Feb24','May24','Aug24','Nov24','Feb25','May25'],axisLine:{lineStyle:{color:'#cfd8e6'}},axisLabel:{fontSize:10,color:COL.muted}},
+    yAxis:{type:'value',max:100,splitLine:{lineStyle:{color:COL.grid}},axisLabel:{fontSize:10,color:COL.muted}},
+    series:[
+      {name:'Planned',type:'line',smooth:true,symbol:'none',data:[5,14,26,40,55,70,82,92,100],lineStyle:{width:3,color:COL.accent},areaStyle:{color:'rgba(47,125,225,.10)'}},
+      {name:'Actual',type:'line',smooth:true,symbol:'circle',symbolSize:5,data:[4,12,24,38,52,66,72,null,null],lineStyle:{width:3,color:COL.accent2}}
+    ]});
+}
+function cost(){
+  const c=echarts.init(document.getElementById('ch-cost')); charts.cost=c;
+  c.setOption({tooltip:{trigger:'item'},legend:{orient:'vertical',right:0,top:'center',textStyle:{fontSize:11}},
+    series:[{type:'pie',radius:['52%','78%'],center:['36%','50%'],avoidLabelOverlap:true,
+      label:{show:false},labelLine:{show:false},
+      data:[
+        {value:58,name:'Civil Works',itemStyle:{color:COL.accent}},
+        {value:18,name:'Mechanical',itemStyle:{color:COL.accent2}},
+        {value:12,name:'Electrical',itemStyle:{color:COL.green}},
+        {value:8,name:'Temporary',itemStyle:{color:COL.amber}},
+        {value:4,name:'Comp & Others',itemStyle:{color:COL.muted}}
+      ]}]});
+}
+function geo(){
+  const c=echarts.init(document.getElementById('ch-geo')); charts.geo=c;
+  c.setOption({tooltip:{trigger:'item'},legend:{orient:'vertical',right:0,top:'center',textStyle:{fontSize:11}},
+    series:[{type:'pie',radius:['50%','76%'],center:['36%','50%'],label:{show:false},
+      data:[
+        {value:16,name:'I – Very Good',itemStyle:{color:COL.green}},
+        {value:28,name:'II – Good',itemStyle:{color:COL.accent2}},
+        {value:30,name:'III – Fair',itemStyle:{color:COL.accent}},
+        {value:19,name:'IV – Poor',itemStyle:{color:COL.amber}},
+        {value:7,name:'V – Very Poor',itemStyle:{color:COL.red}}
+      ]}]});
+}
+function advance(){
+  const c=echarts.init(document.getElementById('ch-advance')); charts.advance=c;
+  c.setOption({grid:{left:38,right:12,top:18,bottom:24},tooltip:{trigger:'axis'},
+    xAxis:{type:'category',data:['Nov','Dec','Jan','Feb','Mar','Apr','May'],axisLabel:{fontSize:10,color:COL.muted},axisLine:{lineStyle:{color:'#cfd8e6'}}},
+    yAxis:{type:'value',splitLine:{lineStyle:{color:COL.grid}},axisLabel:{fontSize:10,color:COL.muted}},
+    series:[{type:'bar',data:[168,185,190,220,205,215,235],barWidth:'52%',
+      itemStyle:{borderRadius:[4,4,0,0],color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:COL.accent},{offset:1,color:COL.accent2}])}}]});
+}
+
+const builders={scurve,cost,geo,advance};
+const built={};
+function buildFor(view){
+  // build charts that live in this view if not yet built
+  const map={exec:['scurve','cost'],tunnel:['geo','advance']};
+  (map[view]||[]).forEach(k=>{ if(!built[k]){builders[k]();built[k]=true;} });
+}
+
+// nav switching
+document.getElementById('nav').addEventListener('click',e=>{
+  const item=e.target.closest('.nav-item'); if(!item)return;
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  item.classList.add('active');
+  const v=item.dataset.v;
+  document.querySelectorAll('.view').forEach(s=>s.classList.remove('active'));
+  const view=document.getElementById(v); view.classList.add('active');
+  buildFor(v); animateNums(view);
+  setTimeout(()=>Object.values(charts).forEach(c=>c&&c.resize()),60);
+});
+
+// refresh button demo (re-animates)
+document.getElementById('refresh').addEventListener('click',function(){
+  this.classList.add('spin');
+  setTimeout(()=>{ this.classList.remove('spin');
+    const v=document.querySelector('.view.active'); animateNums(v);
+    Object.values(charts).forEach(c=>c&&c.resize());
+  },900);
+});
+
+window.addEventListener('resize',()=>Object.values(charts).forEach(c=>c&&c.resize()));
+
+// initial
+buildFor('exec'); animateNums(document.getElementById('exec'));
+</script>
+</body>
+</html>

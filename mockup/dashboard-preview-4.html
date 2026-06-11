@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tamakoshi-V Dashboard — UI Preview (Modern Vibrant)</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+  :root{
+    --violet:#6d5efc; --indigo:#4836d6; --pink:#ff5d8f; --teal:#16c9b0; --sky:#3aa0ff;
+    --amber:#ffab2e; --green:#2bc275; --red:#fb5a5a;
+    --bg:#f3f1fb; --card:#ffffff; --ink:#1b1733; --muted:#8a86a3; --line:#ece9f6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);overflow:hidden}
+  .app{display:flex;height:100vh}
+
+  /* sidebar */
+  .sidebar{width:226px;flex-shrink:0;color:#eae7ff;display:flex;flex-direction:column;
+    background:linear-gradient(180deg,var(--violet),var(--indigo))}
+  .brand{padding:20px 18px;display:flex;align-items:center;gap:12px}
+  .brand .logo{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,.16);backdrop-filter:blur(4px);
+    display:grid;place-items:center;font-weight:800;font-size:14px;color:#fff}
+  .brand b{font-size:15px;letter-spacing:.5px;color:#fff} .brand small{display:block;font-size:9.5px;letter-spacing:1.5px;color:#c9c2ff}
+  .nav{padding:8px 12px;flex:1;overflow-y:auto}
+  .nav-item{display:flex;align-items:center;gap:12px;padding:11px 14px;font-size:13.5px;cursor:pointer;border-radius:11px;
+    margin-bottom:3px;color:#d4cfff;transition:.16s}
+  .nav-item .ic{width:18px;text-align:center;font-size:14px;opacity:.9}
+  .nav-item:hover{background:rgba(255,255,255,.10);color:#fff}
+  .nav-item.active{background:#fff;color:var(--indigo);font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.14)}
+  .side-card{margin:12px;padding:14px;border-radius:14px;background:rgba(255,255,255,.12);font-size:11.5px;color:#e7e3ff}
+  .side-card b{color:#fff;display:block;margin-bottom:3px;font-size:12px}
+
+  .main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .topbar{padding:16px 26px;display:flex;align-items:center;justify-content:space-between}
+  .topbar h1{font-size:17px;font-weight:800;letter-spacing:.2px}
+  .topbar .sub{font-size:12px;color:var(--muted);margin-top:2px}
+  .topbar .right{display:flex;align-items:center;gap:14px;font-size:12.5px;color:var(--muted)}
+  .btn-refresh{background:linear-gradient(135deg,var(--violet),var(--pink));color:#fff;border:none;padding:10px 18px;border-radius:11px;
+    font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;transition:.2s;box-shadow:0 8px 20px rgba(109,94,252,.35)}
+  .btn-refresh:hover{transform:translateY(-1px)} .btn-refresh.spin .ic{animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .content{flex:1;overflow-y:auto;padding:6px 26px 28px}
+  .view{display:none;animation:fade .45s ease}.view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+  .grid{display:grid;gap:18px}
+  .kpis{grid-template-columns:repeat(3,1fr)}
+  .row-2{grid-template-columns:1.5fr 1fr}
+  .row-3{grid-template-columns:repeat(3,1fr)}
+
+  .card{background:var(--card);border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(27,23,51,.06)}
+  .card h3{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-weight:700;margin-bottom:12px}
+
+  .kpi{display:flex;align-items:center;gap:14px}
+  .kpi .ico{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;font-size:20px;color:#fff;flex-shrink:0}
+  .kpi .v .val{font-size:23px;font-weight:800;line-height:1.05}
+  .kpi .v .lab{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .trend{margin-left:auto;font-size:11px;font-weight:700;padding:4px 9px;border-radius:20px;white-space:nowrap}
+  .trend.up{background:rgba(43,194,117,.14);color:var(--green)} .trend.dn{background:rgba(251,90,90,.14);color:var(--red)}
+  .trend.flat{background:rgba(58,160,255,.14);color:var(--sky)}
+
+  .chart{width:100%;height:240px}
+  .donut-center{position:relative}
+  .ring{position:relative;width:150px;height:150px;border-radius:50%;display:grid;place-items:center;margin:6px auto 0;
+    background:conic-gradient(var(--violet) 0 72%, #ece9f6 72% 100%)}
+  .ring::after{content:'';position:absolute;inset:15px;border-radius:50%;background:#fff}
+  .ring .t{position:relative;z-index:1;text-align:center}.ring .t b{font-size:15px;color:var(--violet)}.ring .t span{font-size:10px;color:var(--muted);display:block}
+
+  .pbar{margin:13px 0}.pbar .lab{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px;color:#41395f}
+  .pbar .track{height:9px;background:#efecf9;border-radius:7px;overflow:hidden}
+  .pbar .track>i{display:block;height:100%;width:0;border-radius:7px;transition:width 1.3s cubic-bezier(.2,.8,.2,1)}
+  .highlights li{list-style:none;font-size:12.5px;padding:11px 0;border-bottom:1px solid var(--line);display:flex;gap:9px;align-items:center;color:#41395f}
+  .highlights li:last-child{border-bottom:none}
+  .tag{font-size:9.5px;font-weight:800;padding:3px 9px;border-radius:20px;white-space:nowrap}
+  .tag.ok{background:rgba(43,194,117,.15);color:var(--green)} .tag.warn{background:rgba(255,171,46,.18);color:#d98300} .tag.bad{background:rgba(251,90,90,.15);color:var(--red)}
+  .muted{color:var(--muted);font-size:12.5px;line-height:1.6}
+  .preview-flag{position:fixed;bottom:14px;right:16px;background:linear-gradient(135deg,var(--violet),var(--pink));color:#fff;font-size:11px;padding:6px 13px;border-radius:20px;z-index:9}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="logo">TV</div><div><b>Tamakoshi-V</b><small>HYDROELECTRIC</small></div></div>
+    <nav class="nav" id="nav">
+      <div class="nav-item active" data-v="exec"><span class="ic">◆</span>Executive</div>
+      <div class="nav-item" data-v="fin"><span class="ic">₿</span>Financial</div>
+      <div class="nav-item" data-v="sched"><span class="ic">◷</span>Schedule</div>
+      <div class="nav-item" data-v="tunnel"><span class="ic">⛏</span>Tunnel</div>
+      <div class="nav-item" data-v="claims"><span class="ic">§</span>Claims</div>
+      <div class="nav-item" data-v="inv"><span class="ic">⛁</span>Inventory</div>
+      <div class="nav-item" data-v="man"><span class="ic">☷</span>Manpower</div>
+      <div class="nav-item" data-v="equip"><span class="ic">⚙</span>Equipment</div>
+      <div class="nav-item" data-v="safety"><span class="ic">⛨</span>Safety</div>
+    </nav>
+    <div class="side-card"><b>Live data</b>Connected to Nutstore · last refresh just now</div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div><h1>Executive Summary</h1><div class="sub">Tamakoshi-V Hydroelectric Project · Lot-1</div></div>
+      <div class="right"><span>10 Jun 2026</span><button class="btn-refresh" id="refresh"><span class="ic">⟳</span>Refresh</button></div>
+    </header>
+
+    <div class="content">
+      <!-- EXEC -->
+      <section class="view active" id="exec">
+        <div class="grid kpis" style="margin-bottom:18px">
+          <div class="card kpi"><div class="ico" style="background:linear-gradient(135deg,var(--violet),var(--indigo))">₿</div>
+            <div class="v"><div class="val">NPR <span class="num" data-to="98.67" data-dec="2">0</span>B</div><div class="lab">Contract Amount</div></div></div>
+          <div class="card kpi"><div class="ico" style="background:linear-gradient(135deg,var(--teal),#0fa68f)">%</div>
+            <div class="v"><div class="val"><span class="num" data-to="68.45" data-dec="2">0</span>%</div><div class="lab">Financial Progress</div></div><span class="trend up">▲ on plan</span></div>
+          <div class="card kpi"><div class="ico" style="background:linear-gradient(135deg,var(--sky),#1f7fe0)">⬈</div>
+            <div class="v"><div class="val"><span class="num" data-to="72.30" data-dec="2">0</span>%</div><div class="lab">Physical Progress</div></div><span class="trend up">▲ ahead</span></div>
+          <div class="card kpi"><div class="ico" style="background:linear-gradient(135deg,var(--pink),#e23d75)">EV</div>
+            <div class="v"><div class="val">NPR <span class="num" data-to="67.46" data-dec="2">0</span>B</div><div class="lab">Earned Value</div></div></div>
+          <div class="card kpi"><div class="ico" style="background:linear-gradient(135deg,var(--amber),#f0890f)">S</div>
+            <div class="v"><div class="val"><span class="num" data-to="1.05" data-dec="2">0</span></div><div class="lab">SPI · Schedule</div></div><span class="trend up">▲ 1.05</span></div>
+          <div class="card kpi"><div class="ico" style="background:linear-gradient(135deg,var(--green),#1c9e5d)">C</div>
+            <div class="v"><div class="val"><span class="num" data-to="1.02" data-dec="2">0</span></div><div class="lab">CPI · Cost</div></div><span class="trend flat">► 1.02</span></div>
+        </div>
+
+        <div class="grid row-3" style="margin-bottom:18px">
+          <div class="card"><h3>Overall Completion</h3>
+            <div class="ring"><div class="t"><b>72.3%</b><span>ON TRACK</span></div></div>
+            <p class="muted" style="text-align:center;margin-top:10px">As on 10 Jun 2026</p></div>
+          <div class="card" style="grid-column:span 2"><h3>S-Curve — Planned vs Actual (%)</h3><div id="m-scurve" class="chart"></div></div>
+        </div>
+
+        <div class="grid row-2">
+          <div class="card"><h3>Cost Breakdown by Work Package</h3><div id="m-cost" class="chart"></div></div>
+          <div class="card"><h3>Key Highlights</h3>
+            <ul class="highlights">
+              <li><span class="tag ok">ON TRACK</span> Tunnel excavation 7,620 / 9,124 m</li>
+              <li><span class="tag ok">PROGRESS</span> Main civil works as planned</li>
+              <li><span class="tag warn">WATCH</span> Powerhouse excavation +12 days</li>
+              <li><span class="tag bad">ALERT</span> 2 claims awaiting approval</li>
+              <li><span class="tag ok">SAFETY</span> 245 days without LTI</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- TUNNEL -->
+      <section class="view" id="tunnel">
+        <div class="grid row-2" style="margin-bottom:18px">
+          <div class="card"><h3>Tunnel Progress (% complete)</h3>
+            <div class="pbar"><div class="lab"><span>Headrace Tunnel</span><span>84%</span></div><div class="track"><i style="background:linear-gradient(90deg,var(--violet),var(--pink))" data-w="84"></i></div></div>
+            <div class="pbar"><div class="lab"><span>Surge Shaft</span><span>72%</span></div><div class="track"><i style="background:linear-gradient(90deg,var(--violet),var(--pink))" data-w="72"></i></div></div>
+            <div class="pbar"><div class="lab"><span>Pressure Shaft</span><span>62%</span></div><div class="track"><i style="background:linear-gradient(90deg,var(--violet),var(--pink))" data-w="62"></i></div></div>
+            <div class="pbar"><div class="lab"><span>Access Tunnel</span><span>71%</span></div><div class="track"><i style="background:linear-gradient(90deg,var(--violet),var(--pink))" data-w="71"></i></div></div>
+            <div class="pbar"><div class="lab"><span>Tailrace Tunnel</span><span>91%</span></div><div class="track"><i style="background:linear-gradient(90deg,var(--violet),var(--pink))" data-w="91"></i></div></div>
+          </div>
+          <div class="card"><h3>Geological Summary</h3><div id="m-geo" class="chart"></div></div>
+        </div>
+        <div class="grid row-2">
+          <div class="card"><h3>Monthly Advance (m)</h3><div id="m-advance" class="chart"></div></div>
+          <div class="card"><h3>Drill &amp; Blast Statistics</h3>
+            <div class="pbar"><div class="lab"><span>No. of Blasts (this month)</span><span>42</span></div><div class="track"><i style="background:var(--teal)" data-w="70"></i></div></div>
+            <div class="pbar"><div class="lab"><span>Avg. advance / blast (m)</span><span>5.1</span></div><div class="track"><i style="background:var(--teal)" data-w="51"></i></div></div>
+            <div class="pbar"><div class="lab"><span>Powder factor (kg/m³)</span><span>0.38</span></div><div class="track"><i style="background:var(--teal)" data-w="38"></i></div></div>
+            <div class="pbar"><div class="lab"><span>Avg. overbreak (%)</span><span>8.5</span></div><div class="track"><i style="background:var(--teal)" data-w="42"></i></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="fin"><div class="card"><h3>Financial</h3><p class="muted">IPC tracker, certified vs paid, monthly revenue & cost breakdown — from your finance sheet.</p></div></section>
+      <section class="view" id="sched"><div class="card"><h3>Schedule</h3><p class="muted">Milestones, critical-path table, planned vs actual phasing — from your schedule sheet.</p></div></section>
+      <section class="view" id="claims"><div class="card"><h3>Claims</h3><p class="muted">Claims & variations, EOT summary, claim register — from your claims sheet.</p></div></section>
+      <section class="view" id="inv"><div class="card"><h3>Inventory</h3><p class="muted">Material & explosives stock, consumption, blast summary — from your inventory/purchase sheets.</p></div></section>
+      <section class="view" id="man"><div class="card"><h3>Manpower</h3><p class="muted">Workforce by category & nationality, attendance, productivity — from your manpower sheet.</p></div></section>
+      <section class="view" id="equip"><div class="card"><h3>Equipment</h3><p class="muted">Status, utilization, fuel, top equipment by hours — from your equipment sheet.</p></div></section>
+      <section class="view" id="safety"><div class="card"><h3>Safety</h3><p class="muted">LTI/LTIFR, near misses, man-hours, incident trend, risk heat-map — from your NCR/safety sheet.</p></div></section>
+    </div>
+  </div>
+</div>
+<div class="preview-flag">UI PREVIEW · modern vibrant · mock data</div>
+
+<script>
+const C={violet:'#6d5efc',indigo:'#4836d6',pink:'#ff5d8f',teal:'#16c9b0',sky:'#3aa0ff',amber:'#ffab2e',green:'#2bc275',red:'#fb5a5a',muted:'#8a86a3',grid:'#efecf9'};
+const txt={color:C.muted,fontSize:10};let charts={};
+function animateNums(scope){
+  scope.querySelectorAll('.num').forEach(el=>{const to=parseFloat(el.dataset.to),dec=+(el.dataset.dec||0);let s=null,d=1100;
+    function step(t){if(!s)s=t;const p=Math.min((t-s)/d,1);const e=1-Math.pow(1-p,3);el.textContent=(to*e).toFixed(dec);if(p<1)requestAnimationFrame(step);}requestAnimationFrame(step);});
+  scope.querySelectorAll('.track>i').forEach(b=>b.style.width=(b.dataset.w||0)+'%');
+}
+function scurve(){const c=echarts.init(document.getElementById('m-scurve'));charts.s=c;
+  c.setOption({grid:{left:36,right:14,top:26,bottom:24},legend:{right:0,top:0,textStyle:{fontSize:11,color:C.muted}},tooltip:{trigger:'axis'},
+    xAxis:{type:'category',data:['May23','Aug23','Nov23','Feb24','May24','Aug24','Nov24','Feb25','May25'],axisLine:{lineStyle:{color:'#ddd7f0'}},axisLabel:txt},
+    yAxis:{type:'value',max:100,splitLine:{lineStyle:{color:C.grid}},axisLabel:txt},
+    series:[{name:'Planned',type:'line',smooth:true,symbol:'none',data:[5,14,26,40,55,70,82,92,100],lineStyle:{width:3,color:C.violet},areaStyle:{color:'rgba(109,94,252,.12)'}},
+      {name:'Actual',type:'line',smooth:true,symbol:'circle',symbolSize:6,data:[4,12,24,38,52,66,72,null,null],lineStyle:{width:3,color:C.pink},itemStyle:{color:C.pink}}]});}
+function cost(){const c=echarts.init(document.getElementById('m-cost'));charts.c=c;
+  c.setOption({tooltip:{trigger:'item'},legend:{orient:'vertical',right:0,top:'center',textStyle:{fontSize:11,color:C.muted}},
+    series:[{type:'pie',radius:['55%','80%'],center:['36%','50%'],label:{show:false},labelLine:{show:false},
+      data:[{value:58,name:'Civil Works',itemStyle:{color:C.violet}},{value:18,name:'Mechanical',itemStyle:{color:C.pink}},
+        {value:12,name:'Electrical',itemStyle:{color:C.teal}},{value:8,name:'Temporary',itemStyle:{color:C.amber}},
+        {value:4,name:'Others',itemStyle:{color:C.sky}}]}]});}
+function geo(){const c=echarts.init(document.getElementById('m-geo'));charts.g=c;
+  c.setOption({tooltip:{trigger:'item'},legend:{orient:'vertical',right:0,top:'center',textStyle:{fontSize:11,color:C.muted}},
+    series:[{type:'pie',radius:['52%','78%'],center:['36%','50%'],label:{show:false},
+      data:[{value:16,name:'I – Very Good',itemStyle:{color:C.green}},{value:28,name:'II – Good',itemStyle:{color:C.teal}},
+        {value:30,name:'III – Fair',itemStyle:{color:C.sky}},{value:19,name:'IV – Poor',itemStyle:{color:C.amber}},
+        {value:7,name:'V – Very Poor',itemStyle:{color:C.red}}]}]});}
+function advance(){const c=echarts.init(document.getElementById('m-advance'));charts.a=c;
+  c.setOption({grid:{left:38,right:12,top:18,bottom:24},tooltip:{trigger:'axis'},
+    xAxis:{type:'category',data:['Nov','Dec','Jan','Feb','Mar','Apr','May'],axisLabel:txt,axisLine:{lineStyle:{color:'#ddd7f0'}}},
+    yAxis:{type:'value',splitLine:{lineStyle:{color:C.grid}},axisLabel:txt},
+    series:[{type:'bar',data:[168,185,190,220,205,215,235],barWidth:'52%',
+      itemStyle:{borderRadius:[6,6,0,0],color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:C.violet},{offset:1,color:C.pink}])}}]});}
+
+const builders={exec:[scurve,cost],tunnel:[geo,advance]};const done={};
+function buildFor(v){if(done[v])return;(builders[v]||[]).forEach(fn=>fn());done[v]=true;}
+document.getElementById('nav').addEventListener('click',e=>{
+  const it=e.target.closest('.nav-item');if(!it)return;
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));it.classList.add('active');
+  const v=it.dataset.v;document.querySelectorAll('.view').forEach(s=>s.classList.remove('active'));
+  const view=document.getElementById(v);view.classList.add('active');
+  document.querySelector('.topbar h1').textContent=it.textContent.trim();
+  buildFor(v);animateNums(view);setTimeout(()=>Object.values(charts).forEach(c=>c&&c.resize()),60);
+});
+document.getElementById('refresh').addEventListener('click',function(){this.classList.add('spin');
+  setTimeout(()=>{this.classList.remove('spin');animateNums(document.querySelector('.view.active'));Object.values(charts).forEach(c=>c&&c.resize());},900);});
+window.addEventListener('resize',()=>Object.values(charts).forEach(c=>c&&c.resize()));
+buildFor('exec');animateNums(document.getElementById('exec'));
+</script>
+</body>
+</html>
