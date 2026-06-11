@@ -99,7 +99,25 @@ then swapped to real mappings sheet by sheet.**
 - Excel quirks (merged cells, blank rows, date serials) handled in per-sheet parsers,
   following patterns already proven in `build_tracker.js`.
 
-## 8. Out of scope (for now)
+## 8. 3D Project View (added 2026-06-11)
+
+A tenth panel: an interactive **3D model of the tunnel network** (headrace, surge shaft,
+pressure shaft, access tunnels, tailrace, powerhouse cavern) rendered with **Three.js**
+(WebGL, CDN — fits the static-site architecture, no plugins).
+
+- **Geometry:** built from the user's real alignment documents (chainages, coordinates,
+  elevations — user confirms all documents/data are available). Tunnels modeled as tube
+  segments along their true alignment.
+- **Progress visualization:** each tunnel split into chainage segments, colored by status
+  from the same Excel data (e.g. excavated = green, remaining = grey); the visible boundary
+  is the current workfront. Refresh updates colors with the rest of the dashboard.
+- **Interaction:** orbit/pan/zoom; **click a workfront/tunnel** (raycasting) → details card
+  with progress %, metres done/remaining, monthly advance, rock class, last update.
+- **Optional later:** simplified terrain surface overlay for context.
+- **Build position:** after the core panels are live (step 5.5 in build order); the data
+  wiring reuses the Tunnel panel's parsed data.
+
+## 9. Out of scope (for now)
 
 - Multiple simultaneous editors / real-time sync (single maintainer assumed).
 - Access control on the dashboard link (can add Vercel password protection later).
