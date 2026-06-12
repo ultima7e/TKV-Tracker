@@ -112,11 +112,11 @@
         <td>${cell(r.foreigner)}</td><td>${cell(r.otherNepali)}</td>
         <td>${cell(r.localNepali)}</td><td>${r.total}</td>
       </tr>`;
-    const table = (rows, total) => `
+    const table = (rows, total, rowCls) => `
       <table class="tbl">
         <thead><tr><th>Manpower Category</th><th>Foreigner</th>
           <th>Other Nepali</th><th>Local Nepali</th><th>Total</th></tr></thead>
-        <tbody>${rows.map((r) => rowHtml(r)).join('')}
+        <tbody>${rows.map((r) => rowHtml(r, rowCls)).join('')}
           ${total ? rowHtml(total, 'total') : ''}</tbody>
       </table>`;
     $('#mp-date').textContent = mp.date || '—';
@@ -125,21 +125,21 @@
     }
     if (mp.idle) {
       $('#mp-idle').innerHTML = mp.idle.length
-        ? table(mp.idle, mp.idleTotal)
+        ? table(mp.idle, mp.idleTotal, 'warn')
         : '<p class="muted">No idle manpower reported.</p>';
     }
 
     // Compact status table on the Executive Summary.
     $('#mp-exec-date').textContent = mp.date || '—';
     if (mp.mobilizedTotal) {
-      const status = (label, t) => rowHtml({ category: label, ...t });
+      const status = (label, t, cls) => rowHtml({ category: label, ...t }, cls);
       $('#mp-exec').innerHTML = `
         <table class="tbl">
           <thead><tr><th></th><th>Foreigner</th><th>Other Nepali</th>
             <th>Local Nepali</th><th>Total</th></tr></thead>
           <tbody>
-            ${status('Mobilized', mp.mobilizedTotal)}
-            ${mp.idleTotal ? status('Idle', mp.idleTotal) : ''}
+            ${status('Mobilized', mp.mobilizedTotal, 'ok')}
+            ${mp.idleTotal ? status('Idle', mp.idleTotal, 'warn') : ''}
           </tbody>
         </table>`;
     }

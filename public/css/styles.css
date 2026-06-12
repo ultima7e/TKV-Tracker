@@ -86,8 +86,19 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .tbl{width:100%;border-collapse:collapse;font-size:12.5px}
 .tbl th,.tbl td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;color:#41506a}
 .tbl th:first-child,.tbl td:first-child{text-align:left}
-.tbl th{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700}
-.tbl tr.total td{font-weight:800;color:var(--navy);border-top:2px solid #cfd8e6;border-bottom:none}
+.tbl th{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;
+  background:#e9f1fb;color:var(--navy);border-bottom:2px solid #d3e2f4}
+.tbl tbody tr:nth-child(even) td{background:#f6f9fd}
+.tbl td:first-child{font-weight:600;color:var(--navy)}
+.tbl td:last-child{font-weight:700;color:var(--accent)}
+.tbl tr.total td{font-weight:800;color:var(--navy);border-top:2px solid #f0dca8;border-bottom:none;
+  background:#fff6e2}
+.tbl tr.total td:last-child{color:#9a6b00}
+.tbl tr.ok td:first-child::before,.tbl tr.warn td:first-child::before{content:'';display:inline-block;
+  width:8px;height:8px;border-radius:50%;margin-right:7px}
+.tbl tr.ok td:first-child::before{background:var(--green)}
+.tbl tr.warn td:first-child::before{background:var(--amber)}
+.tbl tr.warn td:last-child{color:var(--red)}
 
 /* ---- responsive ---- */
 @media (min-width:881px) and (max-width:1280px){
