@@ -43,14 +43,9 @@
     const f = data.finance || {};
     setKpi('v-budget-usd', f.budgetUSD != null ? f.budgetUSD / 1e6 : null, 2);
     setKpi('v-budget-npr', f.budgetNPR != null ? f.budgetNPR / 1e9 : null, 2);
-    setKpi('v-budget-total', f.budgetUSDEquiv != null ? f.budgetUSDEquiv / 1e6 : null, 2);
-    setKpi('v-received', f.receivedNPREquiv != null ? f.receivedNPREquiv / 1e9 : null, 2);
+    setKpi('v-received-usd', f.receivedUSD != null ? f.receivedUSD / 1e6 : null, 2);
+    setKpi('v-received-npr', f.receivedNPR != null ? f.receivedNPR / 1e9 : null, 2);
     setKpi('v-finprog', f.financialProgressPct, 1);
-    if (f.receivedUSD != null && f.receivedNPR != null) {
-      document.getElementById('v-received-split').textContent =
-        '$ ' + (f.receivedUSD / 1e6).toFixed(2) + ' M + NPR ' +
-        (f.receivedNPR / 1e9).toFixed(2) + ' Bn, incl. advances';
-    }
     // Earned Value card stays '—' until the EV data sheet is provided.
   }
 
