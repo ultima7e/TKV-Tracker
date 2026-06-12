@@ -62,18 +62,28 @@
     });
   }
 
-  function renderTunnelCompletionChart(id) {
-    const tunnels = (data.tunnel && data.tunnel.tunnels) || [];
+  function renderSCurve(id) {
+    const sc = data.scurve || { months: [], plannedPct: [], actualPct: [] };
     makeChart(id).setOption({
-      grid: { left: 110, right: 30, top: 10, bottom: 24 },
-      tooltip: { trigger: 'axis' },
-      xAxis: { type: 'value', max: 100, splitLine: { lineStyle: { color: COL.grid } },
-        axisLabel: { fontSize: 10, color: COL.muted } },
-      yAxis: { type: 'category', data: tunnels.map((t) => t.name),
-        axisLabel: { fontSize: 10, color: COL.muted } },
-      series: [{ type: 'bar', data: tunnels.map((t) => t.progressPct), barWidth: '55%',
-        label: { show: true, position: 'right', fontSize: 10, formatter: '{c}%' },
-        itemStyle: { borderRadius: [0, 4, 4, 0], color: COL.accent } }],
+      grid: { left: 40, right: 16, top: 30, bottom: 26 },
+      legend: { right: 0, top: 0, textStyle: { fontSize: 11, color: COL.muted } },
+      tooltip: { trigger: 'axis', valueFormatter: (v) => (v == null ? '—' : v + '%') },
+      xAxis: { type: 'category', data: sc.months,
+        axisLabel: { fontSize: 10, color: COL.muted },
+        axisLine: { lineStyle: { color: '#cfd8e6' } } },
+      yAxis: { type: 'value', max: 100,
+        axisLabel: { fontSize: 10, color: COL.muted, formatter: '{value}%' },
+        splitLine: { lineStyle: { color: COL.grid } } },
+      series: [
+        { name: 'Planned', type: 'line', smooth: true, symbol: 'none',
+          data: sc.plannedPct,
+          lineStyle: { width: 3, color: COL.accent },
+          areaStyle: { color: 'rgba(47,125,225,.08)' } },
+        { name: 'Actual', type: 'line', smooth: true, symbol: 'circle', symbolSize: 4,
+          data: sc.actualPct, connectNulls: false,
+          lineStyle: { width: 3, color: COL.accent2 },
+          itemStyle: { color: COL.accent2 } },
+      ],
     });
   }
 
@@ -92,8 +102,7 @@
 
   function renderAll() {
     renderKpis();
-    renderAdvanceChart('ch-exec-advance');
-    renderTunnelCompletionChart('ch-exec-tunnel');
+    renderSCurve('ch-scurve');
     renderAdvanceChart('ch-tunnel-advance');
     renderTunnelBars();
     $('#data-source').textContent = data.source === 'nutstore' ? 'Nutstore' : 'Local sample';
