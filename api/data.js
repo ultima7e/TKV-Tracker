@@ -8,38 +8,56 @@
 //   NUTSTORE_FILE_PATH - path under /dav/, e.g. "ProjectData/tracker.xlsx"
 const fs = require('fs');
 const path = require('path');
-const { workbookToRows } = require('../lib/workbook');
-const { parseTunnel, parseKpis } = require('../lib/parsers');
+const { workbookToRows, workbookToMatrices } = require('../lib/workbook');
+const { parseTunnel, parseKpis, parseSCurve } = require('../lib/parsers');
 
 const DAV_BASE = 'https://dav.jianguoyun.com/dav/';
 
-async function fetchWorkbookBuffer() {
+// NUTSTORE_FILE_PATH may list several files separated by ';' — each is
+// fetched and their sheets merged (later files win on duplicate names).
+async function fetchWorkbookBuffers() {
   const { NUTSTORE_USER, NUTSTORE_PASSWORD, NUTSTORE_FILE_PATH } = process.env;
   if (NUTSTORE_USER && NUTSTORE_PASSWORD && NUTSTORE_FILE_PATH) {
-    const url = DAV_BASE + NUTSTORE_FILE_PATH.replace(/^\/+/, '')
-      .split('/').map(encodeURIComponent).join('/');
     const auth = Buffer.from(`${NUTSTORE_USER}:${NUTSTORE_PASSWORD}`).toString('base64');
-    const res = await fetch(url, { headers: { Authorization: `Basic ${auth}` } });
-    if (!res.ok) {
-      throw new Error(`Nutstore responded ${res.status} ${res.statusText}`);
+    const paths = NUTSTORE_FILE_PATH.split(';').map((p) => p.trim()).filter(Boolean);
+    const buffers = [];
+    for (const p of paths) {
+      const url = DAV_BASE + p.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
+      const res = await fetch(url, { headers: { Authorization: `Basic ${auth}` } });
+      if (!res.ok) {
+        throw new Error(`Nutstore responded ${res.status} ${res.statusText} for "${p}"`);
+      }
+      buffers.push(Buffer.from(await res.arrayBuffer()));
     }
-    return { buffer: Buffer.from(await res.arrayBuffer()), source: 'nutstore' };
+    return { buffers, source: 'nutstore' };
   }
-  const local = path.join(__dirname, '..', 'data', 'sample.xlsx');
-  return { buffer: fs.readFileSync(local), source: 'local-file' };
+  // Local development: merge every workbook in data/ (Excel lock files excluded).
+  const dir = path.join(__dirname, '..', 'data');
+  const buffers = fs.readdirSync(dir)
+    .filter((f) => f.endsWith('.xlsx') && !f.startsWith('~$'))
+    .sort()
+    .map((f) => fs.readFileSync(path.join(dir, f)));
+  return { buffers, source: 'local-file' };
 }
 
 async function buildPayload() {
-  const { buffer, source } = await fetchWorkbookBuffer();
-  const sheets = workbookToRows(buffer);
+  const { buffers, source } = await fetchWorkbookBuffers();
+  const sheets = {};
+  const matrices = {};
+  for (const buffer of buffers) {
+    Object.assign(sheets, workbookToRows(buffer));
+    Object.assign(matrices, workbookToMatrices(buffer));
+  }
   const tunnel = parseTunnel(sheets);
   const executive = parseKpis(sheets);
+  const scurve = parseSCurve(matrices);
   return {
     generatedAt: new Date().toISOString(),
     source,
-    warnings: [...tunnel.warnings, ...executive.warnings],
+    warnings: [...tunnel.warnings, ...executive.warnings, ...scurve.warnings],
     tunnel: { tunnels: tunnel.tunnels, monthlyAdvance: tunnel.monthlyAdvance },
     executive: { kpis: executive.kpis },
+    scurve: { months: scurve.months, plannedPct: scurve.plannedPct, actualPct: scurve.actualPct },
   };
 }
 

@@ -4,3 +4,8 @@ node_modules/
 .vercel/
 .env
 .env.local
+
+# Real project workbooks stay out of version control (privacy + size).
+# Only the synthetic dev sample is tracked.
+*.xlsx
+!data/sample.xlsx

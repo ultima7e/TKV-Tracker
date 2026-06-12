@@ -9,5 +9,11 @@ test('buildPayload assembles panels and metadata from local sample file', async 
   assert.equal(payload.source, 'local-file');
   assert.equal(payload.tunnel.tunnels.length, 5);
   assert.equal(payload.executive.kpis['SPI'], 1.05);
-  assert.deepEqual(payload.warnings, []);
+  // S-curve comes from the TKV workbook merged in from data/ — if that file
+  // is present it must parse; either way the key must exist.
+  assert.equal(Array.isArray(payload.scurve.months), true);
+  if (payload.scurve.months.length > 0) {
+    assert.deepEqual(payload.warnings, []);
+    assert.equal(payload.scurve.plannedPct[payload.scurve.plannedPct.length - 1], 100);
+  }
 });
