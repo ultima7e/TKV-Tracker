@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { buildPayload } = require('../api/data');
 
+const PORT = process.env.PORT || 3000;
 const PUB = path.join(__dirname, '..', 'public');
 const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json' };
 
@@ -28,4 +29,4 @@ http.createServer(async (req, res) => {
   } else {
     res.writeHead(404); res.end('Not found');
   }
-}).listen(3000, () => console.log('Dev server: http://localhost:3000'));
+}).listen(PORT, () => console.log(`Dev server: http://localhost:${PORT}`));
