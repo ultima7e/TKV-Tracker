@@ -172,10 +172,10 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
             <div id="ch-scurve" class="chart"></div>
           </div>
           <div class="card">
-            <h3>Schedule &amp; Progress Summary</h3>
-            <p class="muted">Schedule Variance, Rate of Progress, Overall Progress,<br>
-              Total Workforce and Inventory Summary will appear here<br>
-              as their data sheets are added.</p>
+            <h3>Manpower Status — <span id="mp-exec-date">—</span></h3>
+            <div id="mp-exec"><p class="muted">Awaiting manpower data.</p></div>
+            <p class="muted" style="margin-top:12px">Schedule Variance, Rate of Progress and
+              Inventory Summary will be added here. Full manpower details in the Manpower panel.</p>
           </div>
         </div>
       </section>
@@ -330,6 +330,21 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       $('#mp-idle').innerHTML = mp.idle.length
         ? table(mp.idle, mp.idleTotal)
         : '<p class="muted">No idle manpower reported.</p>';
+    }
+
+    // Compact status table on the Executive Summary.
+    $('#mp-exec-date').textContent = mp.date || '—';
+    if (mp.mobilizedTotal) {
+      const status = (label, t) => rowHtml({ category: label, ...t });
+      $('#mp-exec').innerHTML = `
+        <table class="tbl">
+          <thead><tr><th></th><th>Foreigner</th><th>Other Nepali</th>
+            <th>Local Nepali</th><th>Total</th></tr></thead>
+          <tbody>
+            ${status('Mobilized', mp.mobilizedTotal)}
+            ${mp.idleTotal ? status('Idle', mp.idleTotal) : ''}
+          </tbody>
+        </table>`;
     }
   }
 

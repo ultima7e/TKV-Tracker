@@ -128,6 +128,21 @@
         ? table(mp.idle, mp.idleTotal)
         : '<p class="muted">No idle manpower reported.</p>';
     }
+
+    // Compact status table on the Executive Summary.
+    $('#mp-exec-date').textContent = mp.date || '—';
+    if (mp.mobilizedTotal) {
+      const status = (label, t) => rowHtml({ category: label, ...t });
+      $('#mp-exec').innerHTML = `
+        <table class="tbl">
+          <thead><tr><th></th><th>Foreigner</th><th>Other Nepali</th>
+            <th>Local Nepali</th><th>Total</th></tr></thead>
+          <tbody>
+            ${status('Mobilized', mp.mobilizedTotal)}
+            ${mp.idleTotal ? status('Idle', mp.idleTotal) : ''}
+          </tbody>
+        </table>`;
+    }
   }
 
   function renderAll() {
