@@ -64,6 +64,12 @@ async function buildPayload() {
 }
 
 module.exports = async (req, res) => {
+  // Allow the standalone TamakoshiTracker.html (opened from disk, origin
+  // "null") to call this API. Exposes project data read-only; credentials
+  // never leave the server.
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(204).end();
   try {
     const payload = await buildPayload();
     res.setHeader('Cache-Control', 'no-store');
