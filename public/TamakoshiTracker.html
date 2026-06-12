@@ -89,6 +89,35 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .banner.show{display:block}
 .banner.warn{background:#fff8e6;color:#8a6400;border-color:#f0dca8}
 .last-refresh{font-size:11px;color:#b9c7dc}
+
+/* ---- responsive ---- */
+@media (min-width:881px) and (max-width:1280px){
+  .kpis{grid-template-columns:repeat(3,1fr)}
+}
+@media (max-width:880px){
+  .app{flex-direction:column;height:100dvh}
+  .sidebar{width:100%}
+  .brand{padding:10px 14px;font-size:13px}
+  .nav{display:flex;flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:0;flex:none;
+    -webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .nav::-webkit-scrollbar{display:none}
+  .nav-item{padding:10px 13px;border-left:none;border-bottom:3px solid transparent;
+    font-size:12.5px;flex-shrink:0}
+  .nav-item.active{border-bottom-color:var(--accent)}
+  .nav-foot{display:none}
+  .topbar{padding:10px 14px;gap:10px}
+  .topbar h1{font-size:12px;letter-spacing:.2px}
+  .topbar .right{gap:10px}
+  .btn-refresh{padding:7px 13px}
+  .content{padding:14px}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .row-2,.row-3{grid-template-columns:1fr}
+  .kpi .val{font-size:19px}
+}
+@media (max-width:560px){
+  #today{display:none}
+  .topbar h1{font-size:11px}
+}
 </style>
 </head>
 <body>
