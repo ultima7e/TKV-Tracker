@@ -1,6 +1,16 @@
 {
-  "devDependencies": {
-    "exceljs": "^4.4.0",
+  "name": "tamakoshi-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/",
+    "dev": "node scripts/dev-server.js",
+    "make-sample": "node scripts/make-sample-xlsx.js"
+  },
+  "dependencies": {
     "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "exceljs": "^4.4.0"
   }
 }
