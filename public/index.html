@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tamakoshi-V Project Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="logo">TV</div><div>TAMAKOSHI-V</div></div>
+    <nav class="nav" id="nav">
+      <div class="nav-item active" data-v="exec"><span class="ic">▰</span>Executive Summary</div>
+      <div class="nav-item" data-v="fin"><span class="ic">₿</span>Financial</div>
+      <div class="nav-item" data-v="sched"><span class="ic">◷</span>Schedule &amp; Progress</div>
+      <div class="nav-item" data-v="tunnel"><span class="ic">⛏</span>Tunnel</div>
+      <div class="nav-item" data-v="claims"><span class="ic">§</span>Claims &amp; Variations</div>
+      <div class="nav-item" data-v="inv"><span class="ic">⛁</span>Inventory &amp; Explosives</div>
+      <div class="nav-item" data-v="man"><span class="ic">☷</span>Manpower</div>
+      <div class="nav-item" data-v="equip"><span class="ic">⚙</span>Equipment</div>
+      <div class="nav-item" data-v="safety"><span class="ic">⛨</span>Safety</div>
+    </nav>
+    <div class="nav-foot">Data source: <span id="data-source">—</span><br>
+      <span class="last-refresh" id="last-refresh">Not loaded yet</span></div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <h1><span class="dot"></span>TAMAKOSHI-V HYDROELECTRIC PROJECT</h1>
+      <div class="right">
+        <span id="today"></span>
+        <button class="btn-refresh" id="refresh"><span class="ic">⟳</span>Refresh</button>
+      </div>
+    </header>
+    <div class="content">
+      <div class="banner" id="banner"></div>
+
+      <section class="view active" id="exec">
+        <div class="grid kpis" style="margin-bottom:16px">
+          <div class="card kpi"><h3>Contract Amount</h3><div class="val">NPR <span data-kpi="Contract Amount">—</span> Bn</div></div>
+          <div class="card kpi"><h3>Financial Progress</h3><div class="val"><span data-kpi="Financial Progress">—</span>%</div></div>
+          <div class="card kpi"><h3>Physical Progress</h3><div class="val"><span data-kpi="Physical Progress">—</span>%</div></div>
+          <div class="card kpi"><h3>Earned Value (EV)</h3><div class="val">NPR <span data-kpi="Earned Value">—</span> Bn</div></div>
+          <div class="card kpi"><h3>SPI</h3><div class="val"><span data-kpi="SPI">—</span></div><div class="sub">Schedule Performance</div></div>
+          <div class="card kpi"><h3>CPI</h3><div class="val"><span data-kpi="CPI">—</span></div><div class="sub">Cost Performance</div></div>
+        </div>
+        <div class="grid row-2">
+          <div class="card"><h3>Monthly Advance (m)</h3><div id="ch-exec-advance" class="chart"></div></div>
+          <div class="card"><h3>Tunnel Completion (%)</h3><div id="ch-exec-tunnel" class="chart"></div></div>
+        </div>
+      </section>
+
+      <section class="view" id="tunnel">
+        <div class="grid row-2" style="margin-bottom:16px">
+          <div class="card"><h3>Tunnel Progress (% complete)</h3><div id="tunnel-bars"></div></div>
+          <div class="card"><h3>Monthly Advance (m)</h3><div id="ch-tunnel-advance" class="chart"></div></div>
+        </div>
+      </section>
+
+      <section class="view" id="fin"><div class="card"><h3>Financial Dashboard</h3><p class="muted">Awaiting finance data sheet (Phase 2).</p></div></section>
+      <section class="view" id="sched"><div class="card"><h3>Schedule &amp; Progress</h3><p class="muted">Awaiting schedule data sheet (Phase 2).</p></div></section>
+      <section class="view" id="claims"><div class="card"><h3>Claims &amp; Variations</h3><p class="muted">Awaiting claims data sheet (Phase 2).</p></div></section>
+      <section class="view" id="inv"><div class="card"><h3>Inventory &amp; Explosives</h3><p class="muted">Awaiting inventory data sheet (Phase 2).</p></div></section>
+      <section class="view" id="man"><div class="card"><h3>Manpower</h3><p class="muted">Awaiting manpower data sheet (Phase 2).</p></div></section>
+      <section class="view" id="equip"><div class="card"><h3>Equipment</h3><p class="muted">Awaiting equipment data sheet (Phase 2).</p></div></section>
+      <section class="view" id="safety"><div class="card"><h3>Safety</h3><p class="muted">Awaiting safety data sheet (Phase 2).</p></div></section>
+    </div>
+  </div>
+</div>
+<script src="/js/app.js"></script>
+</body>
+</html>
