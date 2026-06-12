@@ -9,7 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const { workbookToRows, workbookToMatrices } = require('../lib/workbook');
-const { parseTunnel, parseKpis, parseSCurve } = require('../lib/parsers');
+const { parseTunnel, parseKpis, parseSCurve, parseFinance } = require('../lib/parsers');
 
 const DAV_BASE = 'https://dav.jianguoyun.com/dav/';
 
@@ -51,13 +51,15 @@ async function buildPayload() {
   const tunnel = parseTunnel(sheets);
   const executive = parseKpis(sheets);
   const scurve = parseSCurve(matrices);
+  const finance = parseFinance(matrices);
   return {
     generatedAt: new Date().toISOString(),
     source,
-    warnings: [...tunnel.warnings, ...executive.warnings, ...scurve.warnings],
+    warnings: [...tunnel.warnings, ...executive.warnings, ...scurve.warnings, ...finance.warnings],
     tunnel: { tunnels: tunnel.tunnels, monthlyAdvance: tunnel.monthlyAdvance },
     executive: { kpis: executive.kpis },
     scurve: { months: scurve.months, plannedPct: scurve.plannedPct, actualPct: scurve.actualPct },
+    finance,
   };
 }
 
