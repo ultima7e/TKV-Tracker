@@ -90,6 +90,12 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .banner.warn{background:#fff8e6;color:#8a6400;border-color:#f0dca8}
 .last-refresh{font-size:11px;color:#b9c7dc}
 
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.tbl th,.tbl td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;color:#41506a}
+.tbl th:first-child,.tbl td:first-child{text-align:left}
+.tbl th{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700}
+.tbl tr.total td{font-weight:800;color:var(--navy);border-top:2px solid #cfd8e6;border-bottom:none}
+
 /* ---- responsive ---- */
 @media (min-width:881px) and (max-width:1280px){
   .kpis{grid-template-columns:repeat(3,1fr)}
@@ -185,7 +191,12 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       <section class="view" id="sched"><div class="card"><h3>Schedule &amp; Progress</h3><p class="muted">Awaiting schedule data sheet (Phase 2).</p></div></section>
       <section class="view" id="claims"><div class="card"><h3>Claims &amp; Variations</h3><p class="muted">Awaiting claims data sheet (Phase 2).</p></div></section>
       <section class="view" id="inv"><div class="card"><h3>Inventory &amp; Explosives</h3><p class="muted">Awaiting inventory data sheet (Phase 2).</p></div></section>
-      <section class="view" id="man"><div class="card"><h3>Manpower</h3><p class="muted">Awaiting manpower data sheet (Phase 2).</p></div></section>
+      <section class="view" id="man">
+        <div class="grid row-2">
+          <div class="card"><h3>Mobilized Manpower — <span id="mp-date">—</span></h3><div id="mp-mobilized"><p class="muted">Awaiting manpower data.</p></div></div>
+          <div class="card"><h3>Idle Manpower</h3><div id="mp-idle"><p class="muted">Awaiting manpower data.</p></div></div>
+        </div>
+      </section>
       <section class="view" id="equip"><div class="card"><h3>Equipment</h3><p class="muted">Awaiting equipment data sheet (Phase 2).</p></div></section>
       <section class="view" id="safety"><div class="card"><h3>Safety</h3><p class="muted">Awaiting safety data sheet (Phase 2).</p></div></section>
     </div>
@@ -295,11 +306,39 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     });
   }
 
+  function renderManpower() {
+    const mp = data.manpower || {};
+    const cell = (v) => (v > 0 ? v : '–');
+    const rowHtml = (r, cls) => `
+      <tr${cls ? ' class="' + cls + '"' : ''}>
+        <td>${r.category || 'Total'}</td>
+        <td>${cell(r.foreigner)}</td><td>${cell(r.otherNepali)}</td>
+        <td>${cell(r.localNepali)}</td><td>${r.total}</td>
+      </tr>`;
+    const table = (rows, total) => `
+      <table class="tbl">
+        <thead><tr><th>Manpower Category</th><th>Foreigner</th>
+          <th>Other Nepali</th><th>Local Nepali</th><th>Total</th></tr></thead>
+        <tbody>${rows.map((r) => rowHtml(r)).join('')}
+          ${total ? rowHtml(total, 'total') : ''}</tbody>
+      </table>`;
+    $('#mp-date').textContent = mp.date || '—';
+    if (mp.mobilized && mp.mobilized.length) {
+      $('#mp-mobilized').innerHTML = table(mp.mobilized, mp.mobilizedTotal);
+    }
+    if (mp.idle) {
+      $('#mp-idle').innerHTML = mp.idle.length
+        ? table(mp.idle, mp.idleTotal)
+        : '<p class="muted">No idle manpower reported.</p>';
+    }
+  }
+
   function renderAll() {
     renderKpis();
     renderSCurve('ch-scurve');
     renderAdvanceChart('ch-tunnel-advance');
     renderTunnelBars();
+    renderManpower();
     $('#data-source').textContent = data.source === 'nutstore' ? 'Nutstore' : 'Local sample';
     $('#last-refresh').textContent = 'Last refresh: ' + new Date(data.generatedAt).toLocaleTimeString();
     if (data.warnings && data.warnings.length) {

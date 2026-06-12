@@ -103,11 +103,39 @@
     });
   }
 
+  function renderManpower() {
+    const mp = data.manpower || {};
+    const cell = (v) => (v > 0 ? v : '–');
+    const rowHtml = (r, cls) => `
+      <tr${cls ? ' class="' + cls + '"' : ''}>
+        <td>${r.category || 'Total'}</td>
+        <td>${cell(r.foreigner)}</td><td>${cell(r.otherNepali)}</td>
+        <td>${cell(r.localNepali)}</td><td>${r.total}</td>
+      </tr>`;
+    const table = (rows, total) => `
+      <table class="tbl">
+        <thead><tr><th>Manpower Category</th><th>Foreigner</th>
+          <th>Other Nepali</th><th>Local Nepali</th><th>Total</th></tr></thead>
+        <tbody>${rows.map((r) => rowHtml(r)).join('')}
+          ${total ? rowHtml(total, 'total') : ''}</tbody>
+      </table>`;
+    $('#mp-date').textContent = mp.date || '—';
+    if (mp.mobilized && mp.mobilized.length) {
+      $('#mp-mobilized').innerHTML = table(mp.mobilized, mp.mobilizedTotal);
+    }
+    if (mp.idle) {
+      $('#mp-idle').innerHTML = mp.idle.length
+        ? table(mp.idle, mp.idleTotal)
+        : '<p class="muted">No idle manpower reported.</p>';
+    }
+  }
+
   function renderAll() {
     renderKpis();
     renderSCurve('ch-scurve');
     renderAdvanceChart('ch-tunnel-advance');
     renderTunnelBars();
+    renderManpower();
     $('#data-source').textContent = data.source === 'nutstore' ? 'Nutstore' : 'Local sample';
     $('#last-refresh').textContent = 'Last refresh: ' + new Date(data.generatedAt).toLocaleTimeString();
     if (data.warnings && data.warnings.length) {
