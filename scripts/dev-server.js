@@ -7,7 +7,11 @@ const { buildPayload } = require('../api/data');
 
 const PORT = process.env.PORT || 3000;
 const PUB = path.join(__dirname, '..', 'public');
-const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json' };
+const MIME = {
+  '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+  '.svg': 'image/svg+xml', '.gif': 'image/gif', '.webp': 'image/webp',
+};
 
 http.createServer(async (req, res) => {
   if (req.url.startsWith('/api/data')) {
