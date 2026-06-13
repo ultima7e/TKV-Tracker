@@ -165,15 +165,11 @@
         <td>${usdM(r.netUSD)}</td><td>${nprM(r.netNPR)}</td>
         <td>${r.status}</td>
       </tr>`;
-    const t = ipc.total;
     $('#ipc-table').innerHTML = `
       <table class="tbl">
         <thead><tr><th>IPC</th><th>Certified</th><th>Net (USD M)</th>
           <th>Net (NPR M)</th><th>Status</th></tr></thead>
-        <tbody>${rows.map(ipcRow).join('')}
-          <tr class="total"><td>Total</td><td></td>
-            <td>${usdM(t.netUSD)}</td><td>${nprM(t.netNPR)}</td><td></td></tr>
-        </tbody>
+        <tbody>${rows.map(ipcRow).join('')}</tbody>
       </table>`;
   }
 
