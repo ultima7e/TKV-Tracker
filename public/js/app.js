@@ -145,12 +145,45 @@
     }
   }
 
+  function renderIpc() {
+    const ipc = data.ipc || {};
+    const rows = ipc.rows || [];
+    $('#ipc-count').textContent = ipc.total ? ipc.total.count : '—';
+    if (!rows.length) return;
+    const fmtDate = (iso) => {
+      if (!iso) return '—';
+      const d = new Date(iso + 'T00:00:00Z');
+      const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()];
+      return d.getUTCDate() + ' ' + m + ' ' + d.getUTCFullYear();
+    };
+    const usdM = (v) => (v ? (v / 1e6).toFixed(2) : '–');
+    const nprM = (v) => (v ? (v / 1e6).toFixed(1) : '–');
+    const done = (s) => /complete/i.test(s);
+    const ipcRow = (r) => `
+      <tr class="${done(r.status) ? 'ok' : 'warn'}">
+        <td>${r.ipc}</td><td>${fmtDate(r.certifiedDate)}</td>
+        <td>${usdM(r.netUSD)}</td><td>${nprM(r.netNPR)}</td>
+        <td>${r.status}</td>
+      </tr>`;
+    const t = ipc.total;
+    $('#ipc-table').innerHTML = `
+      <table class="tbl">
+        <thead><tr><th>IPC</th><th>Certified</th><th>Net (USD M)</th>
+          <th>Net (NPR M)</th><th>Status</th></tr></thead>
+        <tbody>${rows.map(ipcRow).join('')}
+          <tr class="total"><td>Total</td><td></td>
+            <td>${usdM(t.netUSD)}</td><td>${nprM(t.netNPR)}</td><td></td></tr>
+        </tbody>
+      </table>`;
+  }
+
   function renderAll() {
     renderKpis();
     renderSCurve('ch-scurve');
     renderAdvanceChart('ch-tunnel-advance');
     renderTunnelBars();
     renderManpower();
+    renderIpc();
     $('#data-source').textContent = data.source === 'nutstore' ? 'Nutstore' : 'Local sample';
     $('#last-refresh').textContent = 'Last refresh: ' + new Date(data.generatedAt).toLocaleTimeString();
     if (data.warnings && data.warnings.length) {
