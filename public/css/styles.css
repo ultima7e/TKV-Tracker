@@ -101,6 +101,11 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .tbl tr.warn td:last-child{color:var(--red)}
 
 /* ---- interactive 3D tunnel view ---- */
+.t3d-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
+.t3d-tab{padding:7px 14px;border-radius:20px;border:1px solid var(--line);background:#f4f7fb;
+  font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;transition:.15s}
+.t3d-tab:hover{color:var(--navy);border-color:#c3d3ea}
+.t3d-tab.active{background:linear-gradient(135deg,var(--accent),#2563c9);color:#fff;border-color:transparent}
 .t3d{display:grid;grid-template-columns:1.7fr 1fr;gap:16px;align-items:start}
 .t3d-wrap{position:relative;width:100%;background:#fbfdff;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .t3d-wrap img{width:100%;display:block}
