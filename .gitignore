@@ -9,3 +9,11 @@ node_modules/
 # Only the synthetic dev sample is tracked.
 *.xlsx
 !data/sample.xlsx
+
+# Large CAD source files + conversion temp artifacts (the compact
+# public/assets/tunnels.bin built from them IS tracked).
+*.dwg
+*.dxf
+*.pptx
+_*.scr
+_acad_log.txt

@@ -107,6 +107,11 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .t3d-tab:hover{color:var(--navy);border-color:#c3d3ea}
 .t3d-tab.active{background:linear-gradient(135deg,var(--accent),#2563c9);color:#fff;border-color:transparent}
 .t3d{display:grid;grid-template-columns:1.7fr 1fr;gap:16px;align-items:start}
+.t3d-canvas{width:100%;height:520px;border-radius:10px;overflow:hidden;
+  background:radial-gradient(circle at 50% 30%,#1b3a5c,#0e1f33);position:relative;cursor:grab}
+.t3d-canvas:active{cursor:grabbing}
+.t3d-canvas canvas{display:block}
+.t3d-loading{position:absolute;inset:0;display:grid;place-items:center;color:#9fb3cc;font-size:13px}
 .t3d-wrap{position:relative;width:100%;background:#fbfdff;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .t3d-wrap img{width:100%;display:block}
 .t3d-dot{position:absolute;width:20px;height:20px;border-radius:50%;border:2.5px solid #fff;
