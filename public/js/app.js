@@ -173,6 +173,62 @@
       </table>`;
   }
 
+  // Headwork & HRT area — sections + on-image hotspot coords (% of render),
+  // extracted from the 3D deck (Data Date 31-Oct-2025). Progress will later
+  // come from Excel; embedded here so the prototype works end-to-end.
+  const TUNNEL_HEADWORK = {
+    dataDate: '31 Oct 2025',
+    sections: [
+      { name: 'Adit #1', design: '167.77 m', excavated: '167.77 m', pct: 100, x: 58.4, y: 32.6 },
+      { name: 'Connecting Tunnel', design: '93.85 m', excavated: '59.75 m', pct: 63.67, x: 45.8, y: 34.4 },
+      { name: 'Construction Adit Tunnel', design: '21.60 m', excavated: '21.60 m', pct: 100, x: 43.3, y: 51.7 },
+      { name: 'Headpond Layer 1~4', design: '11,959.47 m³', excavated: '11,959.47 m³', pct: 100, x: 25.1, y: 54.7 },
+      { name: 'Spillway Tunnel', design: '277.75 m', excavated: '160.13 m', pct: 57.65, x: 60.3, y: 67.1 },
+      { name: 'HRT-F1', design: '1,568.00 m', excavated: '150.85 m', pct: 9.62, x: 14.8, y: 66.8 },
+    ],
+  };
+  const t3dColor = (p) => (p >= 99.5 ? '#36b37e' : p >= 50 ? '#2f7de1' : p >= 25 ? '#f5a623' : '#e5554e');
+
+  function renderTunnel3D() {
+    const wrap = document.querySelector('.t3d-wrap');
+    const legend = document.getElementById('t3d-legend');
+    const detail = document.getElementById('t3d-detail');
+    if (!wrap || !legend || !detail) return;
+    const secs = TUNNEL_HEADWORK.sections;
+    wrap.querySelectorAll('.t3d-dot').forEach((d) => d.remove());
+
+    const select = (i) => {
+      const s = secs[i];
+      wrap.querySelectorAll('.t3d-dot').forEach((d, j) => d.classList.toggle('active', j === i));
+      legend.querySelectorAll('li').forEach((li, j) => li.classList.toggle('active', j === i));
+      detail.innerHTML = `
+        <div class="dn">${s.name}</div>
+        <div class="dbig" style="color:${t3dColor(s.pct)}">${s.pct}%</div>
+        <div class="pbar"><div class="track"><i style="width:${s.pct}%;background:${t3dColor(s.pct)}"></i></div></div>
+        <div class="drow"><span>Design length</span><span>${s.design}</span></div>
+        <div class="drow"><span>Excavated</span><span>${s.excavated}</span></div>
+        <div class="drow"><span>Data date</span><span>${TUNNEL_HEADWORK.dataDate}</span></div>`;
+    };
+
+    secs.forEach((s, i) => {
+      const d = document.createElement('div');
+      d.className = 't3d-dot pulse';
+      d.style.left = s.x + '%';
+      d.style.top = s.y + '%';
+      d.style.background = t3dColor(s.pct);
+      d.title = s.name + ' — ' + s.pct + '%';
+      d.addEventListener('click', () => select(i));
+      wrap.appendChild(d);
+    });
+
+    legend.innerHTML = secs.map((s, i) => `
+      <li data-i="${i}"><span class="ld" style="background:${t3dColor(s.pct)}"></span>
+        <span class="nm">${s.name}</span>
+        <span class="pc" style="color:${t3dColor(s.pct)}">${s.pct}%</span></li>`).join('');
+    legend.querySelectorAll('li').forEach((li) =>
+      li.addEventListener('click', () => select(+li.dataset.i)));
+  }
+
   function renderAll() {
     renderKpis();
     renderSCurve('ch-scurve');
@@ -227,5 +283,6 @@
   $('#today').textContent = new Date().toLocaleDateString('en-GB',
     { day: '2-digit', month: 'short', year: 'numeric' });
 
+  renderTunnel3D(); // embedded data — independent of the API fetch
   load();
 })();

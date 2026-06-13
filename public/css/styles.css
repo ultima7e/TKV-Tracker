@@ -100,6 +100,31 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .tbl tr.warn td:first-child::before{background:var(--amber)}
 .tbl tr.warn td:last-child{color:var(--red)}
 
+/* ---- interactive 3D tunnel view ---- */
+.t3d{display:grid;grid-template-columns:1.7fr 1fr;gap:16px;align-items:start}
+.t3d-wrap{position:relative;width:100%;background:#fbfdff;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.t3d-wrap img{width:100%;display:block}
+.t3d-dot{position:absolute;width:20px;height:20px;border-radius:50%;border:2.5px solid #fff;
+  transform:translate(-50%,-50%);cursor:pointer;box-shadow:0 1px 4px rgba(16,42,74,.35);transition:.15s}
+.t3d-dot:hover,.t3d-dot.active{transform:translate(-50%,-50%) scale(1.4);z-index:3}
+.t3d-dot.pulse{animation:t3dpulse 1.8s infinite}
+@keyframes t3dpulse{0%{box-shadow:0 0 0 0 rgba(47,125,225,.45)}
+  70%{box-shadow:0 0 0 13px rgba(47,125,225,0)}100%{box-shadow:0 0 0 0 rgba(47,125,225,0)}}
+.t3d-legend{list-style:none}
+.t3d-legend li{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:7px;cursor:pointer;
+  font-size:12.5px;border-bottom:1px solid var(--line);transition:.12s}
+.t3d-legend li:last-child{border-bottom:none}
+.t3d-legend li:hover,.t3d-legend li.active{background:#eef4fc}
+.t3d-legend .ld{width:11px;height:11px;border-radius:50%;flex-shrink:0}
+.t3d-legend .nm{flex:1;color:var(--navy);font-weight:600}
+.t3d-legend .pc{font-weight:700}
+.t3d-detail{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:10px;background:#f8fbff}
+.t3d-detail .dn{font-size:13px;font-weight:800;color:var(--navy)}
+.t3d-detail .dbig{font-size:30px;font-weight:800;line-height:1.1;margin:6px 0 2px}
+.t3d-detail .drow{display:flex;justify-content:space-between;font-size:12.5px;color:#41506a;padding:4px 0;border-top:1px dashed var(--line)}
+.t3d-detail .pbar .track{height:9px;background:#eef2f7;border-radius:6px;overflow:hidden;margin:8px 0 12px}
+.t3d-detail .pbar .track>i{display:block;height:100%;border-radius:6px;transition:width 1s cubic-bezier(.2,.8,.2,1)}
+
 /* ---- responsive ---- */
 @media (min-width:881px) and (max-width:1280px){
   .kpis{grid-template-columns:repeat(3,1fr)}
@@ -123,7 +148,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   .btn-refresh{padding:7px 13px}
   .content{padding:14px}
   .kpis{grid-template-columns:repeat(2,1fr)}
-  .row-2,.row-3{grid-template-columns:1fr}
+  .row-2,.row-3,.t3d{grid-template-columns:1fr}
   .kpi .val{font-size:19px}
 }
 @media (max-width:560px){
