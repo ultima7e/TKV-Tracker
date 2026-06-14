@@ -2,5 +2,11 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "api/data.js": { "maxDuration": 15 }
-  }
+  },
+  "headers": [
+    {
+      "source": "/(.*)\\.(css|js|html)",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
+    }
+  ]
 }
