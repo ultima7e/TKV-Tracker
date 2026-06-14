@@ -274,8 +274,105 @@
     selectArea(t3dArea);
   }
 
+  function renderFinancial() {
+    const fd = data.financeDetail;
+    if (!fd) return;
+    const b = fd.budget, rc = fd.received;
+    const usdM = (v) => (v / 1e6).toFixed(2);
+    const nprB = (v) => (v / 1e9).toFixed(2);
+    const nprM = (v) => (v / 1e6).toFixed(1);
+    setKpi('f-cusd', b.workUSD / 1e6, 2);
+    setKpi('f-cnpr', b.workNPR / 1e9, 2);
+    setKpi('f-rusd', rc.usd / 1e6, 2);
+    setKpi('f-rnpr', rc.npr / 1e9, 2);
+    setKpi('f-out', b.outUSDEq / 1e6, 2);
+    setKpi('f-prog', b.workUSDEq ? Math.round((b.completeUSDEq / b.workUSDEq) * 1000) / 10 : null, 1);
+
+    // donut: certified vs outstanding work value (USD-equivalent)
+    makeChart('f-donut').setOption({
+      tooltip: { trigger: 'item',
+        formatter: (p) => `${p.name}<br/><b>$ ${usdM(p.value)} M</b> (${p.percent}%)` },
+      legend: { bottom: 0, textStyle: { fontSize: 11, color: COL.muted } },
+      series: [{
+        type: 'pie', radius: ['48%', '72%'], center: ['50%', '45%'], avoidLabelOverlap: true,
+        itemStyle: { borderColor: '#fff', borderWidth: 2 },
+        label: { show: true, formatter: '{d}%', fontSize: 11, fontWeight: 700, color: COL.muted },
+        data: [
+          { name: 'Certified', value: Math.round(b.completeUSDEq), itemStyle: { color: COL.accent2 } },
+          { name: 'Outstanding', value: Math.round(b.outUSDEq), itemStyle: { color: '#dde5ef' } },
+        ],
+      }],
+    });
+
+    // bar: cash received per IPC (NPR, millions)
+    const ipcs = fd.ipcs || [];
+    makeChart('f-bar').setOption({
+      grid: { left: 44, right: 12, top: 16, bottom: 56 },
+      tooltip: { trigger: 'axis',
+        formatter: (ps) => {
+          const i = ipcs[ps[0].dataIndex];
+          return `<b>${i.ipc}</b>${i.certifiedDate ? ' · ' + i.certifiedDate : ''}<br/>` +
+            `Received: NPR ${nprM(i.receivedNPR)} M` + (i.receivedUSD ? ` + $ ${usdM(i.receivedUSD)} M` : '') +
+            `<br/>Status: ${i.status}`;
+        } },
+      xAxis: { type: 'category', data: ipcs.map((i) => i.ipc.replace('Advance Payment', 'Adv')),
+        axisLabel: { fontSize: 9, color: COL.muted, rotate: 38 }, axisLine: { lineStyle: { color: '#cfd8e6' } } },
+      yAxis: { type: 'value', name: 'NPR M', nameTextStyle: { fontSize: 10, color: COL.muted },
+        splitLine: { lineStyle: { color: COL.grid } }, axisLabel: { fontSize: 10, color: COL.muted } },
+      series: [{ type: 'bar', data: ipcs.map((i) => Math.round(i.receivedNPR / 1e6)), barWidth: '58%',
+        itemStyle: { borderRadius: [4, 4, 0, 0],
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1,
+            [{ offset: 0, color: COL.accent }, { offset: 1, color: COL.accent2 }]) } }],
+    });
+
+    // IPC register accordion
+    document.getElementById('f-ipccount').textContent = ipcs.length;
+    const chip = (it) => {
+      const L = /^[A-F]/.test(it.code) ? it.code[0].toUpperCase() : '';
+      return `<span class="chip ${L}">${it.category}</span>`;
+    };
+    const itemsTable = (items) => `
+      <table class="tbl">
+        <thead><tr><th>Item</th><th>Category</th><th>Payment&nbsp;%</th><th>Net (USD)</th><th>Net (NPR)</th></tr></thead>
+        <tbody>${items.map((it) => `
+          <tr><td>${it.code}</td><td style="text-align:left">${chip(it)}</td>
+            <td>${it.paymentPct != null ? it.paymentPct + '%' : '–'}</td>
+            <td>${it.netUSD ? '$ ' + usdM(it.netUSD) + ' M' : '–'}</td>
+            <td>${it.netNPR ? nprM(it.netNPR) + ' M' : '–'}</td></tr>`).join('')}
+        </tbody>
+      </table>`;
+    const instalTable = (ins) => `
+      <table class="tbl">
+        <thead><tr><th>Tranche</th><th>Date</th><th>USD</th><th>NPR</th></tr></thead>
+        <tbody>${ins.map((x) => `
+          <tr><td>${x.label}</td><td>${x.date || '–'}</td>
+            <td>${x.amountUSD ? '$ ' + usdM(x.amountUSD) + ' M' : '–'}</td>
+            <td>${x.amountNPR ? nprM(x.amountNPR) + ' M' : '–'}</td></tr>`).join('')}
+        </tbody>
+      </table>`;
+    const done = (s) => /complete/i.test(s);
+    document.getElementById('f-ipclist').innerHTML = ipcs.map((i, idx) => `
+      <div class="ipc" data-i="${idx}">
+        <div class="ipc-head">
+          <span class="ipc-name">${i.ipc}</span>
+          <span class="ipc-date">${i.certifiedDate || ''}</span>
+          <span class="ipc-amt">Net <b>$${usdM(i.netUSD)}M</b> / <b>NPR ${nprM(i.netNPR)}M</b></span>
+          <span class="ipc-amt">Recv <b>NPR ${nprM(i.receivedNPR)}M</b></span>
+          <span class="badge ${done(i.status) ? 'ok' : 'warn'}">${i.status}</span>
+          <span class="ipc-caret">▸</span>
+        </div>
+        <div class="ipc-body">
+          ${i.items.length ? '<div class="ipc-sub">Work Items (' + i.items.length + ')</div>' + itemsTable(i.items) : ''}
+          ${i.installments.length ? '<div class="ipc-sub">Payment Tranches</div>' + instalTable(i.installments) : ''}
+        </div>
+      </div>`).join('');
+    document.querySelectorAll('#f-ipclist .ipc-head').forEach((h) =>
+      h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
+  }
+
   function renderAll() {
     renderKpis();
+    renderFinancial();
     renderSCurve('ch-scurve');
     renderAdvanceChart('ch-tunnel-advance');
     renderTunnelBars();

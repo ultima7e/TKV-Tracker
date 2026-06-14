@@ -130,6 +130,30 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .t3d-detail .pbar .track{height:9px;background:#eef2f7;border-radius:6px;overflow:hidden;margin:8px 0 12px}
 .t3d-detail .pbar .track>i{display:block;height:100%;border-radius:6px;transition:width 1s cubic-bezier(.2,.8,.2,1)}
 
+/* ---- finance: IPC accordion ---- */
+.ipc{border:1px solid var(--line);border-radius:10px;margin-bottom:9px;overflow:hidden;background:#fff}
+.ipc-head{display:grid;grid-template-columns:108px 1fr auto auto auto 20px;gap:12px;align-items:center;
+  padding:11px 14px;cursor:pointer;transition:.12s}
+.ipc-head:hover{background:#f6f9fd}
+.ipc.open .ipc-head{background:#eef4fc}
+.ipc-name{font-weight:800;color:var(--navy);font-size:13px}
+.ipc-date{font-size:11.5px;color:var(--muted)}
+.ipc-amt{font-size:12px;color:#41506a;white-space:nowrap}
+.ipc-amt b{color:var(--navy)}
+.ipc-caret{transition:transform .18s;color:var(--muted);font-size:12px;text-align:center}
+.ipc.open .ipc-caret{transform:rotate(90deg)}
+.ipc-body{display:none;padding:4px 14px 14px;border-top:1px solid var(--line);background:#fbfdff}
+.ipc.open .ipc-body{display:block}
+.ipc-sub{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);
+  font-weight:700;margin:12px 2px 6px}
+.badge{font-size:10px;font-weight:800;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.badge.ok{background:#e4f5ee;color:#1c7a52} .badge.warn{background:#fdf0d8;color:#9a6b00}
+.chip{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;
+  background:#eef2f7;color:#51637e}
+.chip.A{background:#ede9fb;color:#5b46c9} .chip.B{background:#e6f0fd;color:#2f6fd0}
+.chip.C{background:#e2f4ee;color:#1d8a63} .chip.D{background:#fdeede;color:#b9772a}
+.chip.E{background:#fde8ea;color:#c0414b} .chip.F{background:#e9eef5;color:#445876}
+
 /* ---- responsive ---- */
 @media (min-width:881px) and (max-width:1280px){
   .kpis{grid-template-columns:repeat(3,1fr)}
@@ -155,6 +179,8 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   .kpis{grid-template-columns:repeat(2,1fr)}
   .row-2,.row-3,.t3d{grid-template-columns:1fr}
   .kpi .val{font-size:19px}
+  .ipc-head{grid-template-columns:1fr auto 20px;row-gap:4px}
+  .ipc-date,.ipc-amt{grid-column:1 / -1}
 }
 @media (max-width:560px){
   #today{display:none}

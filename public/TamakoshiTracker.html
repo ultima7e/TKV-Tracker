@@ -107,6 +107,30 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .tbl tr.warn td:first-child::before{background:var(--amber)}
 .tbl tr.warn td:last-child{color:var(--red)}
 
+/* ---- finance: IPC accordion ---- */
+.ipc{border:1px solid var(--line);border-radius:10px;margin-bottom:9px;overflow:hidden;background:#fff}
+.ipc-head{display:grid;grid-template-columns:108px 1fr auto auto auto 20px;gap:12px;align-items:center;
+  padding:11px 14px;cursor:pointer;transition:.12s}
+.ipc-head:hover{background:#f6f9fd}
+.ipc.open .ipc-head{background:#eef4fc}
+.ipc-name{font-weight:800;color:var(--navy);font-size:13px}
+.ipc-date{font-size:11.5px;color:var(--muted)}
+.ipc-amt{font-size:12px;color:#41506a;white-space:nowrap}
+.ipc-amt b{color:var(--navy)}
+.ipc-caret{transition:transform .18s;color:var(--muted);font-size:12px;text-align:center}
+.ipc.open .ipc-caret{transform:rotate(90deg)}
+.ipc-body{display:none;padding:4px 14px 14px;border-top:1px solid var(--line);background:#fbfdff}
+.ipc.open .ipc-body{display:block}
+.ipc-sub{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);
+  font-weight:700;margin:12px 2px 6px}
+.badge{font-size:10px;font-weight:800;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.badge.ok{background:#e4f5ee;color:#1c7a52} .badge.warn{background:#fdf0d8;color:#9a6b00}
+.chip{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;
+  background:#eef2f7;color:#51637e}
+.chip.A{background:#ede9fb;color:#5b46c9} .chip.B{background:#e6f0fd;color:#2f6fd0}
+.chip.C{background:#e2f4ee;color:#1d8a63} .chip.D{background:#fdeede;color:#b9772a}
+.chip.E{background:#fde8ea;color:#c0414b} .chip.F{background:#e9eef5;color:#445876}
+
 /* ---- responsive ---- */
 @media (min-width:881px) and (max-width:1280px){
   .kpis{grid-template-columns:repeat(3,1fr)}
@@ -130,8 +154,10 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   .btn-refresh{padding:7px 13px}
   .content{padding:14px}
   .kpis{grid-template-columns:repeat(2,1fr)}
-  .row-2,.row-3{grid-template-columns:1fr}
+  .row-2,.row-3,.t3d{grid-template-columns:1fr}
   .kpi .val{font-size:19px}
+  .ipc-head{grid-template-columns:1fr auto 20px;row-gap:4px}
+  .ipc-date,.ipc-amt{grid-column:1 / -1}
 }
 @media (max-width:560px){
   #today{display:none}
@@ -213,7 +239,24 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
         </div>
       </section>
 
-      <section class="view" id="fin"><div class="card"><h3>Financial Dashboard</h3><p class="muted">Awaiting finance data sheet (Phase 2).</p></div></section>
+      <section class="view" id="fin">
+        <div class="grid kpis" style="margin-bottom:16px">
+          <div class="card kpi"><h3>Contract (USD)</h3><div class="val">$ <span id="f-cusd">—</span> M</div><div class="sub">USD portion of contract</div></div>
+          <div class="card kpi"><h3>Contract (NPR)</h3><div class="val">NPR <span id="f-cnpr">—</span> Bn</div><div class="sub">NPR portion of contract</div></div>
+          <div class="card kpi"><h3>Received (USD)</h3><div class="val">$ <span id="f-rusd">—</span> M</div><div class="sub">incl. advances</div></div>
+          <div class="card kpi"><h3>Received (NPR)</h3><div class="val">NPR <span id="f-rnpr">—</span> Bn</div><div class="sub">incl. advances</div></div>
+          <div class="card kpi"><h3>Outstanding</h3><div class="val">$ <span id="f-out">—</span> M</div><div class="sub">USD-equivalent</div></div>
+          <div class="card kpi"><h3>Financial Progress</h3><div class="val"><span id="f-prog">—</span>%</div><div class="sub">certified / contract value</div></div>
+        </div>
+        <div class="grid row-2" style="margin-bottom:16px">
+          <div class="card"><h3>Work Value — Certified vs Outstanding</h3><div id="f-donut" class="chart" style="height:280px"></div></div>
+          <div class="card"><h3>Cash Received per IPC</h3><div id="f-bar" class="chart" style="height:280px"></div></div>
+        </div>
+        <div class="card">
+          <h3>IPC Register — <span id="f-ipccount">—</span> certificates <span class="muted" style="font-weight:600">· click to expand items</span></h3>
+          <div id="f-ipclist"><p class="muted">Awaiting finance data.</p></div>
+        </div>
+      </section>
       <section class="view" id="sched"><div class="card"><h3>Schedule &amp; Progress</h3><p class="muted">Awaiting schedule data sheet (Phase 2).</p></div></section>
       <section class="view" id="claims"><div class="card"><h3>Claims &amp; Variations</h3><p class="muted">Awaiting claims data sheet (Phase 2).</p></div></section>
       <section class="view" id="inv"><div class="card"><h3>Inventory &amp; Explosives</h3><p class="muted">Awaiting inventory data sheet (Phase 2).</p></div></section>
@@ -503,8 +546,101 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     selectArea(t3dArea);
   }
 
+  function renderFinancial() {
+    const fd = data.financeDetail;
+    if (!fd) return;
+    const b = fd.budget, rc = fd.received;
+    const usdM = (v) => (v / 1e6).toFixed(2);
+    const nprM = (v) => (v / 1e6).toFixed(1);
+    setKpi('f-cusd', b.workUSD / 1e6, 2);
+    setKpi('f-cnpr', b.workNPR / 1e9, 2);
+    setKpi('f-rusd', rc.usd / 1e6, 2);
+    setKpi('f-rnpr', rc.npr / 1e9, 2);
+    setKpi('f-out', b.outUSDEq / 1e6, 2);
+    setKpi('f-prog', b.workUSDEq ? Math.round((b.completeUSDEq / b.workUSDEq) * 1000) / 10 : null, 1);
+
+    makeChart('f-donut').setOption({
+      tooltip: { trigger: 'item',
+        formatter: (p) => `${p.name}<br/><b>$ ${usdM(p.value)} M</b> (${p.percent}%)` },
+      legend: { bottom: 0, textStyle: { fontSize: 11, color: COL.muted } },
+      series: [{
+        type: 'pie', radius: ['48%', '72%'], center: ['50%', '45%'], avoidLabelOverlap: true,
+        itemStyle: { borderColor: '#fff', borderWidth: 2 },
+        label: { show: true, formatter: '{d}%', fontSize: 11, fontWeight: 700, color: COL.muted },
+        data: [
+          { name: 'Certified', value: Math.round(b.completeUSDEq), itemStyle: { color: COL.accent2 } },
+          { name: 'Outstanding', value: Math.round(b.outUSDEq), itemStyle: { color: '#dde5ef' } },
+        ],
+      }],
+    });
+
+    const ipcs = fd.ipcs || [];
+    makeChart('f-bar').setOption({
+      grid: { left: 44, right: 12, top: 16, bottom: 56 },
+      tooltip: { trigger: 'axis',
+        formatter: (ps) => {
+          const i = ipcs[ps[0].dataIndex];
+          return `<b>${i.ipc}</b>${i.certifiedDate ? ' · ' + i.certifiedDate : ''}<br/>` +
+            `Received: NPR ${nprM(i.receivedNPR)} M` + (i.receivedUSD ? ` + $ ${usdM(i.receivedUSD)} M` : '') +
+            `<br/>Status: ${i.status}`;
+        } },
+      xAxis: { type: 'category', data: ipcs.map((i) => i.ipc.replace('Advance Payment', 'Adv')),
+        axisLabel: { fontSize: 9, color: COL.muted, rotate: 38 }, axisLine: { lineStyle: { color: '#cfd8e6' } } },
+      yAxis: { type: 'value', name: 'NPR M', nameTextStyle: { fontSize: 10, color: COL.muted },
+        splitLine: { lineStyle: { color: COL.grid } }, axisLabel: { fontSize: 10, color: COL.muted } },
+      series: [{ type: 'bar', data: ipcs.map((i) => Math.round(i.receivedNPR / 1e6)), barWidth: '58%',
+        itemStyle: { borderRadius: [4, 4, 0, 0],
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1,
+            [{ offset: 0, color: COL.accent }, { offset: 1, color: COL.accent2 }]) } }],
+    });
+
+    document.getElementById('f-ipccount').textContent = ipcs.length;
+    const chip = (it) => {
+      const L = /^[A-F]/.test(it.code) ? it.code[0].toUpperCase() : '';
+      return `<span class="chip ${L}">${it.category}</span>`;
+    };
+    const itemsTable = (items) => `
+      <table class="tbl">
+        <thead><tr><th>Item</th><th>Category</th><th>Payment&nbsp;%</th><th>Net (USD)</th><th>Net (NPR)</th></tr></thead>
+        <tbody>${items.map((it) => `
+          <tr><td>${it.code}</td><td style="text-align:left">${chip(it)}</td>
+            <td>${it.paymentPct != null ? it.paymentPct + '%' : '–'}</td>
+            <td>${it.netUSD ? '$ ' + usdM(it.netUSD) + ' M' : '–'}</td>
+            <td>${it.netNPR ? nprM(it.netNPR) + ' M' : '–'}</td></tr>`).join('')}
+        </tbody>
+      </table>`;
+    const instalTable = (ins) => `
+      <table class="tbl">
+        <thead><tr><th>Tranche</th><th>Date</th><th>USD</th><th>NPR</th></tr></thead>
+        <tbody>${ins.map((x) => `
+          <tr><td>${x.label}</td><td>${x.date || '–'}</td>
+            <td>${x.amountUSD ? '$ ' + usdM(x.amountUSD) + ' M' : '–'}</td>
+            <td>${x.amountNPR ? nprM(x.amountNPR) + ' M' : '–'}</td></tr>`).join('')}
+        </tbody>
+      </table>`;
+    const done = (s) => /complete/i.test(s);
+    document.getElementById('f-ipclist').innerHTML = ipcs.map((i) => `
+      <div class="ipc">
+        <div class="ipc-head">
+          <span class="ipc-name">${i.ipc}</span>
+          <span class="ipc-date">${i.certifiedDate || ''}</span>
+          <span class="ipc-amt">Net <b>$${usdM(i.netUSD)}M</b> / <b>NPR ${nprM(i.netNPR)}M</b></span>
+          <span class="ipc-amt">Recv <b>NPR ${nprM(i.receivedNPR)}M</b></span>
+          <span class="badge ${done(i.status) ? 'ok' : 'warn'}">${i.status}</span>
+          <span class="ipc-caret">▸</span>
+        </div>
+        <div class="ipc-body">
+          ${i.items.length ? '<div class="ipc-sub">Work Items (' + i.items.length + ')</div>' + itemsTable(i.items) : ''}
+          ${i.installments.length ? '<div class="ipc-sub">Payment Tranches</div>' + instalTable(i.installments) : ''}
+        </div>
+      </div>`).join('');
+    document.querySelectorAll('#f-ipclist .ipc-head').forEach((h) =>
+      h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
+  }
+
   function renderAll() {
     renderKpis();
+    renderFinancial();
     renderSCurve('ch-scurve');
     renderAdvanceChart('ch-tunnel-advance');
     renderTunnelBars();

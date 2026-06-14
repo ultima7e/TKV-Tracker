@@ -9,7 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const { workbookToRows, workbookToMatrices } = require('../lib/workbook');
-const { parseTunnel, parseKpis, parseSCurve, parseFinance, parseManpower, parseIpc } = require('../lib/parsers');
+const { parseTunnel, parseKpis, parseSCurve, parseFinance, parseManpower, parseIpc, parseFinanceDetail } = require('../lib/parsers');
 
 const DAV_BASE = 'https://dav.jianguoyun.com/dav/';
 
@@ -54,6 +54,7 @@ async function buildPayload() {
   const finance = parseFinance(matrices);
   const manpower = parseManpower(matrices);
   const ipc = parseIpc(matrices);
+  const financeDetail = parseFinanceDetail(matrices);
   return {
     generatedAt: new Date().toISOString(),
     source,
@@ -71,6 +72,7 @@ async function buildPayload() {
       idleTotal: manpower.idleTotal,
     },
     ipc: { rows: ipc.rows, total: ipc.total },
+    financeDetail,
   };
 }
 
