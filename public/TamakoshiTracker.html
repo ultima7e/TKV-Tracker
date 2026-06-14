@@ -197,12 +197,13 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 
       <section class="view" id="tunnel">
         <div class="card" style="margin-bottom:16px">
-          <h3>Tunnel 3D Model <span class="muted" style="font-weight:600">· click a tunnel · drag to rotate, scroll to zoom</span></h3>
+          <h3>Tunnel 3D Progress View <span class="muted" style="font-weight:600">· click a section</span></h3>
+          <div class="t3d-tabs" id="t3d-tabs"></div>
           <div class="t3d">
-            <div class="t3d-canvas" id="t3d-canvas"><div class="t3d-loading">Loading 3D model…</div></div>
+            <div class="t3d-wrap"><img id="t3d-img" alt="Tunnel 3D view"></div>
             <div>
               <ul class="t3d-legend" id="t3d-legend"></ul>
-              <div class="t3d-detail" id="t3d-detail"><p class="muted">Select a tunnel to see its progress.</p></div>
+              <div class="t3d-detail" id="t3d-detail"><p class="muted">Select a tunnel section to see its progress.</p></div>
             </div>
           </div>
         </div>
@@ -554,14 +555,9 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   $('#today').textContent = new Date().toLocaleDateString('en-GB',
     { day: '2-digit', month: 'short', year: 'numeric' });
 
+  renderTunnel3D(); // embedded data — independent of the API fetch
   load();
 })();
 </script>
-<!-- Real 3D tunnel model: three.js + viewer + geometry all served from Vercel,
-     so this shared single file stays small and always current. -->
-<script>window.T3D_BIN_URL = 'https://tkv-tracker.vercel.app/assets/tunnels.bin';</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-<script src="https://tkv-tracker.vercel.app/js/tunnel3d.js"></script>
 </body>
 </html>

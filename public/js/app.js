@@ -328,5 +328,6 @@
   $('#today').textContent = new Date().toLocaleDateString('en-GB',
     { day: '2-digit', month: 'short', year: 'numeric' });
 
+  renderTunnel3D(); // embedded data — independent of the API fetch
   load();
 })();
