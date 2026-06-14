@@ -298,8 +298,8 @@
         itemStyle: { borderColor: '#fff', borderWidth: 2 },
         label: { show: true, formatter: '{d}%', fontSize: 11, fontWeight: 700, color: COL.muted },
         data: [
-          { name: 'Certified', value: Math.round(b.completeUSDEq), itemStyle: { color: COL.accent2 } },
-          { name: 'Outstanding', value: Math.round(b.outUSDEq), itemStyle: { color: '#dde5ef' } },
+          { name: 'Certified', value: Math.round(b.completeUSDEq), itemStyle: { color: '#2fae7a' } },
+          { name: 'Outstanding', value: Math.round(b.outUSDEq), itemStyle: { color: '#f2a65a' } },
         ],
       }],
     });
