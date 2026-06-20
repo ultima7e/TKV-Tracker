@@ -13,20 +13,36 @@ const { parseTunnel, parseKpis, parseSCurve, parseFinance, parseManpower, parseI
 
 const DAV_BASE = 'https://dav.jianguoyun.com/dav/';
 
-// NUTSTORE_FILE_PATH may list several files separated by ';' — each is
-// fetched and their sheets merged (later files win on duplicate names).
+const encPath = (p) => p.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
+
+// Production: load EVERY .xlsx in the Nutstore folder so newly-added workbooks
+// (e.g. the daily manpower sheet) are picked up automatically — no env-var
+// change needed. The folder is taken from NUTSTORE_FILE_PATH (dir of the first
+// entry). Falls back to the explicit ';'-separated list if listing fails.
 async function fetchWorkbookBuffers() {
   const { NUTSTORE_USER, NUTSTORE_PASSWORD, NUTSTORE_FILE_PATH } = process.env;
   if (NUTSTORE_USER && NUTSTORE_PASSWORD && NUTSTORE_FILE_PATH) {
     const auth = Buffer.from(`${NUTSTORE_USER}:${NUTSTORE_PASSWORD}`).toString('base64');
-    const paths = NUTSTORE_FILE_PATH.split(';').map((p) => p.trim()).filter(Boolean);
+    const headers = { Authorization: `Basic ${auth}` };
+    const first = NUTSTORE_FILE_PATH.split(';')[0].trim().replace(/^\/+/, '');
+    const dir = first.includes('/') ? first.slice(0, first.lastIndexOf('/')) : '';
+
+    let paths = [];
+    try {
+      const res = await fetch(DAV_BASE + encPath(dir) + '/', { method: 'PROPFIND', headers: { ...headers, Depth: '1' } });
+      if (res.ok) {
+        const xml = await res.text();
+        paths = [...xml.matchAll(/<[a-z]*:?href>([^<]*)<\/[a-z]*:?href>/gi)]
+          .map((m) => decodeURIComponent(m[1]).replace(/^\/dav\//, '').replace(/\/$/, ''))
+          .filter((h) => /\.xlsx$/i.test(h) && !/\/~\$/.test(h));
+      }
+    } catch { /* fall through to explicit list */ }
+    if (!paths.length) paths = NUTSTORE_FILE_PATH.split(';').map((p) => p.trim()).filter(Boolean);
+
     const buffers = [];
     for (const p of paths) {
-      const url = DAV_BASE + p.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
-      const res = await fetch(url, { headers: { Authorization: `Basic ${auth}` } });
-      if (!res.ok) {
-        throw new Error(`Nutstore responded ${res.status} ${res.statusText} for "${p}"`);
-      }
+      const res = await fetch(DAV_BASE + encPath(p), { headers });
+      if (!res.ok) throw new Error(`Nutstore responded ${res.status} ${res.statusText} for "${p}"`);
       buffers.push(Buffer.from(await res.arrayBuffer()));
     }
     return { buffers, source: 'nutstore' };
