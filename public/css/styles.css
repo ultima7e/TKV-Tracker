@@ -132,6 +132,16 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .t3d-detail .pbar .track{height:9px;background:#eef2f7;border-radius:6px;overflow:hidden;margin:8px 0 12px}
 .t3d-detail .pbar .track>i{display:block;height:100%;border-radius:6px;transition:width 1s cubic-bezier(.2,.8,.2,1)}
 
+/* ---- finance: advance amortisation ---- */
+.amort{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 18px;align-items:end}
+.amort .a-stat .lab{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700}
+.amort .a-stat .num{font-size:19px;font-weight:800;color:var(--navy);margin-top:3px;line-height:1.1}
+.amort .a-stat .num small{font-size:12px;font-weight:700;color:#41506a}
+.amort .a-stat.recovered .num{color:var(--green)} .amort .a-stat.out .num{color:var(--amber)}
+.amort .a-bar{grid-column:1/-1;height:10px;background:#eef2f7;border-radius:6px;overflow:hidden;margin-top:2px}
+.amort .a-bar>i{display:block;height:100%;border-radius:6px;width:0;
+  background:linear-gradient(90deg,var(--green),var(--accent-2));transition:width 1s cubic-bezier(.2,.8,.2,1)}
+
 /* ---- finance: IPC accordion ---- */
 .ipc{border:1px solid var(--line);border-radius:10px;margin-bottom:9px;overflow:hidden;background:#fff}
 .ipc-head{display:grid;grid-template-columns:108px 1fr auto auto auto 20px;gap:12px;align-items:center;

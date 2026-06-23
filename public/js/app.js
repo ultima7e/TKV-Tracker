@@ -316,6 +316,55 @@
     setKpi('f-out', b.outUSDEq / 1e6, 2);
     setKpi('f-prog', b.workUSDEq ? Math.round((b.completeUSDEq / b.workUSDEq) * 1000) / 10 : null, 1);
 
+    // Advance Payment amortisation summary
+    const adv = fd.advance;
+    if (adv) {
+      const stat = (cls, lab, usd, npr) =>
+        `<div class="a-stat ${cls}"><div class="lab">${lab}</div>
+          <div class="num">$ ${usdM(usd)} M <small>/ NPR ${nprM(npr)} M</small></div></div>`;
+      document.getElementById('f-advance').innerHTML = `
+        <div class="amort">
+          ${stat('', 'Disbursed', adv.disbursedUSD, adv.disbursedNPR)}
+          ${stat('recovered', 'Recovered', adv.recoveredUSD, adv.recoveredNPR)}
+          ${stat('out', 'Outstanding', adv.outstandingUSD, adv.outstandingNPR)}
+          <div class="a-stat"><div class="lab">Amortised</div><div class="num">${adv.amortisedPct}%</div></div>
+          <div class="a-bar"><i data-w="${adv.amortisedPct}"></i></div>
+        </div>
+        <p class="muted" style="margin-top:10px">Recovery is deducted as 15% of each IPC${adv.recoveredNPR === 0 ? ' — not started yet' : ''}.</p>`;
+      requestAnimationFrame(() => {
+        const bar = document.querySelector('#f-advance .a-bar > i');
+        if (bar) bar.style.width = adv.amortisedPct + '%';
+      });
+    }
+
+    // Earned Value by category pie (work done, weighted by USD-equivalent)
+    const cats = fd.earnedByCategory || [];
+    const CHIPCOL = { A: '#5b46c9', B: '#2f6fd0', C: '#1d8a63', D: '#b9772a', E: '#c0414b', F: '#445876' };
+    const catColor = (name) => {
+      const hit = Object.entries({ 'Hydro-mechanical': 'A', 'Mobilisation': 'B', 'Headwork': 'C', 'Headrace': 'D', 'Surge': 'E', 'Powerhouse': 'F' })
+        .find(([k]) => name.indexOf(k) === 0 || name.indexOf(k) >= 0);
+      return hit ? CHIPCOL[hit[1]] : '#9aa7b8';
+    };
+    const evChart = makeChart('f-evpie');
+    evChart.setOption({
+      tooltip: { trigger: 'item', formatter: (p) => `${p.name}<br/><b>$ ${usdM(p.value)} M</b> (${p.percent}%)` },
+      series: [{
+        type: 'pie', radius: ['40%', '70%'], center: ['50%', '50%'],
+        itemStyle: { borderColor: '#fff', borderWidth: 2 },
+        label: { show: false }, labelLine: { show: false },
+        data: cats.map((c) => ({ name: c.category, value: Math.round(c.usdEquiv), itemStyle: { color: catColor(c.category) } })),
+      }],
+    });
+    const evTotal = cats.reduce((s, c) => s + c.usdEquiv, 0) || 1;
+    evChart.off('click');
+    evChart.on('click', (p) => {
+      const c = cats[p.dataIndex];
+      document.getElementById('f-evdetail').innerHTML =
+        `<b style="color:${catColor(c.category)}">${c.category}</b> — $ ${usdM(c.usdEquiv)} M earned ` +
+        `· <b>${Math.round((c.usdEquiv / evTotal) * 1000) / 10}%</b> of total ` +
+        `<span class="muted">($ ${usdM(c.usd)} M + NPR ${nprM(c.npr)} M)</span>`;
+    });
+
     // donut: certified vs outstanding work value (USD-equivalent)
     makeChart('f-donut').setOption({
       tooltip: { trigger: 'item',
@@ -347,10 +396,14 @@
         axisLabel: { fontSize: 9, color: COL.muted, rotate: 38 }, axisLine: { lineStyle: { color: '#cfd8e6' } } },
       yAxis: { type: 'value', name: 'NPR M', nameTextStyle: { fontSize: 10, color: COL.muted },
         splitLine: { lineStyle: { color: COL.grid } }, axisLabel: { fontSize: 10, color: COL.muted } },
-      series: [{ type: 'bar', data: ipcs.map((i) => Math.round(i.receivedNPR / 1e6)), barWidth: '58%',
-        itemStyle: { borderRadius: [4, 4, 0, 0],
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1,
-            [{ offset: 0, color: COL.accent }, { offset: 1, color: COL.accent2 }]) } }],
+      series: [{ type: 'bar', barWidth: '58%',
+        data: ipcs.map((i) => ({
+          value: Math.round(i.receivedNPR / 1e6),
+          // Advance Payment bar shown in amber to set it apart from the IPCs.
+          itemStyle: { borderRadius: [4, 4, 0, 0], color: i.isAdvance
+            ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#f5a623' }, { offset: 1, color: '#f2c879' }])
+            : new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: COL.accent }, { offset: 1, color: COL.accent2 }]) },
+        })) }],
     });
 
     // IPC register accordion
