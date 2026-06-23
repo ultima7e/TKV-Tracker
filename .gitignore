@@ -17,3 +17,6 @@ node_modules/
 *.pptx
 _*.scr
 _acad_log.txt
+
+# P6 schedule source files (the parsed data is served from Nutstore)
+*.xer

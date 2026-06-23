@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const { workbookToRows, workbookToMatrices } = require('../lib/workbook');
 const { parseTunnel, parseKpis, parseSCurve, parseFinance, parseManpower, parseIpc, parseFinanceDetail } = require('../lib/parsers');
+const { parseXer } = require('../lib/xer');
 
 const DAV_BASE = 'https://dav.jianguoyun.com/dav/';
 
@@ -56,6 +57,21 @@ async function fetchWorkbookBuffers() {
   return { buffers, source: 'local-file' };
 }
 
+// The P6 schedule (.xer) — fetched from NUTSTORE_XER_PATH in production, or the
+// first .xer in data/ during local dev. Returns null if none is configured.
+async function fetchXerText() {
+  const { NUTSTORE_USER, NUTSTORE_PASSWORD, NUTSTORE_XER_PATH } = process.env;
+  if (NUTSTORE_USER && NUTSTORE_PASSWORD && NUTSTORE_XER_PATH) {
+    const auth = Buffer.from(`${NUTSTORE_USER}:${NUTSTORE_PASSWORD}`).toString('base64');
+    const res = await fetch(DAV_BASE + encPath(NUTSTORE_XER_PATH), { headers: { Authorization: `Basic ${auth}` } });
+    if (!res.ok) return null;
+    return Buffer.from(await res.arrayBuffer()).toString('latin1');
+  }
+  const dir = path.join(__dirname, '..', 'data');
+  const f = fs.readdirSync(dir).find((x) => x.endsWith('.xer') && !x.startsWith('~$'));
+  return f ? fs.readFileSync(path.join(dir, f), 'latin1') : null;
+}
+
 async function buildPayload() {
   const { buffers, source } = await fetchWorkbookBuffers();
   const sheets = {};
@@ -71,11 +87,14 @@ async function buildPayload() {
   const manpower = parseManpower(matrices);
   const ipc = parseIpc(matrices);
   const financeDetail = parseFinanceDetail(matrices);
+  const xerText = await fetchXerText().catch(() => null);
+  const schedule = xerText ? parseXer(xerText)
+    : { activities: [], relationships: [], wbs: {}, warnings: [] };
   return {
     generatedAt: new Date().toISOString(),
     source,
     warnings: [...tunnel.warnings, ...executive.warnings, ...scurve.warnings,
-      ...finance.warnings, ...manpower.warnings, ...ipc.warnings],
+      ...finance.warnings, ...manpower.warnings, ...ipc.warnings, ...schedule.warnings],
     tunnel: { tunnels: tunnel.tunnels, monthlyAdvance: tunnel.monthlyAdvance },
     executive: { kpis: executive.kpis },
     scurve: { months: scurve.months, plannedPct: scurve.plannedPct, actualPct: scurve.actualPct },
@@ -89,6 +108,7 @@ async function buildPayload() {
     },
     ipc: { rows: ipc.rows, total: ipc.total },
     financeDetail,
+    schedule: { activities: schedule.activities, relationships: schedule.relationships, wbs: schedule.wbs },
   };
 }
 

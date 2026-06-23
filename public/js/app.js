@@ -468,9 +468,114 @@
       h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
   }
 
+  let schedBuiltFor = null;
+  function renderSchedule() {
+    const sch = data.schedule || {};
+    const all = sch.activities || [];
+    const acts = all.filter((a) => a.start && a.finish);
+    if (!acts.length || schedBuiltFor === data) return;
+    schedBuiltFor = data;
+
+    const byTask = {};
+    all.forEach((a) => { byTask[a.taskId] = a; });
+    const predMap = {}, succMap = {};
+    (sch.relationships || []).forEach((r) => {
+      (predMap[r.taskId] = predMap[r.taskId] || []).push(r);
+      (succMap[r.predTaskId] = succMap[r.predTaskId] || []).push(r);
+    });
+    acts.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : (a.id < b.id ? -1 : 1)));
+    const idxByTask = {};
+    acts.forEach((a, j) => { idxByTask[a.taskId] = j; });
+    $('#sch-count').textContent = acts.length;
+
+    const day = (iso) => Math.floor(new Date(iso + 'T00:00:00Z').getTime() / 86400000);
+    const minDay = Math.min(...acts.map((a) => day(a.start)));
+    const maxDay = Math.max(...acts.map((a) => day(a.finish)));
+    const PXD = 2.2, ROW = 28, HEAD = 30, PAD = 20;
+    const width = (maxDay - minDay) * PXD + PAD * 2;
+    const xOf = (d) => PAD + (d - minDay) * PXD;
+    const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    const list = document.getElementById('g-list');
+    list.innerHTML = '<div class="g-head">Activity ID · Name</div>' + acts.map((a, i) =>
+      `<div class="g-row" data-i="${i}">
+        <span class="g-id">${a.id}</span><span class="g-nm">${a.name || ''}</span><span class="g-pc">${a.pct}%</span>
+      </div>`).join('');
+
+    let ticks = '';
+    let d = new Date(minDay * 86400000);
+    d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+    const end = new Date(maxDay * 86400000);
+    while (d <= end) {
+      const x = xOf(Math.floor(d.getTime() / 86400000));
+      const isYr = d.getUTCMonth() === 0;
+      ticks += `<div class="g-tick ${isYr ? 'yr' : ''}" style="left:${x}px">${isYr ? d.getUTCFullYear() : MON[d.getUTCMonth()]}</div>`;
+      d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+    }
+    const todayD = Math.floor(Date.now() / 86400000);
+    const today = (todayD >= minDay && todayD <= maxDay)
+      ? `<div class="g-today" style="left:${xOf(todayD)}px;top:${HEAD}px;height:${acts.length * ROW}px"></div>` : '';
+    const bars = acts.map((a, i) => {
+      const x = xOf(day(a.start)), top = HEAD + i * ROW + (ROW - 13) / 2;
+      if (a.isMilestone) {
+        return `<div class="g-ms ${a.critical ? 'crit' : ''}" data-i="${i}" style="left:${x - 6}px;top:${top - 0}px"></div>`;
+      }
+      const w = Math.max(4, (day(a.finish) - day(a.start)) * PXD);
+      const fill = a.pct > 0 && a.pct < 100 ? `<div class="g-fill" style="left:auto;right:0;width:${100 - a.pct}%"></div>` : '';
+      return `<div class="g-bar ${a.critical ? 'crit' : 'norm'} ${a.pct >= 100 ? 'done' : ''}" data-i="${i}"
+        style="left:${x}px;width:${w}px;top:${top}px" title="${a.id} · ${a.name || ''}">${fill}</div>`;
+    }).join('');
+    const time = document.getElementById('g-time');
+    time.innerHTML = `<div class="g-canvas" style="width:${width}px;height:${HEAD + acts.length * ROW}px">
+      <div class="g-axis" style="width:${width}px">${ticks}</div>${today}${bars}</div>`;
+
+    // synced vertical scroll
+    let lock = false;
+    time.onscroll = () => { if (lock) return; lock = true; list.scrollTop = time.scrollTop; lock = false; };
+    list.onscroll = () => { if (lock) return; lock = true; time.scrollTop = list.scrollTop; lock = false; };
+
+    const relItem = (x) => {
+      const lag = x.lag ? (x.lag > 0 ? ' +' + x.lag + 'd' : ' ' + x.lag + 'd') : '';
+      return `<div class="rl" data-tid="${x.act.taskId}"><span class="t">${x.type}${lag}</span>
+        <span class="rid">${x.act.id}</span><span class="rnm">${x.act.name || ''}</span></div>`;
+    };
+    const select = (i) => {
+      const a = acts[i];
+      list.querySelectorAll('.g-row').forEach((r) => r.classList.remove('sel', 'pred', 'succ'));
+      time.querySelectorAll('.g-bar,.g-ms').forEach((b) => b.classList.remove('hl'));
+      list.querySelector(`.g-row[data-i="${i}"]`)?.classList.add('sel');
+      time.querySelector(`[data-i="${i}"]`)?.classList.add('hl');
+      const preds = (predMap[a.taskId] || []).map((r) => ({ act: byTask[r.predTaskId], type: r.type, lag: r.lagDays })).filter((x) => x.act);
+      const succs = (succMap[a.taskId] || []).map((r) => ({ act: byTask[r.taskId], type: r.type, lag: r.lagDays })).filter((x) => x.act);
+      const mark = (arr, cls) => arr.forEach((x) => {
+        const j = idxByTask[x.act.taskId];
+        if (j != null) { list.querySelector(`.g-row[data-i="${j}"]`)?.classList.add(cls); time.querySelector(`[data-i="${j}"]`)?.classList.add('hl'); }
+      });
+      mark(preds, 'pred'); mark(succs, 'succ');
+      const rel = document.getElementById('g-rel');
+      rel.innerHTML =
+        `<div class="col"><h4>Predecessors (${preds.length})</h4>${preds.map(relItem).join('') || '<p class="muted">None</p>'}</div>
+         <div class="col"><h4>Successors (${succs.length})</h4>${succs.map(relItem).join('') || '<p class="muted">None</p>'}</div>`;
+      rel.querySelectorAll('.rl').forEach((el) => el.addEventListener('click', () => {
+        const j = idxByTask[el.dataset.tid];
+        if (j != null) { select(j); list.querySelector(`.g-row[data-i="${j}"]`).scrollIntoView({ block: 'center' }); }
+      }));
+    };
+
+    list.addEventListener('click', (e) => { const r = e.target.closest('.g-row'); if (r) select(+r.dataset.i); });
+    time.addEventListener('click', (e) => { const b = e.target.closest('.g-bar,.g-ms'); if (b) select(+b.dataset.i); });
+    document.getElementById('sch-search').oninput = (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      if (!q) return;
+      const j = acts.findIndex((a) => (a.id || '').toLowerCase().includes(q) || (a.name || '').toLowerCase().includes(q));
+      if (j >= 0) { select(j); list.querySelector(`.g-row[data-i="${j}"]`).scrollIntoView({ block: 'center' }); }
+    };
+  }
+
   function renderAll() {
     renderKpis();
     renderFinancial();
+    renderSchedule();
     renderSCurve('ch-scurve');
     renderAdvanceChart('ch-tunnel-advance');
     renderTunnelBars();

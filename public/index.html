@@ -118,7 +118,22 @@
           <div id="f-ipclist"><p class="muted">Awaiting finance data.</p></div>
         </div>
       </section>
-      <section class="view" id="sched"><div class="card"><h3>Schedule &amp; Progress</h3><p class="muted">Awaiting schedule data sheet (Phase 2).</p></div></section>
+      <section class="view" id="sched">
+        <div class="card">
+          <h3>Project Schedule — <span id="sch-count">—</span> activities <span class="muted" style="font-weight:600">· click an activity for predecessors &amp; successors</span></h3>
+          <div class="sch-tools">
+            <input id="sch-search" placeholder="Search Activity ID or name…">
+            <span class="leg"><i style="background:linear-gradient(90deg,#2f7de1,#36c5a8)"></i>Normal</span>
+            <span class="leg"><i style="background:linear-gradient(90deg,#e5554e,#f0857f)"></i>Critical</span>
+            <span class="leg"><i style="width:9px;height:9px;background:#0f2a4a;transform:rotate(45deg);border-radius:1px"></i>Milestone</span>
+          </div>
+          <div class="gantt">
+            <div class="g-list" id="g-list"></div>
+            <div class="g-time" id="g-time"></div>
+          </div>
+          <div class="g-rel" id="g-rel"></div>
+        </div>
+      </section>
       <section class="view" id="claims"><div class="card"><h3>Claims &amp; Variations</h3><p class="muted">Awaiting claims data sheet (Phase 2).</p></div></section>
       <section class="view" id="inv"><div class="card"><h3>Inventory &amp; Explosives</h3><p class="muted">Awaiting inventory data sheet (Phase 2).</p></div></section>
       <section class="view" id="man">
