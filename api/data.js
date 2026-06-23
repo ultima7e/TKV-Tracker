@@ -57,13 +57,17 @@ async function fetchWorkbookBuffers() {
   return { buffers, source: 'local-file' };
 }
 
-// The P6 schedule (.xer) — fetched from NUTSTORE_XER_PATH in production, or the
-// first .xer in data/ during local dev. Returns null if none is configured.
+// Default Nutstore location of the P6 schedule. Kept in code (not a secret) so
+// the live site works without a Vercel env-var change; override with NUTSTORE_XER_PATH.
+const DEFAULT_XER_PATH = 'Shared Folder/Schedule/TKV-BL-A-2 (TIA-Bishan).xer';
+
+// The P6 schedule (.xer) — fetched from Nutstore in production, or the first
+// .xer in data/ during local dev. Returns null if none is found.
 async function fetchXerText() {
   const { NUTSTORE_USER, NUTSTORE_PASSWORD, NUTSTORE_XER_PATH } = process.env;
-  if (NUTSTORE_USER && NUTSTORE_PASSWORD && NUTSTORE_XER_PATH) {
+  if (NUTSTORE_USER && NUTSTORE_PASSWORD) {
     const auth = Buffer.from(`${NUTSTORE_USER}:${NUTSTORE_PASSWORD}`).toString('base64');
-    const res = await fetch(DAV_BASE + encPath(NUTSTORE_XER_PATH), { headers: { Authorization: `Basic ${auth}` } });
+    const res = await fetch(DAV_BASE + encPath(NUTSTORE_XER_PATH || DEFAULT_XER_PATH), { headers: { Authorization: `Basic ${auth}` } });
     if (!res.ok) return null;
     return Buffer.from(await res.arrayBuffer()).toString('latin1');
   }
