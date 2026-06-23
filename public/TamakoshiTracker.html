@@ -277,7 +277,10 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
             <div id="f-evpie" class="chart" style="height:250px"></div>
             <div id="f-evdetail" class="muted" style="text-align:center;margin-top:4px">Click a slice to see its contribution.</div>
           </div>
-          <div class="card"><h3>Work Value — Certified vs Outstanding</h3><div id="f-donut" class="chart" style="height:280px"></div></div>
+          <div class="card"><h3>Work Value — Certified vs Outstanding <span class="muted" style="font-weight:600">· click a slice</span></h3>
+            <div id="f-donut" class="chart" style="height:250px"></div>
+            <div id="f-donut-detail" class="muted" style="text-align:center;margin-top:4px">Click “Certified” to see the earned-value breakdown.</div>
+          </div>
         </div>
         <div class="card" style="margin-bottom:16px"><h3>Cash Received per IPC</h3><div id="f-bar" class="chart" style="height:260px"></div></div>
         <div class="card">
@@ -660,7 +663,8 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
         `<span class="muted">($ ${usdM(c.usd)} M + NPR ${nprM(c.npr)} M)</span>`;
     });
 
-    makeChart('f-donut').setOption({
+    const donut = makeChart('f-donut');
+    donut.setOption({
       tooltip: { trigger: 'item',
         formatter: (p) => `${p.name}<br/><b>$ ${usdM(p.value)} M</b> (${p.percent}%)` },
       legend: { bottom: 0, textStyle: { fontSize: 11, color: COL.muted } },
@@ -673,6 +677,21 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
           { name: 'Outstanding', value: Math.round(b.outUSDEq), itemStyle: { color: '#f2a65a' } },
         ],
       }],
+    });
+    donut.off('click');
+    donut.on('click', (p) => {
+      const el = document.getElementById('f-donut-detail');
+      if (p.name === 'Certified') {
+        const body = cats.map((c) =>
+          `<tr><td>${c.category}</td><td>$ ${usdM(c.usdEquiv)} M</td>
+            <td>${Math.round((c.usdEquiv / evTotal) * 1000) / 10}%</td></tr>`).join('');
+        el.innerHTML = `<div class="ipc-sub" style="text-align:left">Earned value — work done by category</div>
+          <table class="tbl"><thead><tr><th>Category</th><th>Earned (USD-eq)</th><th>Weightage</th></tr></thead>
+          <tbody>${body}</tbody></table>`;
+      } else {
+        el.innerHTML = `<span>Outstanding work value: <b>$ ${usdM(b.outUSDEq)} M</b> ` +
+          `(${Math.round((b.outUSDEq / b.workUSDEq) * 1000) / 10}% of contract still to certify)</span>`;
+      }
     });
 
     const ipcs = fd.ipcs || [];

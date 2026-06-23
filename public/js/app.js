@@ -366,7 +366,8 @@
     });
 
     // donut: certified vs outstanding work value (USD-equivalent)
-    makeChart('f-donut').setOption({
+    const donut = makeChart('f-donut');
+    donut.setOption({
       tooltip: { trigger: 'item',
         formatter: (p) => `${p.name}<br/><b>$ ${usdM(p.value)} M</b> (${p.percent}%)` },
       legend: { bottom: 0, textStyle: { fontSize: 11, color: COL.muted } },
@@ -379,6 +380,22 @@
           { name: 'Outstanding', value: Math.round(b.outUSDEq), itemStyle: { color: '#f2a65a' } },
         ],
       }],
+    });
+    // Click "Certified" -> show the earned-value breakdown by work category.
+    donut.off('click');
+    donut.on('click', (p) => {
+      const el = document.getElementById('f-donut-detail');
+      if (p.name === 'Certified') {
+        const body = cats.map((c) =>
+          `<tr><td>${c.category}</td><td>$ ${usdM(c.usdEquiv)} M</td>
+            <td>${Math.round((c.usdEquiv / evTotal) * 1000) / 10}%</td></tr>`).join('');
+        el.innerHTML = `<div class="ipc-sub" style="text-align:left">Earned value — work done by category</div>
+          <table class="tbl"><thead><tr><th>Category</th><th>Earned (USD-eq)</th><th>Weightage</th></tr></thead>
+          <tbody>${body}</tbody></table>`;
+      } else {
+        el.innerHTML = `<span>Outstanding work value: <b>$ ${usdM(b.outUSDEq)} M</b> ` +
+          `(${Math.round((b.outUSDEq / b.workUSDEq) * 1000) / 10}% of contract still to certify)</span>`;
+      }
     });
 
     // bar: cash received per IPC (NPR, millions)
