@@ -39,13 +39,39 @@
     else el.textContent = '—';
   }
 
+  // "Jun-24" -> Date(2024-06-01)
+  function parseMonthLabel(s) {
+    const MON = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+    const m = /^([A-Za-z]{3})-(\d{2})$/.exec(String(s).trim());
+    if (!m) return null;
+    return new Date(2000 + +m[2], MON[m[1]], 1);
+  }
+
+  function renderTimeMeter() {
+    const months = (data.scurve && data.scurve.months) || [];
+    if (months.length < 2) return;
+    const start = parseMonthLabel(months[0]);
+    const end = parseMonthLabel(months[months.length - 1]);
+    if (!start || !end) return;
+    const now = new Date();
+    const pct = Math.max(0, Math.min(100, Math.round(((now - start) / (end - start)) * 1000) / 10));
+    const monthsTotal = Math.round((end - start) / (30.44 * 86400000));
+    const monthsDone = Math.max(0, Math.min(monthsTotal, Math.round((now - start) / (30.44 * 86400000))));
+    setKpi('v-timepct', pct, 1);
+    const fmt = (d) => d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+    $('#v-timesub').textContent = `${monthsDone} / ${monthsTotal} months · ${fmt(start)} → ${fmt(end)}`;
+    requestAnimationFrame(() => { $('#v-timebar').style.width = pct + '%'; });
+  }
+
   function renderKpis() {
     const f = data.finance || {};
     setKpi('v-budget-usd', f.budgetUSD != null ? f.budgetUSD / 1e6 : null, 2);
     setKpi('v-budget-npr', f.budgetNPR != null ? f.budgetNPR / 1e9 : null, 2);
-    setKpi('v-received-usd', f.receivedUSD != null ? f.receivedUSD / 1e6 : null, 2);
-    setKpi('v-received-npr', f.receivedNPR != null ? f.receivedNPR / 1e9 : null, 2);
+    // Received EXCLUDING the mobilisation advance (IPC receipts only).
+    setKpi('v-received-usd', f.receivedExclAdvUSD != null ? f.receivedExclAdvUSD / 1e6 : null, 2);
+    setKpi('v-received-npr', f.receivedExclAdvNPR != null ? f.receivedExclAdvNPR / 1e9 : null, 2);
     setKpi('v-finprog', f.financialProgressPct, 1);
+    renderTimeMeter();
     // Earned Value card stays '—' until the EV data sheet is provided.
   }
 
@@ -106,16 +132,17 @@
   function renderManpower() {
     const mp = data.manpower || {};
     const cell = (v) => (v > 0 ? v : '–');
+    // Expatriate = foreigner; Native = Other Nepali + Local Nepali (merged).
     const rowHtml = (r, cls) => `
       <tr${cls ? ' class="' + cls + '"' : ''}>
         <td>${r.category || 'Total'}</td>
-        <td>${cell(r.foreigner)}</td><td>${cell(r.otherNepali)}</td>
-        <td>${cell(r.localNepali)}</td><td>${r.total}</td>
+        <td>${cell(r.foreigner)}</td><td>${cell((r.otherNepali || 0) + (r.localNepali || 0))}</td>
+        <td>${r.total}</td>
       </tr>`;
     const table = (rows, total, rowCls) => `
       <table class="tbl">
-        <thead><tr><th>Manpower Category</th><th>Foreigner</th>
-          <th>Other Nepali</th><th>Local Nepali</th><th>Total</th></tr></thead>
+        <thead><tr><th>Manpower Category</th><th>Expatriate</th>
+          <th>Native</th><th>Total</th></tr></thead>
         <tbody>${rows.map((r) => rowHtml(r, rowCls)).join('')}
           ${total ? rowHtml(total, 'total') : ''}</tbody>
       </table>`;
@@ -135,8 +162,7 @@
       const status = (label, t, cls) => rowHtml({ category: label, ...t }, cls);
       $('#mp-exec').innerHTML = `
         <table class="tbl">
-          <thead><tr><th></th><th>Foreigner</th><th>Other Nepali</th>
-            <th>Local Nepali</th><th>Total</th></tr></thead>
+          <thead><tr><th></th><th>Expatriate</th><th>Native</th><th>Total</th></tr></thead>
           <tbody>
             ${status('Mobilized', mp.mobilizedTotal, 'ok')}
             ${mp.idleTotal ? status('Idle', mp.idleTotal, 'warn') : ''}
@@ -147,7 +173,9 @@
 
   function renderIpc() {
     const ipc = data.ipc || {};
-    const rows = ipc.rows || [];
+    // Default: reverse-chronological (latest certified first).
+    const rows = (ipc.rows || []).slice()
+      .sort((a, b) => (b.certifiedDate || '').localeCompare(a.certifiedDate || ''));
     $('#ipc-count').textContent = ipc.total ? ipc.total.count : '—';
     if (!rows.length) return;
     const fmtDate = (iso) => {

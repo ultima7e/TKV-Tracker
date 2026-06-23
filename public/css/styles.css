@@ -51,6 +51,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   box-shadow:0 1px 3px rgba(16,42,74,.05);position:relative}
 .card h3{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:700;margin-bottom:10px}
 .kpi .val{font-size:23px;font-weight:800;color:var(--navy);line-height:1.1}
+.kpi .val2{font-size:16px;font-weight:800;color:var(--navy);line-height:1.2;margin-top:3px}
 .kpi .sub{font-size:11px;color:var(--muted);margin-top:3px}
 .kpi .bar{height:5px;border-radius:4px;background:#eef2f7;margin-top:10px;overflow:hidden}
 .kpi .bar > i{display:block;height:100%;border-radius:4px;width:0;transition:width 1.2s cubic-bezier(.2,.8,.2,1)}
