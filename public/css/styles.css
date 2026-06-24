@@ -19,7 +19,9 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .nav{padding:10px 0;overflow-y:auto;flex:1}
 .nav-item{display:flex;align-items:center;gap:11px;padding:11px 18px;font-size:13.5px;cursor:pointer;
   border-left:3px solid transparent;transition:.18s;white-space:nowrap}
-.nav-item .ic{width:18px;text-align:center;opacity:.85}
+.nav-item .ic{width:18px;display:flex;align-items:center;justify-content:center;opacity:.85;flex-shrink:0}
+.nav-item .ic svg{width:17px;height:17px}
+.nav-item.active .ic,.nav-item:hover .ic{opacity:1}
 .nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
 .nav-item.active{background:rgba(47,125,225,.22);border-left-color:var(--accent);color:#fff;font-weight:600}
 .nav-foot{padding:14px 18px;font-size:11px;color:#7e90ac;border-top:1px solid rgba(255,255,255,.08)}
