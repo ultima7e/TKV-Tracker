@@ -24,6 +24,35 @@ let payloadCache = null;     // { sig, payload, ts }
 // lag is longer — a freshly edited file isn't on the server instantly anyway.
 const FRESH_WINDOW_MS = 20000;
 
+// Extra workbooks pulled from Dropbox shared links (direct-download, dl=1).
+// Loaded AFTER the Nutstore files so their sheets win — and any Nutstore file
+// with the same name is skipped. Dropbox returns an ETag that changes on every
+// edit, so a conditional GET both detects changes and avoids re-downloading.
+const DROPBOX_SOURCES = [
+  { name: 'Milestone Payment Summary.xlsx', url: 'https://www.dropbox.com/scl/fi/pn3b7yp72hhjnky8jg1de/Milestone-Payment-Summary.xlsx?rlkey=obqj3v3t9siif2ujqgb35511j&dl=1' },
+];
+const dbxCache = new Map(); // url -> { etag, buffer }
+const normName = (s) => s.toLowerCase().replace(/[\s\-_]/g, '');
+const DBX_NAMEKEYS = new Set(DROPBOX_SOURCES.map((s) => normName(s.name)));
+
+async function dbxFetch(url) {
+  const c = dbxCache.get(url);
+  const r = await fetch(url, { headers: c && c.etag ? { 'If-None-Match': c.etag } : {} });
+  if (r.status === 304 && c) return { etag: c.etag, buffer: c.buffer };
+  if (!r.ok) throw new Error(`Dropbox responded ${r.status} for "${url}"`);
+  const etag = r.headers.get('etag') || '';
+  const buffer = Buffer.from(await r.arrayBuffer());
+  dbxCache.set(url, { etag, buffer });
+  return { etag, buffer };
+}
+
+async function fetchDropbox() {
+  return Promise.all(DROPBOX_SOURCES.map(async (s) => {
+    try { const { etag, buffer } = await dbxFetch(s.url); return { name: s.name, etag, buffer }; }
+    catch (e) { return { name: s.name, etag: 'ERR', buffer: null, warning: `Dropbox '${s.name}' fetch failed: ${e.message}` }; }
+  }));
+}
+
 function davHeaders() {
   const { NUTSTORE_USER, NUTSTORE_PASSWORD } = process.env;
   if (!NUTSTORE_USER || !NUTSTORE_PASSWORD) return null;
@@ -110,40 +139,56 @@ async function buildPayload() {
     const dir = first.includes('/') ? first.slice(0, first.lastIndexOf('/')) : '';
     const xerPath = process.env.NUTSTORE_XER_PATH || DEFAULT_XER_PATH;
 
-    // One PROPFIND for the workbook folder + one for the XER, in parallel.
-    const [listing, xerInfo] = await Promise.all([
+    // Nutstore folder PROPFIND + XER PROPFIND + Dropbox conditional fetches, all parallel.
+    const [listing, xerInfo, dbx] = await Promise.all([
       propfind(DAV_BASE + encPath(dir) + '/', headers, 1),
       propfind(DAV_BASE + encPath(xerPath), headers, 0),
+      fetchDropbox(),
     ]);
     let entries = listing.filter((e) => /\.xlsx$/i.test(e.path) && !/\/~\$/.test(e.path));
     if (!entries.length) entries = process.env.NUTSTORE_FILE_PATH.split(';').map((p) => ({ path: p.trim(), mtime: '' })).filter((e) => e.path);
+    // Drop any Nutstore file that Dropbox now supplies (Dropbox is the source of truth).
+    entries = entries.filter((e) => !DBX_NAMEKEYS.has(normName(e.path.split('/').pop())));
     entries.sort((a, b) => a.path.localeCompare(b.path));
     const xerMtime = (xerInfo[0] && xerInfo[0].mtime) || '';
 
-    const sig = JSON.stringify({ wb: entries.map((e) => e.path + '|' + e.mtime), xer: xerPath + '|' + xerMtime });
+    const sig = JSON.stringify({
+      wb: entries.map((e) => e.path + '|' + e.mtime),
+      xer: xerPath + '|' + xerMtime,
+      dbx: dbx.map((d) => d.name + '|' + d.etag),
+    });
     if (payloadCache && payloadCache.sig === sig) { // nothing changed — reuse parsed payload
       payloadCache.ts = Date.now();
       return stamp(payloadCache.payload);
     }
 
-    const [buffers, xerText] = await Promise.all([
+    const [nutBuffers, xerText] = await Promise.all([
       Promise.all(entries.map((e) => getBuffer(e.path, e.mtime, headers))),
       getXer(xerPath, xerMtime, headers),
     ]);
+    const buffers = [...nutBuffers, ...dbx.filter((d) => d.buffer).map((d) => d.buffer)];
     const payload = assemble(buffers, xerText, 'nutstore');
+    payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
     payloadCache = { sig, payload, ts: Date.now() };
     return stamp(payload);
   }
 
-  // ----- local development: data/ folder, cached by file mtime -----
+  // ----- local development: data/ folder (+ Dropbox), cached by file mtime/etag -----
   const dir = path.join(__dirname, '..', 'data');
   const files = fs.readdirSync(dir).filter((f) => (f.endsWith('.xlsx') || f.endsWith('.xer')) && !f.startsWith('~$')).sort();
-  const sig = JSON.stringify(files.map((f) => f + '|' + fs.statSync(path.join(dir, f)).mtimeMs));
+  const dbx = await fetchDropbox();
+  const sig = JSON.stringify({
+    local: files.map((f) => f + '|' + fs.statSync(path.join(dir, f)).mtimeMs),
+    dbx: dbx.map((d) => d.name + '|' + d.etag),
+  });
   if (payloadCache && payloadCache.sig === sig) return stamp(payloadCache.payload);
-  const buffers = files.filter((f) => f.endsWith('.xlsx')).map((f) => fs.readFileSync(path.join(dir, f)));
+  const localBuffers = files.filter((f) => f.endsWith('.xlsx') && !DBX_NAMEKEYS.has(normName(f)))
+    .map((f) => fs.readFileSync(path.join(dir, f)));
+  const buffers = [...localBuffers, ...dbx.filter((d) => d.buffer).map((d) => d.buffer)];
   const xf = files.find((f) => f.endsWith('.xer'));
   const xerText = xf ? fs.readFileSync(path.join(dir, xf), 'latin1') : null;
   const payload = assemble(buffers, xerText, 'local-file');
+  payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
   payloadCache = { sig, payload, ts: Date.now() };
   return stamp(payload);
 }
