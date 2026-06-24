@@ -18,7 +18,11 @@ const encPath = (p) => p.replace(/^\/+/, '').split('/').map(encodeURIComponent).
 // Module-level caches survive across requests on a warm serverless instance.
 const fileCache = new Map(); // path -> { mtime, buffer }
 let xerCache = null;         // { path, mtime, text }
-let payloadCache = null;     // { sig, payload }
+let payloadCache = null;     // { sig, payload, ts }
+// Within this window a refresh is served straight from memory without even
+// checking Nutstore. Kept short, and safe because Nutstore's own upload/sync
+// lag is longer — a freshly edited file isn't on the server instantly anyway.
+const FRESH_WINDOW_MS = 20000;
 
 function davHeaders() {
   const { NUTSTORE_USER, NUTSTORE_PASSWORD } = process.env;
@@ -99,6 +103,9 @@ async function buildPayload() {
   const headers = davHeaders();
 
   if (headers && process.env.NUTSTORE_FILE_PATH) {
+    // Fast path: recently validated — skip Nutstore entirely.
+    if (payloadCache && Date.now() - payloadCache.ts < FRESH_WINDOW_MS) return stamp(payloadCache.payload);
+
     const first = process.env.NUTSTORE_FILE_PATH.split(';')[0].trim().replace(/^\/+/, '');
     const dir = first.includes('/') ? first.slice(0, first.lastIndexOf('/')) : '';
     const xerPath = process.env.NUTSTORE_XER_PATH || DEFAULT_XER_PATH;
@@ -114,14 +121,17 @@ async function buildPayload() {
     const xerMtime = (xerInfo[0] && xerInfo[0].mtime) || '';
 
     const sig = JSON.stringify({ wb: entries.map((e) => e.path + '|' + e.mtime), xer: xerPath + '|' + xerMtime });
-    if (payloadCache && payloadCache.sig === sig) return stamp(payloadCache.payload); // nothing changed
+    if (payloadCache && payloadCache.sig === sig) { // nothing changed — reuse parsed payload
+      payloadCache.ts = Date.now();
+      return stamp(payloadCache.payload);
+    }
 
     const [buffers, xerText] = await Promise.all([
       Promise.all(entries.map((e) => getBuffer(e.path, e.mtime, headers))),
       getXer(xerPath, xerMtime, headers),
     ]);
     const payload = assemble(buffers, xerText, 'nutstore');
-    payloadCache = { sig, payload };
+    payloadCache = { sig, payload, ts: Date.now() };
     return stamp(payload);
   }
 
@@ -134,7 +144,7 @@ async function buildPayload() {
   const xf = files.find((f) => f.endsWith('.xer'));
   const xerText = xf ? fs.readFileSync(path.join(dir, xf), 'latin1') : null;
   const payload = assemble(buffers, xerText, 'local-file');
-  payloadCache = { sig, payload };
+  payloadCache = { sig, payload, ts: Date.now() };
   return stamp(payload);
 }
 
