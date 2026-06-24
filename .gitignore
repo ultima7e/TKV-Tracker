@@ -15,6 +15,7 @@ node_modules/
 *.dwg
 *.dxf
 *.pptx
+*.xer
 _*.scr
 _acad_log.txt
 

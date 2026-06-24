@@ -469,12 +469,18 @@
   }
 
   let schedBuiltFor = null;
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const schDay = (iso) => Math.floor(new Date(iso + 'T00:00:00Z').getTime() / 86400000);
+  const schFmt = (iso) => { if (!iso) return ''; const p = iso.split('-'); return p[2] + '-' + MON[+p[1] - 1] + '-' + p[0].slice(2); };
+
   function renderSchedule() {
     const sch = data.schedule || {};
     const all = sch.activities || [];
+    const wbs = sch.wbs || {};
     const acts = all.filter((a) => a.start && a.finish);
     if (!acts.length || schedBuiltFor === data) return;
     schedBuiltFor = data;
+    $('#sch-count').textContent = acts.length;
 
     const byTask = {};
     all.forEach((a) => { byTask[a.taskId] = a; });
@@ -483,93 +489,186 @@
       (predMap[r.taskId] = predMap[r.taskId] || []).push(r);
       (succMap[r.predTaskId] = succMap[r.predTaskId] || []).push(r);
     });
-    acts.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : (a.id < b.id ? -1 : 1)));
-    const idxByTask = {};
-    acts.forEach((a, j) => { idxByTask[a.taskId] = j; });
-    $('#sch-count').textContent = acts.length;
 
-    const day = (iso) => Math.floor(new Date(iso + 'T00:00:00Z').getTime() / 86400000);
-    const minDay = Math.min(...acts.map((a) => day(a.start)));
-    const maxDay = Math.max(...acts.map((a) => day(a.finish)));
-    const PXD = 2.2, ROW = 28, HEAD = 30, PAD = 20;
+    // WBS tree: children (sorted by seq), activities per node, subtree span
+    const kids = {};
+    Object.keys(wbs).forEach((id) => { const p = wbs[id].parentId; (kids[p] = kids[p] || []).push(id); });
+    Object.values(kids).forEach((a) => a.sort((x, y) => (wbs[x].seq || 0) - (wbs[y].seq || 0)));
+    const actsByWbs = {};
+    acts.forEach((a) => { (actsByWbs[a.wbsId] = actsByWbs[a.wbsId] || []).push(a); });
+    Object.values(actsByWbs).forEach((arr) => arr.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : (a.id < b.id ? -1 : 1))));
+    const roots = Object.keys(wbs).filter((id) => !wbs[wbs[id].parentId]);
+    const hasA = {};
+    const subHas = (id) => {
+      if (id in hasA) return hasA[id];
+      let h = (actsByWbs[id] || []).length > 0;
+      (kids[id] || []).forEach((c) => { if (subHas(c)) h = true; });
+      return (hasA[id] = h);
+    };
+    roots.forEach(subHas);
+    const span = {};
+    const calcSpan = (id) => {
+      let s = null, f = null;
+      (actsByWbs[id] || []).forEach((a) => { if (!s || a.start < s) s = a.start; if (!f || a.finish > f) f = a.finish; });
+      (kids[id] || []).forEach((c) => { const cs = calcSpan(c); if (cs.s && (!s || cs.s < s)) s = cs.s; if (cs.f && (!f || cs.f > f)) f = cs.f; });
+      return (span[id] = { s, f });
+    };
+    roots.forEach(calcSpan);
+
+    const minDay = Math.min(...acts.map((a) => schDay(a.start)));
+    const maxDay = Math.max(...acts.map((a) => schDay(a.finish)));
+    const PXD = 0.7, ROW = 22, HEAD = 28, PAD = 16;
     const width = (maxDay - minDay) * PXD + PAD * 2;
     const xOf = (d) => PAD + (d - minDay) * PXD;
-    const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-    const list = document.getElementById('g-list');
-    list.innerHTML = '<div class="g-head">Activity ID · Name</div>' + acts.map((a, i) =>
-      `<div class="g-row" data-i="${i}">
-        <span class="g-id">${a.id}</span><span class="g-nm">${a.name || ''}</span><span class="g-pc">${a.pct}%</span>
-      </div>`).join('');
 
     let ticks = '';
-    let d = new Date(minDay * 86400000);
-    d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+    let dt = new Date(minDay * 86400000);
+    dt = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), 1));
     const end = new Date(maxDay * 86400000);
-    while (d <= end) {
-      const x = xOf(Math.floor(d.getTime() / 86400000));
-      const isYr = d.getUTCMonth() === 0;
-      ticks += `<div class="g-tick ${isYr ? 'yr' : ''}" style="left:${x}px">${isYr ? d.getUTCFullYear() : MON[d.getUTCMonth()]}</div>`;
-      d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+    while (dt <= end) {
+      const x = xOf(Math.floor(dt.getTime() / 86400000));
+      const yr = dt.getUTCMonth() === 0;
+      ticks += `<div class="g-tick ${yr ? 'yr' : ''}" style="left:${x}px">${yr ? dt.getUTCFullYear() : MON[dt.getUTCMonth()]}</div>`;
+      dt = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 1));
     }
     const todayD = Math.floor(Date.now() / 86400000);
-    const today = (todayD >= minDay && todayD <= maxDay)
-      ? `<div class="g-today" style="left:${xOf(todayD)}px;top:${HEAD}px;height:${acts.length * ROW}px"></div>` : '';
-    const bars = acts.map((a, i) => {
-      const x = xOf(day(a.start)), top = HEAD + i * ROW + (ROW - 13) / 2;
-      if (a.isMilestone) {
-        return `<div class="g-ms ${a.critical ? 'crit' : ''}" data-i="${i}" style="left:${x - 6}px;top:${top - 0}px"></div>`;
-      }
-      const w = Math.max(4, (day(a.finish) - day(a.start)) * PXD);
-      const fill = a.pct > 0 && a.pct < 100 ? `<div class="g-fill" style="left:auto;right:0;width:${100 - a.pct}%"></div>` : '';
-      return `<div class="g-bar ${a.critical ? 'crit' : 'norm'} ${a.pct >= 100 ? 'done' : ''}" data-i="${i}"
-        style="left:${x}px;width:${w}px;top:${top}px" title="${a.id} · ${a.name || ''}">${fill}</div>`;
-    }).join('');
-    const time = document.getElementById('g-time');
-    time.innerHTML = `<div class="g-canvas" style="width:${width}px;height:${HEAD + acts.length * ROW}px">
-      <div class="g-axis" style="width:${width}px">${ticks}</div>${today}${bars}</div>`;
 
-    // synced vertical scroll
+    const list = document.getElementById('g-list');
+    const time = document.getElementById('g-time');
+    const collapsed = new Set();
+    let rows = [], selTask = null, relOn = false;
+
+    const buildRows = () => {
+      const out = [];
+      const walk = (id, depth) => {
+        if (!subHas(id)) return;
+        out.push({ kind: 'wbs', id, depth });
+        if (collapsed.has(id)) return;
+        (kids[id] || []).forEach((c) => walk(c, depth + 1));
+        (actsByWbs[id] || []).forEach((a) => out.push({ kind: 'act', act: a, depth: depth + 1 }));
+      };
+      roots.forEach((r) => walk(r, 0));
+      return out;
+    };
+
+    const HEADER = '<div class="g-head"><span class="g-cid">Act ID</span><span class="g-cnm">Activity Name</span>' +
+      '<span class="g-cbs">BL Start</span><span class="g-cbs">BL Finish</span><span class="g-cpc">%</span></div>';
+
+    const paint = () => {
+      rows = buildRows();
+      list.innerHTML = HEADER + rows.map((r, i) => {
+        if (r.kind === 'wbs') {
+          return `<div class="g-row g-wbs ${collapsed.has(r.id) ? 'collapsed' : ''}" data-i="${i}" data-wbs="${r.id}">
+            <span class="g-cid"></span><span class="g-cnm" style="padding-left:${r.depth * 12}px"><span class="g-caret">▾</span>${wbs[r.id].name || ''}</span>
+            <span class="g-cbs"></span><span class="g-cbs"></span><span class="g-cpc"></span></div>`;
+        }
+        const a = r.act;
+        return `<div class="g-row" data-i="${i}" data-tid="${a.taskId}">
+          <span class="g-cid">${a.id}</span><span class="g-cnm" style="padding-left:${r.depth * 12}px" title="${a.name || ''}">${a.name || ''}</span>
+          <span class="g-cbs">${schFmt(a.baselineStart)}</span><span class="g-cbs">${schFmt(a.baselineFinish)}</span><span class="g-cpc">${a.pct}%</span></div>`;
+      }).join('');
+
+      const bars = rows.map((r, i) => {
+        const top = HEAD + i * ROW;
+        if (r.kind === 'wbs') {
+          const sp = span[r.id]; if (!sp.s) return '';
+          const x = xOf(schDay(sp.s)), w = Math.max(2, (schDay(sp.f) - schDay(sp.s)) * PXD);
+          return `<div class="g-wbsbar" data-i="${i}" data-wbs="${r.id}" style="left:${x}px;width:${w}px;top:${top + (ROW - 6) / 2}px"></div>`;
+        }
+        const a = r.act, x = xOf(schDay(a.start));
+        if (a.isMilestone) return `<div class="g-ms ${a.critical ? 'crit' : ''}" data-i="${i}" data-tid="${a.taskId}" style="left:${x - 5}px;top:${top + (ROW - 11) / 2}px"></div>`;
+        const w = Math.max(3, (schDay(a.finish) - schDay(a.start)) * PXD);
+        const fill = a.pct > 0 && a.pct < 100 ? `<div class="g-fill" style="right:0;width:${100 - a.pct}%"></div>` : '';
+        return `<div class="g-bar ${a.pct >= 100 ? 'done' : a.critical ? 'crit' : 'norm'}" data-i="${i}" data-tid="${a.taskId}" style="left:${x}px;width:${w}px;top:${top + (ROW - 11) / 2}px" title="${a.id} · ${a.name || ''}">${fill}</div>`;
+      }).join('');
+      const todayLine = (todayD >= minDay && todayD <= maxDay)
+        ? `<div class="g-today" style="left:${xOf(todayD)}px;top:${HEAD}px;height:${rows.length * ROW}px"></div>` : '';
+      const H = HEAD + rows.length * ROW;
+      time.innerHTML = `<div class="g-canvas" style="width:${width}px;height:${H}px">
+        <div class="g-axis" style="width:${width}px">${ticks}</div>${todayLine}
+        <svg class="g-rellines" id="g-rellines" width="${width}" height="${H}"></svg>${bars}</div>`;
+      if (selTask) time.querySelector(`[data-tid="${selTask}"]`)?.classList.add('hl');
+      drawRel();
+    };
+
+    const drawRel = () => {
+      const svg = document.getElementById('g-rellines');
+      if (!svg) return;
+      svg.innerHTML = '';
+      if (!relOn || !selTask) return;
+      const idxOf = {}; rows.forEach((r, i) => { if (r.kind === 'act') idxOf[r.act.taskId] = i; });
+      const si = idxOf[selTask]; if (si == null) return;
+      const a = byTask[selTask];
+      const yOf = (i) => HEAD + i * ROW + ROW / 2;
+      const line = (x1, y1, x2, y2) => { const mx = (x1 + x2) / 2; svg.insertAdjacentHTML('beforeend', `<path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"/>`); };
+      (predMap[a.taskId] || []).forEach((r) => { const pi = idxOf[r.predTaskId]; if (pi == null) return; const p = byTask[r.predTaskId]; line(xOf(schDay(p.finish)), yOf(pi), xOf(schDay(a.start)), yOf(si)); });
+      (succMap[a.taskId] || []).forEach((r) => { const xi = idxOf[r.taskId]; if (xi == null) return; const s = byTask[r.taskId]; line(xOf(schDay(a.finish)), yOf(si), xOf(schDay(s.start)), yOf(xi)); });
+    };
+
+    const tbl = (arr) => `<table class="tbl"><thead><tr><th>Activity ID</th><th>Activity Name</th><th>Type</th><th>Lag</th></tr></thead>
+      <tbody>${arr.map((x) => `<tr><td>${x.act.id}</td><td style="text-align:left">${x.act.name || ''}</td><td>${x.type}</td><td>${x.lag ? x.lag + 'd' : '0'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">None</td></tr>'}</tbody></table>`;
+    const modal = document.getElementById('sch-modal');
+    const openModal = (a) => {
+      const preds = (predMap[a.taskId] || []).map((r) => ({ act: byTask[r.predTaskId], type: r.type, lag: r.lagDays })).filter((x) => x.act);
+      const succs = (succMap[a.taskId] || []).map((r) => ({ act: byTask[r.taskId], type: r.type, lag: r.lagDays })).filter((x) => x.act);
+      document.getElementById('sch-modalbox').innerHTML =
+        `<div class="modal-head"><div><div class="mt">${a.id} — ${a.name || ''}</div>
+          <div class="ms">${a.status} · ${a.pct}% complete · ${preds.length} predecessors · ${succs.length} successors</div></div>
+          <button class="modal-x" id="modal-x">✕</button></div>
+        <div class="modal-grid"><div><h4>Predecessors (${preds.length})</h4>${tbl(preds)}</div>
+          <div><h4>Successors (${succs.length})</h4>${tbl(succs)}</div></div>`;
+      modal.classList.add('show');
+      document.getElementById('modal-x').onclick = () => modal.classList.remove('show');
+    };
+    modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('show'); };
+
+    const select = (tid) => {
+      selTask = tid;
+      list.querySelectorAll('.g-row').forEach((r) => r.classList.remove('sel'));
+      time.querySelectorAll('.hl').forEach((b) => b.classList.remove('hl'));
+      list.querySelector(`.g-row[data-tid="${tid}"]`)?.classList.add('sel');
+      time.querySelector(`[data-tid="${tid}"]`)?.classList.add('hl');
+      drawRel();
+      openModal(byTask[tid]);
+    };
+
+    list.onclick = (e) => {
+      const w = e.target.closest('.g-wbs');
+      if (w) { const id = w.dataset.wbs; collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id); paint(); return; }
+      const r = e.target.closest('.g-row[data-tid]'); if (r) select(r.dataset.tid);
+    };
+    time.onclick = (e) => { const b = e.target.closest('[data-tid]'); if (b) select(b.dataset.tid); };
+
     let lock = false;
     time.onscroll = () => { if (lock) return; lock = true; list.scrollTop = time.scrollTop; lock = false; };
     list.onscroll = () => { if (lock) return; lock = true; time.scrollTop = list.scrollTop; lock = false; };
 
-    const relItem = (x) => {
-      const lag = x.lag ? (x.lag > 0 ? ' +' + x.lag + 'd' : ' ' + x.lag + 'd') : '';
-      return `<div class="rl" data-tid="${x.act.taskId}"><span class="t">${x.type}${lag}</span>
-        <span class="rid">${x.act.id}</span><span class="rnm">${x.act.name || ''}</span></div>`;
-    };
-    const select = (i) => {
-      const a = acts[i];
-      list.querySelectorAll('.g-row').forEach((r) => r.classList.remove('sel', 'pred', 'succ'));
-      time.querySelectorAll('.g-bar,.g-ms').forEach((b) => b.classList.remove('hl'));
-      list.querySelector(`.g-row[data-i="${i}"]`)?.classList.add('sel');
-      time.querySelector(`[data-i="${i}"]`)?.classList.add('hl');
-      const preds = (predMap[a.taskId] || []).map((r) => ({ act: byTask[r.predTaskId], type: r.type, lag: r.lagDays })).filter((x) => x.act);
-      const succs = (succMap[a.taskId] || []).map((r) => ({ act: byTask[r.taskId], type: r.type, lag: r.lagDays })).filter((x) => x.act);
-      const mark = (arr, cls) => arr.forEach((x) => {
-        const j = idxByTask[x.act.taskId];
-        if (j != null) { list.querySelector(`.g-row[data-i="${j}"]`)?.classList.add(cls); time.querySelector(`[data-i="${j}"]`)?.classList.add('hl'); }
-      });
-      mark(preds, 'pred'); mark(succs, 'succ');
-      const rel = document.getElementById('g-rel');
-      rel.innerHTML =
-        `<div class="col"><h4>Predecessors (${preds.length})</h4>${preds.map(relItem).join('') || '<p class="muted">None</p>'}</div>
-         <div class="col"><h4>Successors (${succs.length})</h4>${succs.map(relItem).join('') || '<p class="muted">None</p>'}</div>`;
-      rel.querySelectorAll('.rl').forEach((el) => el.addEventListener('click', () => {
-        const j = idxByTask[el.dataset.tid];
-        if (j != null) { select(j); list.querySelector(`.g-row[data-i="${j}"]`).scrollIntoView({ block: 'center' }); }
-      }));
+    // draggable splitter
+    const split = document.getElementById('g-split');
+    split.onmousedown = (e) => {
+      e.preventDefault();
+      const sx = e.clientX, sw = list.offsetWidth;
+      const mv = (ev) => { list.style.width = Math.max(200, Math.min(760, sw + ev.clientX - sx)) + 'px'; };
+      const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); };
+      document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
     };
 
-    list.addEventListener('click', (e) => { const r = e.target.closest('.g-row'); if (r) select(+r.dataset.i); });
-    time.addEventListener('click', (e) => { const b = e.target.closest('.g-bar,.g-ms'); if (b) select(+b.dataset.i); });
+    document.getElementById('sch-rellines').onclick = (e) => {
+      relOn = !relOn; e.currentTarget.classList.toggle('on', relOn); drawRel();
+    };
     document.getElementById('sch-search').oninput = (e) => {
       const q = e.target.value.trim().toLowerCase();
       if (!q) return;
-      const j = acts.findIndex((a) => (a.id || '').toLowerCase().includes(q) || (a.name || '').toLowerCase().includes(q));
-      if (j >= 0) { select(j); list.querySelector(`.g-row[data-i="${j}"]`).scrollIntoView({ block: 'center' }); }
+      const hit = acts.find((a) => (a.id || '').toLowerCase().includes(q) || (a.name || '').toLowerCase().includes(q));
+      if (!hit) return;
+      // expand ancestors so the row is visible
+      let p = hit.wbsId;
+      while (p && wbs[p]) { collapsed.delete(p); p = wbs[p].parentId; }
+      paint(); select(hit.taskId);
+      list.querySelector(`.g-row[data-tid="${hit.taskId}"]`)?.scrollIntoView({ block: 'center' });
     };
+
+    paint();
   }
 
   function renderAll() {

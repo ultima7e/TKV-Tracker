@@ -145,45 +145,61 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 
 /* ---- schedule: Gantt ---- */
 .sch-tools{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
-.sch-tools input{flex:1;min-width:160px;padding:8px 12px;border:1px solid var(--line);border-radius:7px;font-size:12.5px;color:var(--ink)}
+.sch-tools input{flex:1;min-width:150px;padding:8px 12px;border:1px solid var(--line);border-radius:7px;font-size:12.5px;color:var(--ink)}
+.sch-toggle{padding:7px 12px;border:1px solid var(--line);border-radius:7px;background:#f4f7fb;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
+.sch-toggle.on{background:linear-gradient(135deg,var(--accent),#2563c9);color:#fff;border-color:transparent}
 .sch-tools .leg{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px}
-.sch-tools .leg i{width:18px;height:8px;border-radius:2px;display:inline-block}
-.gantt{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;height:560px}
-.g-list{width:330px;flex-shrink:0;overflow-y:auto;overflow-x:hidden;background:#fff;border-right:2px solid #d3e2f4;scrollbar-width:none}
+.sch-tools .leg i{width:16px;height:8px;border-radius:2px;display:inline-block}
+
+.gantt{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;height:480px}
+.g-list{flex-shrink:0;overflow-y:auto;overflow-x:hidden;background:#fff;scrollbar-width:none}
 .g-list::-webkit-scrollbar{display:none}
+.g-split{width:5px;flex-shrink:0;background:#d3e2f4;cursor:col-resize}
+.g-split:hover{background:var(--accent)}
 .g-time{flex:1;overflow:auto;position:relative;background:#fcfdff}
-.g-head,.g-axis{height:30px;background:#e9f1fb;border-bottom:2px solid #d3e2f4;position:sticky;top:0;z-index:3}
-.g-head{display:flex;align-items:center;padding:0 10px;font-size:10.5px;text-transform:uppercase;
-  letter-spacing:.5px;color:var(--navy);font-weight:700}
-.g-row{height:28px;display:flex;align-items:center;gap:8px;padding:0 10px;font-size:12px;
-  border-bottom:1px solid #f0f3f8;cursor:pointer;white-space:nowrap}
+
+.g-head,.g-axis{height:28px;background:#eef2f7;border-bottom:2px solid #d3e2f4;position:sticky;top:0;z-index:3}
+.g-head{display:flex;align-items:center}
+.g-head span,.g-row span{padding:0 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.g-head span{font-size:9px;text-transform:uppercase;letter-spacing:.3px;color:var(--navy);font-weight:700}
+.g-cid{width:80px;flex-shrink:0} .g-cnm{flex:1;min-width:50px} .g-cbs{width:66px;flex-shrink:0;text-align:right} .g-cpc{width:34px;flex-shrink:0;text-align:right}
+
+.g-row{height:22px;display:flex;align-items:center;font-size:11.5px;border-bottom:1px solid #f3f6fa;cursor:pointer}
 .g-row:hover{background:#f6f9fd}
-.g-row.sel{background:#eef4fc;box-shadow:inset 3px 0 0 var(--accent)}
-.g-row.pred{background:#fff4e2} .g-row.succ{background:#e7f7ef}
-.g-id{font-weight:700;color:var(--navy);width:88px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis}
-.g-nm{flex:1;color:#41506a;overflow:hidden;text-overflow:ellipsis}
-.g-pc{color:var(--muted);font-size:10px;flex-shrink:0;width:30px;text-align:right}
+.g-row.sel{background:#e6f0fd;box-shadow:inset 3px 0 0 var(--accent)}
+.g-row .g-cid{font-weight:700;color:var(--navy)}
+.g-row .g-cnm{color:#41506a}
+.g-row .g-cbs,.g-row .g-cpc{color:var(--muted);font-size:10px}
+.g-wbs{background:#f0f4f9}
+.g-wbs:hover{background:#e7eef6}
+.g-wbs .g-cnm{font-weight:700;color:var(--navy)}
+.g-caret{display:inline-block;width:13px;color:var(--muted);transition:transform .15s}
+.g-wbs.collapsed .g-caret{transform:rotate(-90deg)}
+
 .g-canvas{position:relative}
-.g-tick{position:absolute;top:0;bottom:0;border-left:1px solid #e8eef6;font-size:9.5px;color:var(--muted);padding:7px 0 0 3px;box-sizing:border-box}
+.g-tick{position:absolute;top:0;bottom:0;border-left:1px solid #eef2f7;font-size:8.5px;color:var(--muted);padding:6px 0 0 2px;box-sizing:border-box}
 .g-tick.yr{border-left:1px solid #c6d4e6;font-weight:700;color:#5b6f8c}
-.g-bar{position:absolute;height:13px;border-radius:3px;cursor:pointer;box-shadow:0 1px 2px rgba(16,42,74,.18)}
-.g-bar.crit{background:linear-gradient(90deg,#e5554e,#f0857f)}
-.g-bar.norm{background:linear-gradient(90deg,#2f7de1,#36c5a8)}
-.g-bar.done{opacity:.5}
-.g-bar.hl{outline:2px solid var(--amber);outline-offset:1px;z-index:4}
-.g-fill{position:absolute;left:0;top:0;height:100%;border-radius:3px;background:rgba(255,255,255,.45)}
-.g-ms{position:absolute;width:12px;height:12px;background:var(--navy);transform:rotate(45deg);
-  cursor:pointer;box-shadow:0 1px 2px rgba(16,42,74,.3)}
-.g-ms.crit{background:#e5554e} .g-ms.hl{outline:2px solid var(--amber);outline-offset:1px}
-.g-today{position:absolute;width:0;border-left:2px dashed #e5554e;z-index:2}
-.g-rel{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.g-rel .col h4{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px}
-.g-rel .rl{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);
-  border-radius:7px;margin-bottom:6px;font-size:12px;cursor:pointer}
-.g-rel .rl:hover{background:#f6f9fd}
-.g-rel .rl .t{font-weight:800;font-size:10px;padding:2px 6px;border-radius:5px;background:#eef2f7;color:#51637e}
-.g-rel .rl .rid{font-weight:700;color:var(--navy)}
-.g-rel .rl .rnm{flex:1;color:#41506a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.g-bar{position:absolute;height:11px;border-radius:2px;cursor:pointer}
+.g-bar.norm{background:#4d8af0} .g-bar.crit{background:#ef6c57} .g-bar.done{background:#9fb3cc}
+.g-bar.hl{outline:2px solid var(--amber);outline-offset:1px;z-index:5}
+.g-fill{position:absolute;top:0;height:100%;border-radius:2px;background:rgba(255,255,255,.5)}
+.g-wbsbar{position:absolute;height:6px;background:#5a6577;border-radius:1px;cursor:pointer}
+.g-ms{position:absolute;width:11px;height:11px;background:#2c3e50;transform:rotate(45deg);cursor:pointer}
+.g-ms.crit{background:#ef6c57} .g-ms.hl{outline:2px solid var(--amber);outline-offset:1px}
+.g-today{position:absolute;width:0;border-left:2px dashed #ef6c57;z-index:2}
+.g-rellines{position:absolute;top:0;left:0;pointer-events:none;z-index:4;overflow:visible}
+.g-rellines path{stroke:#f5a623;stroke-width:1.4;fill:none}
+
+/* relationship modal (P6-style) */
+.modal{display:none;position:fixed;inset:0;background:rgba(15,32,55,.45);z-index:50;align-items:center;justify-content:center;padding:20px}
+.modal.show{display:flex}
+.modal-box{background:#fff;border-radius:12px;max-width:920px;width:100%;max-height:84vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff}
+.modal-head .mt{font-size:13px;font-weight:800;color:var(--navy)} .modal-head .ms{font-size:11.5px;color:var(--muted);margin-top:2px}
+.modal-x{border:none;background:#eef2f7;width:28px;height:28px;border-radius:7px;cursor:pointer;font-size:14px;color:#51637e}
+.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px 18px}
+.modal-grid h4{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px}
+@media (max-width:880px){ .modal-grid{grid-template-columns:1fr} }
 
 /* ---- responsive ---- */
 @media (min-width:881px) and (max-width:1280px){
@@ -332,19 +348,22 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       </section>
       <section class="view" id="sched">
         <div class="card">
-          <h3>Project Schedule — <span id="sch-count">—</span> activities <span class="muted" style="font-weight:600">· click an activity for predecessors &amp; successors</span></h3>
+          <h3>Project Schedule — <span id="sch-count">—</span> activities <span class="muted" style="font-weight:600">· grouped by WBS · click an activity for relationships</span></h3>
           <div class="sch-tools">
             <input id="sch-search" placeholder="Search Activity ID or name…">
-            <span class="leg"><i style="background:linear-gradient(90deg,#2f7de1,#36c5a8)"></i>Normal</span>
-            <span class="leg"><i style="background:linear-gradient(90deg,#e5554e,#f0857f)"></i>Critical</span>
-            <span class="leg"><i style="width:9px;height:9px;background:#0f2a4a;transform:rotate(45deg);border-radius:1px"></i>Milestone</span>
+            <button id="sch-rellines" class="sch-toggle">Show relationships</button>
+            <span class="leg"><i style="background:#4d8af0"></i>Normal</span>
+            <span class="leg"><i style="background:#ef6c57"></i>Critical</span>
+            <span class="leg"><i style="background:#5a6577"></i>WBS</span>
+            <span class="leg"><i style="width:9px;height:9px;background:#2c3e50;transform:rotate(45deg);border-radius:1px"></i>Milestone</span>
           </div>
           <div class="gantt">
-            <div class="g-list" id="g-list"></div>
+            <div class="g-list" id="g-list" style="width:380px"></div>
+            <div class="g-split" id="g-split"></div>
             <div class="g-time" id="g-time"></div>
           </div>
-          <div class="g-rel" id="g-rel"></div>
         </div>
+        <div class="modal" id="sch-modal"><div class="modal-box" id="sch-modalbox"></div></div>
       </section>
       <section class="view" id="claims"><div class="card"><h3>Claims &amp; Variations</h3><p class="muted">Awaiting claims data sheet (Phase 2).</p></div></section>
       <section class="view" id="inv"><div class="card"><h3>Inventory &amp; Explosives</h3><p class="muted">Awaiting inventory data sheet (Phase 2).</p></div></section>
@@ -819,12 +838,18 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   }
 
   let schedBuiltFor = null;
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const schDay = (iso) => Math.floor(new Date(iso + 'T00:00:00Z').getTime() / 86400000);
+  const schFmt = (iso) => { if (!iso) return ''; const p = iso.split('-'); return p[2] + '-' + MON[+p[1] - 1] + '-' + p[0].slice(2); };
+
   function renderSchedule() {
     const sch = data.schedule || {};
     const all = sch.activities || [];
+    const wbs = sch.wbs || {};
     const acts = all.filter((a) => a.start && a.finish);
     if (!acts.length || schedBuiltFor === data) return;
     schedBuiltFor = data;
+    $('#sch-count').textContent = acts.length;
 
     const byTask = {};
     all.forEach((a) => { byTask[a.taskId] = a; });
@@ -833,92 +858,183 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       (predMap[r.taskId] = predMap[r.taskId] || []).push(r);
       (succMap[r.predTaskId] = succMap[r.predTaskId] || []).push(r);
     });
-    acts.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : (a.id < b.id ? -1 : 1)));
-    const idxByTask = {};
-    acts.forEach((a, j) => { idxByTask[a.taskId] = j; });
-    $('#sch-count').textContent = acts.length;
 
-    const day = (iso) => Math.floor(new Date(iso + 'T00:00:00Z').getTime() / 86400000);
-    const minDay = Math.min(...acts.map((a) => day(a.start)));
-    const maxDay = Math.max(...acts.map((a) => day(a.finish)));
-    const PXD = 2.2, ROW = 28, HEAD = 30, PAD = 20;
+    const kids = {};
+    Object.keys(wbs).forEach((id) => { const p = wbs[id].parentId; (kids[p] = kids[p] || []).push(id); });
+    Object.values(kids).forEach((a) => a.sort((x, y) => (wbs[x].seq || 0) - (wbs[y].seq || 0)));
+    const actsByWbs = {};
+    acts.forEach((a) => { (actsByWbs[a.wbsId] = actsByWbs[a.wbsId] || []).push(a); });
+    Object.values(actsByWbs).forEach((arr) => arr.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : (a.id < b.id ? -1 : 1))));
+    const roots = Object.keys(wbs).filter((id) => !wbs[wbs[id].parentId]);
+    const hasA = {};
+    const subHas = (id) => {
+      if (id in hasA) return hasA[id];
+      let h = (actsByWbs[id] || []).length > 0;
+      (kids[id] || []).forEach((c) => { if (subHas(c)) h = true; });
+      return (hasA[id] = h);
+    };
+    roots.forEach(subHas);
+    const span = {};
+    const calcSpan = (id) => {
+      let s = null, f = null;
+      (actsByWbs[id] || []).forEach((a) => { if (!s || a.start < s) s = a.start; if (!f || a.finish > f) f = a.finish; });
+      (kids[id] || []).forEach((c) => { const cs = calcSpan(c); if (cs.s && (!s || cs.s < s)) s = cs.s; if (cs.f && (!f || cs.f > f)) f = cs.f; });
+      return (span[id] = { s, f });
+    };
+    roots.forEach(calcSpan);
+
+    const minDay = Math.min(...acts.map((a) => schDay(a.start)));
+    const maxDay = Math.max(...acts.map((a) => schDay(a.finish)));
+    const PXD = 0.7, ROW = 22, HEAD = 28, PAD = 16;
     const width = (maxDay - minDay) * PXD + PAD * 2;
     const xOf = (d) => PAD + (d - minDay) * PXD;
-    const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-    const list = document.getElementById('g-list');
-    list.innerHTML = '<div class="g-head">Activity ID · Name</div>' + acts.map((a, i) =>
-      `<div class="g-row" data-i="${i}">
-        <span class="g-id">${a.id}</span><span class="g-nm">${a.name || ''}</span><span class="g-pc">${a.pct}%</span>
-      </div>`).join('');
 
     let ticks = '';
-    let d = new Date(minDay * 86400000);
-    d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+    let dt = new Date(minDay * 86400000);
+    dt = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), 1));
     const end = new Date(maxDay * 86400000);
-    while (d <= end) {
-      const x = xOf(Math.floor(d.getTime() / 86400000));
-      const isYr = d.getUTCMonth() === 0;
-      ticks += `<div class="g-tick ${isYr ? 'yr' : ''}" style="left:${x}px">${isYr ? d.getUTCFullYear() : MON[d.getUTCMonth()]}</div>`;
-      d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+    while (dt <= end) {
+      const x = xOf(Math.floor(dt.getTime() / 86400000));
+      const yr = dt.getUTCMonth() === 0;
+      ticks += `<div class="g-tick ${yr ? 'yr' : ''}" style="left:${x}px">${yr ? dt.getUTCFullYear() : MON[dt.getUTCMonth()]}</div>`;
+      dt = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 1));
     }
     const todayD = Math.floor(Date.now() / 86400000);
-    const today = (todayD >= minDay && todayD <= maxDay)
-      ? `<div class="g-today" style="left:${xOf(todayD)}px;top:${HEAD}px;height:${acts.length * ROW}px"></div>` : '';
-    const bars = acts.map((a, i) => {
-      const x = xOf(day(a.start)), top = HEAD + i * ROW + (ROW - 13) / 2;
-      if (a.isMilestone) {
-        return `<div class="g-ms ${a.critical ? 'crit' : ''}" data-i="${i}" style="left:${x - 6}px;top:${top - 0}px"></div>`;
-      }
-      const w = Math.max(4, (day(a.finish) - day(a.start)) * PXD);
-      const fill = a.pct > 0 && a.pct < 100 ? `<div class="g-fill" style="left:auto;right:0;width:${100 - a.pct}%"></div>` : '';
-      return `<div class="g-bar ${a.critical ? 'crit' : 'norm'} ${a.pct >= 100 ? 'done' : ''}" data-i="${i}"
-        style="left:${x}px;width:${w}px;top:${top}px" title="${a.id} · ${a.name || ''}">${fill}</div>`;
-    }).join('');
+
+    const list = document.getElementById('g-list');
     const time = document.getElementById('g-time');
-    time.innerHTML = `<div class="g-canvas" style="width:${width}px;height:${HEAD + acts.length * ROW}px">
-      <div class="g-axis" style="width:${width}px">${ticks}</div>${today}${bars}</div>`;
+    const collapsed = new Set();
+    let rows = [], selTask = null, relOn = false;
+
+    const buildRows = () => {
+      const out = [];
+      const walk = (id, depth) => {
+        if (!subHas(id)) return;
+        out.push({ kind: 'wbs', id, depth });
+        if (collapsed.has(id)) return;
+        (kids[id] || []).forEach((c) => walk(c, depth + 1));
+        (actsByWbs[id] || []).forEach((a) => out.push({ kind: 'act', act: a, depth: depth + 1 }));
+      };
+      roots.forEach((r) => walk(r, 0));
+      return out;
+    };
+
+    const HEADER = '<div class="g-head"><span class="g-cid">Act ID</span><span class="g-cnm">Activity Name</span>' +
+      '<span class="g-cbs">BL Start</span><span class="g-cbs">BL Finish</span><span class="g-cpc">%</span></div>';
+
+    const paint = () => {
+      rows = buildRows();
+      list.innerHTML = HEADER + rows.map((r, i) => {
+        if (r.kind === 'wbs') {
+          return `<div class="g-row g-wbs ${collapsed.has(r.id) ? 'collapsed' : ''}" data-i="${i}" data-wbs="${r.id}">
+            <span class="g-cid"></span><span class="g-cnm" style="padding-left:${r.depth * 12}px"><span class="g-caret">▾</span>${wbs[r.id].name || ''}</span>
+            <span class="g-cbs"></span><span class="g-cbs"></span><span class="g-cpc"></span></div>`;
+        }
+        const a = r.act;
+        return `<div class="g-row" data-i="${i}" data-tid="${a.taskId}">
+          <span class="g-cid">${a.id}</span><span class="g-cnm" style="padding-left:${r.depth * 12}px" title="${a.name || ''}">${a.name || ''}</span>
+          <span class="g-cbs">${schFmt(a.baselineStart)}</span><span class="g-cbs">${schFmt(a.baselineFinish)}</span><span class="g-cpc">${a.pct}%</span></div>`;
+      }).join('');
+
+      const bars = rows.map((r, i) => {
+        const top = HEAD + i * ROW;
+        if (r.kind === 'wbs') {
+          const sp = span[r.id]; if (!sp.s) return '';
+          const x = xOf(schDay(sp.s)), w = Math.max(2, (schDay(sp.f) - schDay(sp.s)) * PXD);
+          return `<div class="g-wbsbar" data-i="${i}" data-wbs="${r.id}" style="left:${x}px;width:${w}px;top:${top + (ROW - 6) / 2}px"></div>`;
+        }
+        const a = r.act, x = xOf(schDay(a.start));
+        if (a.isMilestone) return `<div class="g-ms ${a.critical ? 'crit' : ''}" data-i="${i}" data-tid="${a.taskId}" style="left:${x - 5}px;top:${top + (ROW - 11) / 2}px"></div>`;
+        const w = Math.max(3, (schDay(a.finish) - schDay(a.start)) * PXD);
+        const fill = a.pct > 0 && a.pct < 100 ? `<div class="g-fill" style="right:0;width:${100 - a.pct}%"></div>` : '';
+        return `<div class="g-bar ${a.pct >= 100 ? 'done' : a.critical ? 'crit' : 'norm'}" data-i="${i}" data-tid="${a.taskId}" style="left:${x}px;width:${w}px;top:${top + (ROW - 11) / 2}px" title="${a.id} · ${a.name || ''}">${fill}</div>`;
+      }).join('');
+      const todayLine = (todayD >= minDay && todayD <= maxDay)
+        ? `<div class="g-today" style="left:${xOf(todayD)}px;top:${HEAD}px;height:${rows.length * ROW}px"></div>` : '';
+      const H = HEAD + rows.length * ROW;
+      time.innerHTML = `<div class="g-canvas" style="width:${width}px;height:${H}px">
+        <div class="g-axis" style="width:${width}px">${ticks}</div>${todayLine}
+        <svg class="g-rellines" id="g-rellines" width="${width}" height="${H}"></svg>${bars}</div>`;
+      if (selTask) time.querySelector(`[data-tid="${selTask}"]`)?.classList.add('hl');
+      drawRel();
+    };
+
+    const drawRel = () => {
+      const svg = document.getElementById('g-rellines');
+      if (!svg) return;
+      svg.innerHTML = '';
+      if (!relOn || !selTask) return;
+      const idxOf = {}; rows.forEach((r, i) => { if (r.kind === 'act') idxOf[r.act.taskId] = i; });
+      const si = idxOf[selTask]; if (si == null) return;
+      const a = byTask[selTask];
+      const yOf = (i) => HEAD + i * ROW + ROW / 2;
+      const line = (x1, y1, x2, y2) => { const mx = (x1 + x2) / 2; svg.insertAdjacentHTML('beforeend', `<path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"/>`); };
+      (predMap[a.taskId] || []).forEach((r) => { const pi = idxOf[r.predTaskId]; if (pi == null) return; const p = byTask[r.predTaskId]; line(xOf(schDay(p.finish)), yOf(pi), xOf(schDay(a.start)), yOf(si)); });
+      (succMap[a.taskId] || []).forEach((r) => { const xi = idxOf[r.taskId]; if (xi == null) return; const s = byTask[r.taskId]; line(xOf(schDay(a.finish)), yOf(si), xOf(schDay(s.start)), yOf(xi)); });
+    };
+
+    const tbl = (arr) => `<table class="tbl"><thead><tr><th>Activity ID</th><th>Activity Name</th><th>Type</th><th>Lag</th></tr></thead>
+      <tbody>${arr.map((x) => `<tr><td>${x.act.id}</td><td style="text-align:left">${x.act.name || ''}</td><td>${x.type}</td><td>${x.lag ? x.lag + 'd' : '0'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">None</td></tr>'}</tbody></table>`;
+    const modal = document.getElementById('sch-modal');
+    const openModal = (a) => {
+      const preds = (predMap[a.taskId] || []).map((r) => ({ act: byTask[r.predTaskId], type: r.type, lag: r.lagDays })).filter((x) => x.act);
+      const succs = (succMap[a.taskId] || []).map((r) => ({ act: byTask[r.taskId], type: r.type, lag: r.lagDays })).filter((x) => x.act);
+      document.getElementById('sch-modalbox').innerHTML =
+        `<div class="modal-head"><div><div class="mt">${a.id} — ${a.name || ''}</div>
+          <div class="ms">${a.status} · ${a.pct}% complete · ${preds.length} predecessors · ${succs.length} successors</div></div>
+          <button class="modal-x" id="modal-x">✕</button></div>
+        <div class="modal-grid"><div><h4>Predecessors (${preds.length})</h4>${tbl(preds)}</div>
+          <div><h4>Successors (${succs.length})</h4>${tbl(succs)}</div></div>`;
+      modal.classList.add('show');
+      document.getElementById('modal-x').onclick = () => modal.classList.remove('show');
+    };
+    modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('show'); };
+
+    const select = (tid) => {
+      selTask = tid;
+      list.querySelectorAll('.g-row').forEach((r) => r.classList.remove('sel'));
+      time.querySelectorAll('.hl').forEach((b) => b.classList.remove('hl'));
+      list.querySelector(`.g-row[data-tid="${tid}"]`)?.classList.add('sel');
+      time.querySelector(`[data-tid="${tid}"]`)?.classList.add('hl');
+      drawRel();
+      openModal(byTask[tid]);
+    };
+
+    list.onclick = (e) => {
+      const w = e.target.closest('.g-wbs');
+      if (w) { const id = w.dataset.wbs; collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id); paint(); return; }
+      const r = e.target.closest('.g-row[data-tid]'); if (r) select(r.dataset.tid);
+    };
+    time.onclick = (e) => { const b = e.target.closest('[data-tid]'); if (b) select(b.dataset.tid); };
 
     let lock = false;
     time.onscroll = () => { if (lock) return; lock = true; list.scrollTop = time.scrollTop; lock = false; };
     list.onscroll = () => { if (lock) return; lock = true; time.scrollTop = list.scrollTop; lock = false; };
 
-    const relItem = (x) => {
-      const lag = x.lag ? (x.lag > 0 ? ' +' + x.lag + 'd' : ' ' + x.lag + 'd') : '';
-      return `<div class="rl" data-tid="${x.act.taskId}"><span class="t">${x.type}${lag}</span>
-        <span class="rid">${x.act.id}</span><span class="rnm">${x.act.name || ''}</span></div>`;
-    };
-    const select = (i) => {
-      const a = acts[i];
-      list.querySelectorAll('.g-row').forEach((r) => r.classList.remove('sel', 'pred', 'succ'));
-      time.querySelectorAll('.g-bar,.g-ms').forEach((b) => b.classList.remove('hl'));
-      list.querySelector(`.g-row[data-i="${i}"]`)?.classList.add('sel');
-      time.querySelector(`[data-i="${i}"]`)?.classList.add('hl');
-      const preds = (predMap[a.taskId] || []).map((r) => ({ act: byTask[r.predTaskId], type: r.type, lag: r.lagDays })).filter((x) => x.act);
-      const succs = (succMap[a.taskId] || []).map((r) => ({ act: byTask[r.taskId], type: r.type, lag: r.lagDays })).filter((x) => x.act);
-      const mark = (arr, cls) => arr.forEach((x) => {
-        const j = idxByTask[x.act.taskId];
-        if (j != null) { list.querySelector(`.g-row[data-i="${j}"]`)?.classList.add(cls); time.querySelector(`[data-i="${j}"]`)?.classList.add('hl'); }
-      });
-      mark(preds, 'pred'); mark(succs, 'succ');
-      const rel = document.getElementById('g-rel');
-      rel.innerHTML =
-        `<div class="col"><h4>Predecessors (${preds.length})</h4>${preds.map(relItem).join('') || '<p class="muted">None</p>'}</div>
-         <div class="col"><h4>Successors (${succs.length})</h4>${succs.map(relItem).join('') || '<p class="muted">None</p>'}</div>`;
-      rel.querySelectorAll('.rl').forEach((el) => el.addEventListener('click', () => {
-        const j = idxByTask[el.dataset.tid];
-        if (j != null) { select(j); list.querySelector(`.g-row[data-i="${j}"]`).scrollIntoView({ block: 'center' }); }
-      }));
+    const split = document.getElementById('g-split');
+    split.onmousedown = (e) => {
+      e.preventDefault();
+      const sx = e.clientX, sw = list.offsetWidth;
+      const mv = (ev) => { list.style.width = Math.max(200, Math.min(760, sw + ev.clientX - sx)) + 'px'; };
+      const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); };
+      document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
     };
 
-    list.addEventListener('click', (e) => { const r = e.target.closest('.g-row'); if (r) select(+r.dataset.i); });
-    time.addEventListener('click', (e) => { const b = e.target.closest('.g-bar,.g-ms'); if (b) select(+b.dataset.i); });
+    document.getElementById('sch-rellines').onclick = (e) => {
+      relOn = !relOn; e.currentTarget.classList.toggle('on', relOn); drawRel();
+    };
     document.getElementById('sch-search').oninput = (e) => {
       const q = e.target.value.trim().toLowerCase();
       if (!q) return;
-      const j = acts.findIndex((a) => (a.id || '').toLowerCase().includes(q) || (a.name || '').toLowerCase().includes(q));
-      if (j >= 0) { select(j); list.querySelector(`.g-row[data-i="${j}"]`).scrollIntoView({ block: 'center' }); }
+      const hit = acts.find((a) => (a.id || '').toLowerCase().includes(q) || (a.name || '').toLowerCase().includes(q));
+      if (!hit) return;
+      let p = hit.wbsId;
+      while (p && wbs[p]) { collapsed.delete(p); p = wbs[p].parentId; }
+      paint(); select(hit.taskId);
+      list.querySelector(`.g-row[data-tid="${hit.taskId}"]`)?.scrollIntoView({ block: 'center' });
     };
+
+    paint();
   }
 
   function renderAll() {
