@@ -1,88 +1,71 @@
-// Vercel serverless function. Downloads the workbook from Nutstore via
-// WebDAV (plain HTTPS GET + Basic auth) when NUTSTORE_* env vars are set;
-// otherwise reads data/sample.xlsx (local development).
-//
-// Required env vars in production (set in Vercel project settings):
-//   NUTSTORE_USER      - Nutstore account email
-//   NUTSTORE_PASSWORD  - Nutstore APP password (not the login password)
-//   NUTSTORE_FILE_PATH - path under /dav/, e.g. "ProjectData/tracker.xlsx"
+// Vercel serverless function. In production it pulls the project workbooks +
+// P6 schedule from Nutstore (WebDAV); locally it reads data/*. To keep refreshes
+// fast as the data grows it:
+//   - lists files with one PROPFIND and reads each file's Last-Modified,
+//   - only re-downloads files whose mtime changed (per-file buffer cache),
+//   - returns a cached, already-parsed payload when nothing changed at all,
+//   - fetches everything in parallel and parses each workbook only once.
 const fs = require('fs');
 const path = require('path');
-const { workbookToRows, workbookToMatrices } = require('../lib/workbook');
+const { workbookToBoth } = require('../lib/workbook');
 const { parseTunnel, parseKpis, parseSCurve, parseFinance, parseManpower, parseIpc, parseFinanceDetail } = require('../lib/parsers');
 const { parseXer } = require('../lib/xer');
 
 const DAV_BASE = 'https://dav.jianguoyun.com/dav/';
-
+const DEFAULT_XER_PATH = 'Shared Folder/Schedule/TKV-BL-A-2 (TIA-Bishan).xer';
 const encPath = (p) => p.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
 
-// Production: load EVERY .xlsx in the Nutstore folder so newly-added workbooks
-// (e.g. the daily manpower sheet) are picked up automatically — no env-var
-// change needed. The folder is taken from NUTSTORE_FILE_PATH (dir of the first
-// entry). Falls back to the explicit ';'-separated list if listing fails.
-async function fetchWorkbookBuffers() {
-  const { NUTSTORE_USER, NUTSTORE_PASSWORD, NUTSTORE_FILE_PATH } = process.env;
-  if (NUTSTORE_USER && NUTSTORE_PASSWORD && NUTSTORE_FILE_PATH) {
-    const auth = Buffer.from(`${NUTSTORE_USER}:${NUTSTORE_PASSWORD}`).toString('base64');
-    const headers = { Authorization: `Basic ${auth}` };
-    const first = NUTSTORE_FILE_PATH.split(';')[0].trim().replace(/^\/+/, '');
-    const dir = first.includes('/') ? first.slice(0, first.lastIndexOf('/')) : '';
+// Module-level caches survive across requests on a warm serverless instance.
+const fileCache = new Map(); // path -> { mtime, buffer }
+let xerCache = null;         // { path, mtime, text }
+let payloadCache = null;     // { sig, payload }
 
-    let paths = [];
-    try {
-      const res = await fetch(DAV_BASE + encPath(dir) + '/', { method: 'PROPFIND', headers: { ...headers, Depth: '1' } });
-      if (res.ok) {
-        const xml = await res.text();
-        paths = [...xml.matchAll(/<[a-z]*:?href>([^<]*)<\/[a-z]*:?href>/gi)]
-          .map((m) => decodeURIComponent(m[1]).replace(/^\/dav\//, '').replace(/\/$/, ''))
-          .filter((h) => /\.xlsx$/i.test(h) && !/\/~\$/.test(h));
-      }
-    } catch { /* fall through to explicit list */ }
-    if (!paths.length) paths = NUTSTORE_FILE_PATH.split(';').map((p) => p.trim()).filter(Boolean);
-
-    const buffers = [];
-    for (const p of paths) {
-      const res = await fetch(DAV_BASE + encPath(p), { headers });
-      if (!res.ok) throw new Error(`Nutstore responded ${res.status} ${res.statusText} for "${p}"`);
-      buffers.push(Buffer.from(await res.arrayBuffer()));
-    }
-    return { buffers, source: 'nutstore' };
-  }
-  // Local development: merge every workbook in data/ (Excel lock files excluded).
-  const dir = path.join(__dirname, '..', 'data');
-  const buffers = fs.readdirSync(dir)
-    .filter((f) => f.endsWith('.xlsx') && !f.startsWith('~$'))
-    .sort()
-    .map((f) => fs.readFileSync(path.join(dir, f)));
-  return { buffers, source: 'local-file' };
+function davHeaders() {
+  const { NUTSTORE_USER, NUTSTORE_PASSWORD } = process.env;
+  if (!NUTSTORE_USER || !NUTSTORE_PASSWORD) return null;
+  return { Authorization: 'Basic ' + Buffer.from(`${NUTSTORE_USER}:${NUTSTORE_PASSWORD}`).toString('base64') };
 }
 
-// Default Nutstore location of the P6 schedule. Kept in code (not a secret) so
-// the live site works without a Vercel env-var change; override with NUTSTORE_XER_PATH.
-const DEFAULT_XER_PATH = 'Shared Folder/Schedule/TKV-BL-A-2 (TIA-Bishan).xer';
-
-// The P6 schedule (.xer) — fetched from Nutstore in production, or the first
-// .xer in data/ during local dev. Returns null if none is found.
-async function fetchXerText() {
-  const { NUTSTORE_USER, NUTSTORE_PASSWORD, NUTSTORE_XER_PATH } = process.env;
-  if (NUTSTORE_USER && NUTSTORE_PASSWORD) {
-    const auth = Buffer.from(`${NUTSTORE_USER}:${NUTSTORE_PASSWORD}`).toString('base64');
-    const res = await fetch(DAV_BASE + encPath(NUTSTORE_XER_PATH || DEFAULT_XER_PATH), { headers: { Authorization: `Basic ${auth}` } });
-    if (!res.ok) return null;
-    return Buffer.from(await res.arrayBuffer()).toString('latin1');
+// PROPFIND -> [{ path, mtime }] pairing each href with its Last-Modified.
+async function propfind(url, headers, depth) {
+  const res = await fetch(url, { method: 'PROPFIND', headers: { ...headers, Depth: String(depth) } });
+  if (!res.ok) return [];
+  const xml = await res.text();
+  const out = [];
+  for (const block of xml.split(/<[a-z]*:?response>/i).slice(1)) {
+    const href = (block.match(/<[a-z]*:?href>([^<]*)<\/[a-z]*:?href>/i) || [])[1];
+    const lm = (block.match(/<[a-z]*:?getlastmodified>([^<]*)<\/[a-z]*:?getlastmodified>/i) || [])[1];
+    if (href) out.push({ path: decodeURIComponent(href).replace(/^\/dav\//, '').replace(/\/$/, ''), mtime: lm || '' });
   }
-  const dir = path.join(__dirname, '..', 'data');
-  const f = fs.readdirSync(dir).find((x) => x.endsWith('.xer') && !x.startsWith('~$'));
-  return f ? fs.readFileSync(path.join(dir, f), 'latin1') : null;
+  return out;
 }
 
-async function buildPayload() {
-  const { buffers, source } = await fetchWorkbookBuffers();
-  const sheets = {};
-  const matrices = {};
+async function getBuffer(p, mtime, headers) {
+  const c = fileCache.get(p);
+  if (c && c.mtime && c.mtime === mtime) return c.buffer;
+  const res = await fetch(DAV_BASE + encPath(p), { headers });
+  if (!res.ok) throw new Error(`Nutstore responded ${res.status} ${res.statusText} for "${p}"`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  fileCache.set(p, { mtime, buffer: buf });
+  return buf;
+}
+
+async function getXer(p, mtime, headers) {
+  if (xerCache && xerCache.path === p && xerCache.mtime && xerCache.mtime === mtime) return xerCache.text;
+  const res = await fetch(DAV_BASE + encPath(p), { headers });
+  if (!res.ok) return null;
+  const text = Buffer.from(await res.arrayBuffer()).toString('latin1');
+  xerCache = { path: p, mtime, text };
+  return text;
+}
+
+// Parse buffers + XER into the API payload (no generatedAt — added fresh each send).
+function assemble(buffers, xerText, source) {
+  const sheets = {}, matrices = {};
   for (const buffer of buffers) {
-    Object.assign(sheets, workbookToRows(buffer));
-    Object.assign(matrices, workbookToMatrices(buffer));
+    const { rows, matrices: m } = workbookToBoth(buffer);
+    Object.assign(sheets, rows);
+    Object.assign(matrices, m);
   }
   const tunnel = parseTunnel(sheets);
   const executive = parseKpis(sheets);
@@ -91,11 +74,8 @@ async function buildPayload() {
   const manpower = parseManpower(matrices);
   const ipc = parseIpc(matrices);
   const financeDetail = parseFinanceDetail(matrices);
-  const xerText = await fetchXerText().catch(() => null);
-  const schedule = xerText ? parseXer(xerText)
-    : { activities: [], relationships: [], wbs: {}, warnings: [] };
+  const schedule = xerText ? parseXer(xerText) : { activities: [], relationships: [], wbs: {}, warnings: [] };
   return {
-    generatedAt: new Date().toISOString(),
     source,
     warnings: [...tunnel.warnings, ...executive.warnings, ...scurve.warnings,
       ...finance.warnings, ...manpower.warnings, ...ipc.warnings, ...schedule.warnings],
@@ -104,11 +84,8 @@ async function buildPayload() {
     scurve: { months: scurve.months, plannedPct: scurve.plannedPct, actualPct: scurve.actualPct },
     finance,
     manpower: {
-      date: manpower.date,
-      mobilized: manpower.mobilized,
-      mobilizedTotal: manpower.mobilizedTotal,
-      idle: manpower.idle,
-      idleTotal: manpower.idleTotal,
+      date: manpower.date, mobilized: manpower.mobilized, mobilizedTotal: manpower.mobilizedTotal,
+      idle: manpower.idle, idleTotal: manpower.idleTotal,
     },
     ipc: { rows: ipc.rows, total: ipc.total },
     financeDetail,
@@ -116,10 +93,53 @@ async function buildPayload() {
   };
 }
 
+const stamp = (payload) => ({ ...payload, generatedAt: new Date().toISOString() });
+
+async function buildPayload() {
+  const headers = davHeaders();
+
+  if (headers && process.env.NUTSTORE_FILE_PATH) {
+    const first = process.env.NUTSTORE_FILE_PATH.split(';')[0].trim().replace(/^\/+/, '');
+    const dir = first.includes('/') ? first.slice(0, first.lastIndexOf('/')) : '';
+    const xerPath = process.env.NUTSTORE_XER_PATH || DEFAULT_XER_PATH;
+
+    // One PROPFIND for the workbook folder + one for the XER, in parallel.
+    const [listing, xerInfo] = await Promise.all([
+      propfind(DAV_BASE + encPath(dir) + '/', headers, 1),
+      propfind(DAV_BASE + encPath(xerPath), headers, 0),
+    ]);
+    let entries = listing.filter((e) => /\.xlsx$/i.test(e.path) && !/\/~\$/.test(e.path));
+    if (!entries.length) entries = process.env.NUTSTORE_FILE_PATH.split(';').map((p) => ({ path: p.trim(), mtime: '' })).filter((e) => e.path);
+    entries.sort((a, b) => a.path.localeCompare(b.path));
+    const xerMtime = (xerInfo[0] && xerInfo[0].mtime) || '';
+
+    const sig = JSON.stringify({ wb: entries.map((e) => e.path + '|' + e.mtime), xer: xerPath + '|' + xerMtime });
+    if (payloadCache && payloadCache.sig === sig) return stamp(payloadCache.payload); // nothing changed
+
+    const [buffers, xerText] = await Promise.all([
+      Promise.all(entries.map((e) => getBuffer(e.path, e.mtime, headers))),
+      getXer(xerPath, xerMtime, headers),
+    ]);
+    const payload = assemble(buffers, xerText, 'nutstore');
+    payloadCache = { sig, payload };
+    return stamp(payload);
+  }
+
+  // ----- local development: data/ folder, cached by file mtime -----
+  const dir = path.join(__dirname, '..', 'data');
+  const files = fs.readdirSync(dir).filter((f) => (f.endsWith('.xlsx') || f.endsWith('.xer')) && !f.startsWith('~$')).sort();
+  const sig = JSON.stringify(files.map((f) => f + '|' + fs.statSync(path.join(dir, f)).mtimeMs));
+  if (payloadCache && payloadCache.sig === sig) return stamp(payloadCache.payload);
+  const buffers = files.filter((f) => f.endsWith('.xlsx')).map((f) => fs.readFileSync(path.join(dir, f)));
+  const xf = files.find((f) => f.endsWith('.xer'));
+  const xerText = xf ? fs.readFileSync(path.join(dir, xf), 'latin1') : null;
+  const payload = assemble(buffers, xerText, 'local-file');
+  payloadCache = { sig, payload };
+  return stamp(payload);
+}
+
 module.exports = async (req, res) => {
-  // Allow the standalone TamakoshiTracker.html (opened from disk, origin
-  // "null") to call this API. Exposes project data read-only; credentials
-  // never leave the server.
+  // Allow the standalone TamakoshiTracker.html (opened from disk) to call this.
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();
