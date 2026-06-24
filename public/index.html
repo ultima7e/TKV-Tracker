@@ -120,10 +120,11 @@
       </section>
       <section class="view" id="sched">
         <div class="card">
-          <h3>Project Schedule — <span id="sch-count">—</span> activities <span class="muted" style="font-weight:600">· grouped by WBS · click an activity for relationships</span></h3>
+          <h3>Project Schedule — <span id="sch-count">—</span> activities <span class="muted" style="font-weight:600">· grouped by WBS · click an activity for relationships</span> <span class="muted" id="sch-src" style="font-weight:600"></span></h3>
           <div class="sch-tools">
             <input id="sch-search" placeholder="Search Activity ID or name…">
             <button id="sch-rellines" class="sch-toggle">Show relationships</button>
+            <label class="sch-toggle" style="cursor:pointer">⬆ Upload XER<input type="file" id="sch-upload" accept=".xer" style="display:none"></label>
             <span class="leg"><i style="background:#4d8af0"></i>Normal</span>
             <span class="leg"><i style="background:#ef6c57"></i>Critical</span>
             <span class="leg"><i style="background:#5a6577"></i>WBS</span>

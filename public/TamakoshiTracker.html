@@ -350,10 +350,11 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       </section>
       <section class="view" id="sched">
         <div class="card">
-          <h3>Project Schedule — <span id="sch-count">—</span> activities <span class="muted" style="font-weight:600">· grouped by WBS · click an activity for relationships</span></h3>
+          <h3>Project Schedule — <span id="sch-count">—</span> activities <span class="muted" style="font-weight:600">· grouped by WBS · click an activity for relationships</span> <span class="muted" id="sch-src" style="font-weight:600"></span></h3>
           <div class="sch-tools">
             <input id="sch-search" placeholder="Search Activity ID or name…">
             <button id="sch-rellines" class="sch-toggle">Show relationships</button>
+            <label class="sch-toggle" style="cursor:pointer">⬆ Upload XER<input type="file" id="sch-upload" accept=".xer" style="display:none"></label>
             <span class="leg"><i style="background:#4d8af0"></i>Normal</span>
             <span class="leg"><i style="background:#ef6c57"></i>Critical</span>
             <span class="leg"><i style="background:#5a6577"></i>WBS</span>
@@ -847,6 +848,58 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   const schDay = (iso) => Math.floor(new Date(iso + 'T00:00:00Z').getTime() / 86400000);
   const schFmt = (iso) => { if (!iso) return ''; const p = iso.split('-'); return p[2] + '-' + MON[+p[1] - 1] + '-' + p[0].slice(2); };
 
+  function parseXerClient(text) {
+    const tables = {};
+    let cur = null, fields = null;
+    for (const raw of text.split(/\r?\n/)) {
+      if (raw.startsWith('%T')) { cur = raw.split('\t')[1]; tables[cur] = []; fields = null; }
+      else if (raw.startsWith('%F')) { fields = raw.split('\t').slice(1); }
+      else if (raw.startsWith('%R') && cur && fields) {
+        const v = raw.split('\t').slice(1); const row = {};
+        fields.forEach((f, i) => { row[f] = v[i]; }); tables[cur].push(row);
+      }
+    }
+    const MILE = new Set(['TT_Mile', 'TT_FinMile', 'TT_StartMile']);
+    const ST = { TK_NotStart: 'Not Started', TK_Active: 'In Progress', TK_Complete: 'Complete' };
+    const PR = { PR_FS: 'FS', PR_SS: 'SS', PR_FF: 'FF', PR_SF: 'SF' };
+    const iso = (s) => (s && /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : null);
+    const num = (v) => (v == null || v === '' ? 0 : parseFloat(v));
+    const wbs = {};
+    (tables.PROJWBS || []).forEach((w) => { wbs[w.wbs_id] = { name: w.wbs_name, parentId: w.parent_wbs_id, seq: parseInt(w.seq_num, 10) || 0 }; });
+    const activities = (tables.TASK || []).map((r) => ({
+      taskId: r.task_id, id: r.task_code, name: r.task_name, wbsId: r.wbs_id,
+      status: ST[r.status_code] || r.status_code, pct: Math.round(num(r.phys_complete_pct)),
+      isMilestone: MILE.has(r.task_type),
+      start: iso(r.act_start_date) || iso(r.early_start_date) || iso(r.target_start_date) || iso(r.restart_date),
+      finish: iso(r.act_end_date) || iso(r.early_end_date) || iso(r.target_end_date) || iso(r.reend_date),
+      baselineStart: iso(r.target_start_date), baselineFinish: iso(r.target_end_date),
+      totalFloatDays: Math.round((num(r.total_float_hr_cnt) / 8) * 10) / 10,
+      critical: num(r.total_float_hr_cnt) <= 0,
+    }));
+    const relationships = (tables.TASKPRED || []).map((r) => ({
+      taskId: r.task_id, predTaskId: r.pred_task_id, type: PR[r.pred_type] || r.pred_type,
+      lagDays: Math.round((num(r.lag_hr_cnt) / 8) * 10) / 10,
+    }));
+    return { activities, relationships, wbs };
+  }
+
+  function handleXerUpload(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = parseXerClient(reader.result);
+        if (!parsed.activities.length) { alert('No activities (TASK table) found in this XER file.'); return; }
+        data = data || {};
+        data.schedule = parsed;
+        schedBuiltFor = null;
+        renderSchedule();
+        const src = $('#sch-src');
+        if (src) src.textContent = '· uploaded: ' + file.name;
+      } catch (err) { alert('Could not read this XER file: ' + err.message); }
+    };
+    reader.readAsText(file);
+  }
+
   function renderSchedule() {
     const sch = data.schedule || {};
     const all = sch.activities || [];
@@ -1115,6 +1168,14 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     { day: '2-digit', month: 'short', year: 'numeric' });
 
   renderTunnel3D(); // embedded data — independent of the API fetch
+
+  const xerInput = document.getElementById('sch-upload');
+  if (xerInput) xerInput.addEventListener('change', (e) => {
+    const f = e.target.files[0];
+    if (f) handleXerUpload(f);
+    e.target.value = '';
+  });
+
   load();
 })();
 </script>
