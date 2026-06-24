@@ -151,7 +151,8 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .sch-tools .leg{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px}
 .sch-tools .leg i{width:16px;height:8px;border-radius:2px;display:inline-block}
 
-.gantt{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;height:480px}
+.sched-wrap{display:flex;flex-direction:column;height:620px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.gantt{display:flex;overflow:hidden;flex:1;min-height:120px}
 .g-list{flex-shrink:0;overflow-y:auto;overflow-x:hidden;background:#fff;scrollbar-width:none}
 .g-list::-webkit-scrollbar{display:none}
 .g-split{width:5px;flex-shrink:0;background:#d3e2f4;cursor:col-resize}
@@ -188,18 +189,19 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .g-ms.crit{background:#ef6c57} .g-ms.hl{outline:2px solid var(--amber);outline-offset:1px}
 .g-today{position:absolute;width:0;border-left:2px dashed #ef6c57;z-index:2}
 .g-rellines{position:absolute;top:0;left:0;pointer-events:none;z-index:4;overflow:visible}
-.g-rellines path{stroke:#f5a623;stroke-width:1.4;fill:none}
+.g-rellines path{stroke:#b3c1d4;stroke-width:.8;fill:none}
+.g-rellines path.sel{stroke:#f5a623;stroke-width:1.6}
 
-/* relationship modal (P6-style) */
-.modal{display:none;position:fixed;inset:0;background:rgba(15,32,55,.45);z-index:50;align-items:center;justify-content:center;padding:20px}
-.modal.show{display:flex}
-.modal-box{background:#fff;border-radius:12px;max-width:920px;width:100%;max-height:84vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
-.modal-head{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff}
-.modal-head .mt{font-size:13px;font-weight:800;color:var(--navy)} .modal-head .ms{font-size:11.5px;color:var(--muted);margin-top:2px}
-.modal-x{border:none;background:#eef2f7;width:28px;height:28px;border-radius:7px;cursor:pointer;font-size:14px;color:#51637e}
-.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px 18px}
-.modal-grid h4{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px}
-@media (max-width:880px){ .modal-grid{grid-template-columns:1fr} }
+/* P6-style bottom detail pane (resizable, non-blocking) */
+.g-vsplit{height:6px;background:#d3e2f4;cursor:row-resize;flex-shrink:0}
+.g-vsplit:hover{background:var(--accent)}
+.g-detail{height:170px;flex-shrink:0;overflow:auto;background:#fff;padding:12px 14px}
+.g-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g-detail-grid h4{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:7px}
+.g-detail-title{font-size:12.5px;font-weight:800;color:var(--navy);margin-bottom:10px}
+.g-detail-title span{font-weight:600;color:var(--muted)}
+.g-detail .tbl td{cursor:pointer}
+@media (max-width:880px){ .g-detail-grid{grid-template-columns:1fr} }
 
 /* ---- responsive ---- */
 @media (min-width:881px) and (max-width:1280px){
@@ -357,13 +359,16 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
             <span class="leg"><i style="background:#5a6577"></i>WBS</span>
             <span class="leg"><i style="width:9px;height:9px;background:#2c3e50;transform:rotate(45deg);border-radius:1px"></i>Milestone</span>
           </div>
-          <div class="gantt">
-            <div class="g-list" id="g-list" style="width:380px"></div>
-            <div class="g-split" id="g-split"></div>
-            <div class="g-time" id="g-time"></div>
+          <div class="sched-wrap">
+            <div class="gantt">
+              <div class="g-list" id="g-list" style="width:380px"></div>
+              <div class="g-split" id="g-split"></div>
+              <div class="g-time" id="g-time"></div>
+            </div>
+            <div class="g-vsplit" id="g-vsplit"></div>
+            <div class="g-detail" id="g-detail"><p class="muted">Select an activity to see its predecessors and successors.</p></div>
           </div>
         </div>
-        <div class="modal" id="sch-modal"><div class="modal-box" id="sch-modalbox"></div></div>
       </section>
       <section class="view" id="claims"><div class="card"><h3>Claims &amp; Variations</h3><p class="muted">Awaiting claims data sheet (Phase 2).</p></div></section>
       <section class="view" id="inv"><div class="card"><h3>Inventory &amp; Explosives</h3><p class="muted">Awaiting inventory data sheet (Phase 2).</p></div></section>
@@ -938,11 +943,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 
       const bars = rows.map((r, i) => {
         const top = HEAD + i * ROW;
-        if (r.kind === 'wbs') {
-          const sp = span[r.id]; if (!sp.s) return '';
-          const x = xOf(schDay(sp.s)), w = Math.max(2, (schDay(sp.f) - schDay(sp.s)) * PXD);
-          return `<div class="g-wbsbar" data-i="${i}" data-wbs="${r.id}" style="left:${x}px;width:${w}px;top:${top + (ROW - 6) / 2}px"></div>`;
-        }
+        if (r.kind === 'wbs') return ''; // no summary bar in the Gantt
         const a = r.act, x = xOf(schDay(a.start));
         if (a.isMilestone) return `<div class="g-ms ${a.critical ? 'crit' : ''}" data-i="${i}" data-tid="${a.taskId}" style="left:${x - 5}px;top:${top + (ROW - 11) / 2}px"></div>`;
         const w = Math.max(3, (schDay(a.finish) - schDay(a.start)) * PXD);
@@ -959,36 +960,49 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       drawRel();
     };
 
+    // P6-style relationship lines across the whole Gantt (orthogonal elbows),
+    // type-aware endpoints. Only between currently-visible activities; the
+    // selected activity's links are emphasised in amber.
     const drawRel = () => {
       const svg = document.getElementById('g-rellines');
       if (!svg) return;
-      svg.innerHTML = '';
-      if (!relOn || !selTask) return;
+      if (!relOn) { svg.innerHTML = ''; return; }
       const idxOf = {}; rows.forEach((r, i) => { if (r.kind === 'act') idxOf[r.act.taskId] = i; });
-      const si = idxOf[selTask]; if (si == null) return;
-      const a = byTask[selTask];
       const yOf = (i) => HEAD + i * ROW + ROW / 2;
-      const line = (x1, y1, x2, y2) => { const mx = (x1 + x2) / 2; svg.insertAdjacentHTML('beforeend', `<path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"/>`); };
-      (predMap[a.taskId] || []).forEach((r) => { const pi = idxOf[r.predTaskId]; if (pi == null) return; const p = byTask[r.predTaskId]; line(xOf(schDay(p.finish)), yOf(pi), xOf(schDay(a.start)), yOf(si)); });
-      (succMap[a.taskId] || []).forEach((r) => { const xi = idxOf[r.taskId]; if (xi == null) return; const s = byTask[r.taskId]; line(xOf(schDay(a.finish)), yOf(si), xOf(schDay(s.start)), yOf(xi)); });
+      const xS = (a) => xOf(schDay(a.start)), xF = (a) => xOf(schDay(a.finish));
+      let paths = '';
+      (sch.relationships || []).forEach((r) => {
+        const pi = idxOf[r.predTaskId], xi = idxOf[r.taskId];
+        if (pi == null || xi == null) return;
+        const p = byTask[r.predTaskId], s = byTask[r.taskId];
+        let x1, x2;
+        if (r.type === 'SS') { x1 = xS(p); x2 = xS(s); }
+        else if (r.type === 'FF') { x1 = xF(p); x2 = xF(s); }
+        else if (r.type === 'SF') { x1 = xS(p); x2 = xF(s); }
+        else { x1 = xF(p); x2 = xS(s); } // FS
+        const y1 = yOf(pi), y2 = yOf(xi), mx = x1 + 7;
+        const sel = (selTask === r.predTaskId || selTask === r.taskId);
+        paths += `<path class="${sel ? 'sel' : ''}" d="M${x1},${y1} L${mx},${y1} L${mx},${y2} L${x2},${y2}"/>`;
+      });
+      svg.innerHTML = paths;
     };
 
+    // Non-blocking bottom detail pane (P6-style): predecessor & successor tables.
+    const detail = document.getElementById('g-detail');
     const tbl = (arr) => `<table class="tbl"><thead><tr><th>Activity ID</th><th>Activity Name</th><th>Type</th><th>Lag</th></tr></thead>
-      <tbody>${arr.map((x) => `<tr><td>${x.act.id}</td><td style="text-align:left">${x.act.name || ''}</td><td>${x.type}</td><td>${x.lag ? x.lag + 'd' : '0'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">None</td></tr>'}</tbody></table>`;
-    const modal = document.getElementById('sch-modal');
-    const openModal = (a) => {
+      <tbody>${arr.map((x) => `<tr data-tid="${x.act.taskId}"><td>${x.act.id}</td><td style="text-align:left">${x.act.name || ''}</td><td>${x.type}</td><td>${x.lag ? x.lag + 'd' : '0'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">None</td></tr>'}</tbody></table>`;
+    const renderDetail = (a) => {
       const preds = (predMap[a.taskId] || []).map((r) => ({ act: byTask[r.predTaskId], type: r.type, lag: r.lagDays })).filter((x) => x.act);
       const succs = (succMap[a.taskId] || []).map((r) => ({ act: byTask[r.taskId], type: r.type, lag: r.lagDays })).filter((x) => x.act);
-      document.getElementById('sch-modalbox').innerHTML =
-        `<div class="modal-head"><div><div class="mt">${a.id} — ${a.name || ''}</div>
-          <div class="ms">${a.status} · ${a.pct}% complete · ${preds.length} predecessors · ${succs.length} successors</div></div>
-          <button class="modal-x" id="modal-x">✕</button></div>
-        <div class="modal-grid"><div><h4>Predecessors (${preds.length})</h4>${tbl(preds)}</div>
+      detail.innerHTML =
+        `<div class="g-detail-title">${a.id} — ${a.name || ''} <span>· ${a.status} · ${a.pct}% complete</span></div>
+        <div class="g-detail-grid"><div><h4>Predecessors (${preds.length})</h4>${tbl(preds)}</div>
           <div><h4>Successors (${succs.length})</h4>${tbl(succs)}</div></div>`;
-      modal.classList.add('show');
-      document.getElementById('modal-x').onclick = () => modal.classList.remove('show');
+      detail.querySelectorAll('tr[data-tid]').forEach((tr) => tr.addEventListener('click', () => {
+        select(tr.dataset.tid);
+        list.querySelector(`.g-row[data-tid="${tr.dataset.tid}"]`)?.scrollIntoView({ block: 'center' });
+      }));
     };
-    modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('show'); };
 
     const select = (tid) => {
       selTask = tid;
@@ -997,7 +1011,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       list.querySelector(`.g-row[data-tid="${tid}"]`)?.classList.add('sel');
       time.querySelector(`[data-tid="${tid}"]`)?.classList.add('hl');
       drawRel();
-      openModal(byTask[tid]);
+      renderDetail(byTask[tid]);
     };
 
     list.onclick = (e) => {
@@ -1016,6 +1030,15 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       e.preventDefault();
       const sx = e.clientX, sw = list.offsetWidth;
       const mv = (ev) => { list.style.width = Math.max(200, Math.min(760, sw + ev.clientX - sx)) + 'px'; };
+      const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); };
+      document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+    };
+
+    const vsplit = document.getElementById('g-vsplit');
+    vsplit.onmousedown = (e) => {
+      e.preventDefault();
+      const sy = e.clientY, sh = detail.offsetHeight;
+      const mv = (ev) => { detail.style.height = Math.max(60, Math.min(420, sh - (ev.clientY - sy))) + 'px'; };
       const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); };
       document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
     };

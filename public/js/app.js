@@ -570,11 +570,7 @@
 
       const bars = rows.map((r, i) => {
         const top = HEAD + i * ROW;
-        if (r.kind === 'wbs') {
-          const sp = span[r.id]; if (!sp.s) return '';
-          const x = xOf(schDay(sp.s)), w = Math.max(2, (schDay(sp.f) - schDay(sp.s)) * PXD);
-          return `<div class="g-wbsbar" data-i="${i}" data-wbs="${r.id}" style="left:${x}px;width:${w}px;top:${top + (ROW - 6) / 2}px"></div>`;
-        }
+        if (r.kind === 'wbs') return ''; // no summary bar in the Gantt
         const a = r.act, x = xOf(schDay(a.start));
         if (a.isMilestone) return `<div class="g-ms ${a.critical ? 'crit' : ''}" data-i="${i}" data-tid="${a.taskId}" style="left:${x - 5}px;top:${top + (ROW - 11) / 2}px"></div>`;
         const w = Math.max(3, (schDay(a.finish) - schDay(a.start)) * PXD);
@@ -591,36 +587,49 @@
       drawRel();
     };
 
+    // P6-style relationship lines across the whole Gantt (orthogonal elbows),
+    // type-aware endpoints. Only between currently-visible activities; the
+    // selected activity's links are emphasised in amber.
     const drawRel = () => {
       const svg = document.getElementById('g-rellines');
       if (!svg) return;
-      svg.innerHTML = '';
-      if (!relOn || !selTask) return;
+      if (!relOn) { svg.innerHTML = ''; return; }
       const idxOf = {}; rows.forEach((r, i) => { if (r.kind === 'act') idxOf[r.act.taskId] = i; });
-      const si = idxOf[selTask]; if (si == null) return;
-      const a = byTask[selTask];
       const yOf = (i) => HEAD + i * ROW + ROW / 2;
-      const line = (x1, y1, x2, y2) => { const mx = (x1 + x2) / 2; svg.insertAdjacentHTML('beforeend', `<path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"/>`); };
-      (predMap[a.taskId] || []).forEach((r) => { const pi = idxOf[r.predTaskId]; if (pi == null) return; const p = byTask[r.predTaskId]; line(xOf(schDay(p.finish)), yOf(pi), xOf(schDay(a.start)), yOf(si)); });
-      (succMap[a.taskId] || []).forEach((r) => { const xi = idxOf[r.taskId]; if (xi == null) return; const s = byTask[r.taskId]; line(xOf(schDay(a.finish)), yOf(si), xOf(schDay(s.start)), yOf(xi)); });
+      const xS = (a) => xOf(schDay(a.start)), xF = (a) => xOf(schDay(a.finish));
+      let paths = '';
+      (sch.relationships || []).forEach((r) => {
+        const pi = idxOf[r.predTaskId], xi = idxOf[r.taskId];
+        if (pi == null || xi == null) return;
+        const p = byTask[r.predTaskId], s = byTask[r.taskId];
+        let x1, x2;
+        if (r.type === 'SS') { x1 = xS(p); x2 = xS(s); }
+        else if (r.type === 'FF') { x1 = xF(p); x2 = xF(s); }
+        else if (r.type === 'SF') { x1 = xS(p); x2 = xF(s); }
+        else { x1 = xF(p); x2 = xS(s); } // FS
+        const y1 = yOf(pi), y2 = yOf(xi), mx = x1 + 7;
+        const sel = (selTask === r.predTaskId || selTask === r.taskId);
+        paths += `<path class="${sel ? 'sel' : ''}" d="M${x1},${y1} L${mx},${y1} L${mx},${y2} L${x2},${y2}"/>`;
+      });
+      svg.innerHTML = paths;
     };
 
+    // Non-blocking bottom detail pane (P6-style): predecessor & successor tables.
+    const detail = document.getElementById('g-detail');
     const tbl = (arr) => `<table class="tbl"><thead><tr><th>Activity ID</th><th>Activity Name</th><th>Type</th><th>Lag</th></tr></thead>
-      <tbody>${arr.map((x) => `<tr><td>${x.act.id}</td><td style="text-align:left">${x.act.name || ''}</td><td>${x.type}</td><td>${x.lag ? x.lag + 'd' : '0'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">None</td></tr>'}</tbody></table>`;
-    const modal = document.getElementById('sch-modal');
-    const openModal = (a) => {
+      <tbody>${arr.map((x) => `<tr data-tid="${x.act.taskId}"><td>${x.act.id}</td><td style="text-align:left">${x.act.name || ''}</td><td>${x.type}</td><td>${x.lag ? x.lag + 'd' : '0'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">None</td></tr>'}</tbody></table>`;
+    const renderDetail = (a) => {
       const preds = (predMap[a.taskId] || []).map((r) => ({ act: byTask[r.predTaskId], type: r.type, lag: r.lagDays })).filter((x) => x.act);
       const succs = (succMap[a.taskId] || []).map((r) => ({ act: byTask[r.taskId], type: r.type, lag: r.lagDays })).filter((x) => x.act);
-      document.getElementById('sch-modalbox').innerHTML =
-        `<div class="modal-head"><div><div class="mt">${a.id} — ${a.name || ''}</div>
-          <div class="ms">${a.status} · ${a.pct}% complete · ${preds.length} predecessors · ${succs.length} successors</div></div>
-          <button class="modal-x" id="modal-x">✕</button></div>
-        <div class="modal-grid"><div><h4>Predecessors (${preds.length})</h4>${tbl(preds)}</div>
+      detail.innerHTML =
+        `<div class="g-detail-title">${a.id} — ${a.name || ''} <span>· ${a.status} · ${a.pct}% complete</span></div>
+        <div class="g-detail-grid"><div><h4>Predecessors (${preds.length})</h4>${tbl(preds)}</div>
           <div><h4>Successors (${succs.length})</h4>${tbl(succs)}</div></div>`;
-      modal.classList.add('show');
-      document.getElementById('modal-x').onclick = () => modal.classList.remove('show');
+      detail.querySelectorAll('tr[data-tid]').forEach((tr) => tr.addEventListener('click', () => {
+        select(tr.dataset.tid);
+        list.querySelector(`.g-row[data-tid="${tr.dataset.tid}"]`)?.scrollIntoView({ block: 'center' });
+      }));
     };
-    modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('show'); };
 
     const select = (tid) => {
       selTask = tid;
@@ -629,7 +638,7 @@
       list.querySelector(`.g-row[data-tid="${tid}"]`)?.classList.add('sel');
       time.querySelector(`[data-tid="${tid}"]`)?.classList.add('hl');
       drawRel();
-      openModal(byTask[tid]);
+      renderDetail(byTask[tid]);
     };
 
     list.onclick = (e) => {
@@ -649,6 +658,16 @@
       e.preventDefault();
       const sx = e.clientX, sw = list.offsetWidth;
       const mv = (ev) => { list.style.width = Math.max(200, Math.min(760, sw + ev.clientX - sx)) + 'px'; };
+      const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); };
+      document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+    };
+
+    // vertical splitter: resize the bottom detail pane (drag up = taller)
+    const vsplit = document.getElementById('g-vsplit');
+    vsplit.onmousedown = (e) => {
+      e.preventDefault();
+      const sy = e.clientY, sh = detail.offsetHeight;
+      const mv = (ev) => { detail.style.height = Math.max(60, Math.min(420, sh - (ev.clientY - sy))) + 'px'; };
       const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); };
       document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
     };
