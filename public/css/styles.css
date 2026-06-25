@@ -218,8 +218,15 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .g-wbs.collapsed .g-caret{transform:rotate(-90deg)}
 
 .g-canvas{position:relative}
-.g-tick{position:absolute;top:0;bottom:0;border-left:1px solid #eef2f7;font-size:8.5px;color:var(--muted);padding:6px 0 0 2px;box-sizing:border-box}
-.g-tick.yr{border-left:1px solid #c6d4e6;font-weight:700;color:#5b6f8c}
+/* Two-tier P6 timescale: year band over month band; drag to zoom. */
+.g-axis{cursor:col-resize;user-select:none}
+.g-axis-yr,.g-axis-mo{position:absolute;left:0;height:14px}
+.g-axis-yr{top:0;border-bottom:1px solid #d3e2f4}
+.g-axis-mo{top:14px}
+.g-yr{position:absolute;top:0;height:14px;line-height:14px;border-left:1px solid #c6d4e6;font-size:9px;font-weight:700;color:#5b6f8c;padding-left:3px;box-sizing:border-box;overflow:hidden;white-space:nowrap}
+.g-mo{position:absolute;top:0;height:14px;line-height:14px;border-left:1px solid #e3eaf3;font-size:8.5px;color:var(--muted);padding-left:2px;box-sizing:border-box;overflow:hidden;white-space:nowrap}
+.g-grid{position:absolute;top:0;bottom:0;border-left:1px solid #f1f5fa;width:0}
+.g-grid.yr{border-left:1px solid #d8e2ee}
 /* Bar = light "remaining" track; inner .g-done = solid "completed" segment.
    Strong tone contrast so progress reads clearly, even on the red critical bars. */
 .g-bar{position:absolute;height:11px;border-radius:2px;cursor:pointer;overflow:hidden}

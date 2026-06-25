@@ -194,8 +194,15 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .g-wbs.collapsed .g-caret{transform:rotate(-90deg)}
 
 .g-canvas{position:relative}
-.g-tick{position:absolute;top:0;bottom:0;border-left:1px solid #eef2f7;font-size:8.5px;color:var(--muted);padding:6px 0 0 2px;box-sizing:border-box}
-.g-tick.yr{border-left:1px solid #c6d4e6;font-weight:700;color:#5b6f8c}
+/* Two-tier P6 timescale: year band over month band; drag to zoom. */
+.g-axis{cursor:col-resize;user-select:none}
+.g-axis-yr,.g-axis-mo{position:absolute;left:0;height:14px}
+.g-axis-yr{top:0;border-bottom:1px solid #d3e2f4}
+.g-axis-mo{top:14px}
+.g-yr{position:absolute;top:0;height:14px;line-height:14px;border-left:1px solid #c6d4e6;font-size:9px;font-weight:700;color:#5b6f8c;padding-left:3px;box-sizing:border-box;overflow:hidden;white-space:nowrap}
+.g-mo{position:absolute;top:0;height:14px;line-height:14px;border-left:1px solid #e3eaf3;font-size:8.5px;color:var(--muted);padding-left:2px;box-sizing:border-box;overflow:hidden;white-space:nowrap}
+.g-grid{position:absolute;top:0;bottom:0;border-left:1px solid #f1f5fa;width:0}
+.g-grid.yr{border-left:1px solid #d8e2ee}
 /* Bar = light "remaining" track; inner .g-done = solid "completed" segment.
    Strong tone contrast so progress reads clearly, even on the red critical bars. */
 .g-bar{position:absolute;height:11px;border-radius:2px;cursor:pointer;overflow:hidden}
@@ -956,56 +963,105 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       (succMap[r.predTaskId] = succMap[r.predTaskId] || []).push(r);
     });
 
-    // Flat activity list, sorted by start date (WBS grouping removed — not needed).
-    acts.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : (a.id < b.id ? -1 : 1)));
+    // WBS tree (children sorted by seq, activities per node). The WBS grouping is
+    // KEPT in the left activity list; only the WBS summary bars are dropped from
+    // the Gantt timeline.
+    const kids = {};
+    Object.keys(wbs).forEach((id) => { const p = wbs[id].parentId; (kids[p] = kids[p] || []).push(id); });
+    Object.values(kids).forEach((a) => a.sort((x, y) => (wbs[x].seq || 0) - (wbs[y].seq || 0)));
+    const actsByWbs = {};
+    acts.forEach((a) => { (actsByWbs[a.wbsId] = actsByWbs[a.wbsId] || []).push(a); });
+    Object.values(actsByWbs).forEach((arr) => arr.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : (a.id < b.id ? -1 : 1))));
+    const roots = Object.keys(wbs).filter((id) => !wbs[wbs[id].parentId]);
 
     const minDay = Math.min(...acts.map((a) => schDay(a.start)));
     const maxDay = Math.max(...acts.map((a) => schDay(a.finish)));
-    const PXD = 0.7, ROW = 22, HEAD = 28, PAD = 16;
-    const width = (maxDay - minDay) * PXD + PAD * 2;
-    const xOf = (d) => PAD + (d - minDay) * PXD;
-
-    let ticks = '';
-    let dt = new Date(minDay * 86400000);
-    dt = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), 1));
-    const end = new Date(maxDay * 86400000);
-    while (dt <= end) {
-      const x = xOf(Math.floor(dt.getTime() / 86400000));
-      const yr = dt.getUTCMonth() === 0;
-      ticks += `<div class="g-tick ${yr ? 'yr' : ''}" style="left:${x}px">${yr ? dt.getUTCFullYear() : MON[dt.getUTCMonth()]}</div>`;
-      dt = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 1));
-    }
+    let pxd = 0.7;                 // px per day — mutable: timescale drag zooms it
+    const ROW = 22, HEAD = 28, PAD = 16;
+    const xOf = (d) => PAD + (d - minDay) * pxd;
+    const widthOf = () => (maxDay - minDay) * pxd + PAD * 2;
     const todayD = Math.floor(Date.now() / 86400000);
+
+    // Two-tier P6 timescale: years across the top, months below — plus faint
+    // full-height month/year gridlines. Rebuilt each paint so zoom rescales it.
+    const buildAxis = () => {
+      let years = '', months = '', grid = '';
+      const lo = new Date(minDay * 86400000), hi = new Date(maxDay * 86400000);
+      let dt = new Date(Date.UTC(lo.getUTCFullYear(), lo.getUTCMonth(), 1));
+      while (Math.floor(dt.getTime() / 86400000) <= maxDay) {
+        const mStart = Math.floor(dt.getTime() / 86400000);
+        const next = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 1));
+        const w = (Math.floor(next.getTime() / 86400000) - mStart) * pxd, x = xOf(mStart);
+        months += `<div class="g-mo" style="left:${x}px;width:${w}px">${w < 22 ? MON[dt.getUTCMonth()][0] : MON[dt.getUTCMonth()]}</div>`;
+        grid += `<div class="g-grid ${dt.getUTCMonth() === 0 ? 'yr' : ''}" style="left:${x}px"></div>`;
+        dt = next;
+      }
+      for (let y = lo.getUTCFullYear(); y <= hi.getUTCFullYear(); y++) {
+        const s = Math.max(minDay, Math.floor(Date.UTC(y, 0, 1) / 86400000));
+        const e = Math.min(maxDay, Math.floor(Date.UTC(y + 1, 0, 1) / 86400000));
+        years += `<div class="g-yr" style="left:${xOf(s)}px;width:${(e - s) * pxd}px">${y}</div>`;
+      }
+      return { header: `<div class="g-axis-yr">${years}</div><div class="g-axis-mo">${months}</div>`, grid };
+    };
 
     const list = document.getElementById('g-list');
     const time = document.getElementById('g-time');
+    const collapsed = new Set();
     let rows = [], selTask = null, relOn = false, critOnly = false;
+
+    // Critical Path toggle filters the visible activities (and prunes empty WBS).
+    const visActs = (id) => (actsByWbs[id] || []).filter((a) => !critOnly || a.critical);
+    const subHas = (id) => visActs(id).length > 0 || (kids[id] || []).some(subHas);
+
+    const buildRows = () => {
+      const out = [];
+      const walk = (id, depth) => {
+        if (!subHas(id)) return;
+        out.push({ kind: 'wbs', id, depth });
+        if (collapsed.has(id)) return;
+        (kids[id] || []).forEach((c) => walk(c, depth + 1));
+        visActs(id).forEach((a) => out.push({ kind: 'act', act: a, depth: depth + 1 }));
+      };
+      roots.forEach((r) => walk(r, 0));
+      return out;
+    };
 
     const HEADER = '<div class="g-head"><span class="g-cid">Act ID</span><span class="g-cnm">Activity Name</span>' +
       '<span class="g-cbs">BL Start</span><span class="g-cbs">BL Finish</span><span class="g-cpc">%</span></div>';
 
     const paint = () => {
-      // Critical Path toggle: show only critical activities when on.
-      rows = critOnly ? acts.filter((a) => a.critical) : acts;
-      $('#sch-count').textContent = critOnly ? rows.length + ' critical' : acts.length;
-      list.innerHTML = HEADER + rows.map((a, i) => `<div class="g-row" data-i="${i}" data-tid="${a.taskId}">
-          <span class="g-cid">${a.id}</span><span class="g-cnm" title="${a.name || ''}">${a.name || ''}</span>
-          <span class="g-cbs">${schFmt(a.baselineStart)}</span><span class="g-cbs">${schFmt(a.baselineFinish)}</span><span class="g-cpc">${a.pct}%</span></div>`).join('');
+      rows = buildRows();
+      const nAct = rows.reduce((n, r) => n + (r.kind === 'act' ? 1 : 0), 0);
+      $('#sch-count').textContent = critOnly ? nAct + ' critical' : acts.length;
+      list.innerHTML = HEADER + rows.map((r, i) => {
+        if (r.kind === 'wbs') {
+          return `<div class="g-row g-wbs ${collapsed.has(r.id) ? 'collapsed' : ''}" data-i="${i}" data-wbs="${r.id}">
+            <span class="g-cid"></span><span class="g-cnm" style="padding-left:${r.depth * 12}px"><span class="g-caret">▾</span>${wbs[r.id].name || ''}</span>
+            <span class="g-cbs"></span><span class="g-cbs"></span><span class="g-cpc"></span></div>`;
+        }
+        const a = r.act;
+        return `<div class="g-row" data-i="${i}" data-tid="${a.taskId}">
+          <span class="g-cid">${a.id}</span><span class="g-cnm" style="padding-left:${r.depth * 12}px" title="${a.name || ''}">${a.name || ''}</span>
+          <span class="g-cbs">${schFmt(a.baselineStart)}</span><span class="g-cbs">${schFmt(a.baselineFinish)}</span><span class="g-cpc">${a.pct}%</span></div>`;
+      }).join('');
+      if (selTask) list.querySelector(`.g-row[data-tid="${selTask}"]`)?.classList.add('sel');
 
-      const bars = rows.map((a, i) => {
-        const top = HEAD + i * ROW, x = xOf(schDay(a.start));
+      const width = widthOf();
+      const bars = rows.map((r, i) => {
+        if (r.kind === 'wbs') return ''; // no WBS summary bar in the Gantt
+        const a = r.act, top = HEAD + i * ROW, x = xOf(schDay(a.start));
         if (a.isMilestone) return `<div class="g-ms ${a.critical ? 'crit' : ''}" data-i="${i}" data-tid="${a.taskId}" style="left:${x - 5}px;top:${top + (ROW - 11) / 2}px"></div>`;
-        const w = Math.max(3, (schDay(a.finish) - schDay(a.start)) * PXD);
+        const w = Math.max(3, (schDay(a.finish) - schDay(a.start)) * pxd);
         // Two-tone progress: solid "done" segment (left, = pct%) over a light
-        // "remaining" track — so progressed vs unprogressed reads clearly even
-        // on the red critical bars.
+        // "remaining" track — clear even on the red critical bars.
         return `<div class="g-bar ${a.critical ? 'crit' : 'norm'}" data-i="${i}" data-tid="${a.taskId}" style="left:${x}px;width:${w}px;top:${top + (ROW - 11) / 2}px" title="${a.id} · ${a.name || ''} · ${a.pct}%"><div class="g-done" style="width:${a.pct}%"></div></div>`;
       }).join('');
+      const H = HEAD + rows.length * ROW;
       const todayLine = (todayD >= minDay && todayD <= maxDay)
         ? `<div class="g-today" style="left:${xOf(todayD)}px;top:${HEAD}px;height:${rows.length * ROW}px"></div>` : '';
-      const H = HEAD + rows.length * ROW;
+      const ax = buildAxis();
       time.innerHTML = `<div class="g-canvas" style="width:${width}px;height:${H}px">
-        <div class="g-axis" style="width:${width}px">${ticks}</div>${todayLine}
+        ${ax.grid}<div class="g-axis" id="g-axis" style="width:${width}px" title="Drag left/right to zoom the timescale">${ax.header}</div>${todayLine}
         <svg class="g-rellines" id="g-rellines" width="${width}" height="${H}"></svg>${bars}</div>`;
       if (selTask) time.querySelector(`[data-tid="${selTask}"]`)?.classList.add('hl');
       drawRel();
@@ -1018,7 +1074,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       const svg = document.getElementById('g-rellines');
       if (!svg) return;
       if (!relOn) { svg.innerHTML = ''; return; }
-      const idxOf = {}; rows.forEach((a, i) => { idxOf[a.taskId] = i; });
+      const idxOf = {}; rows.forEach((r, i) => { if (r.kind === 'act') idxOf[r.act.taskId] = i; });
       const yOf = (i) => HEAD + i * ROW + ROW / 2;
       const xS = (a) => xOf(schDay(a.start)), xF = (a) => xOf(schDay(a.finish));
       let paths = '';
@@ -1066,6 +1122,8 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     };
 
     list.onclick = (e) => {
+      const w = e.target.closest('.g-wbs');
+      if (w) { const id = w.dataset.wbs; collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id); paint(); return; }
       const r = e.target.closest('.g-row[data-tid]'); if (r) select(r.dataset.tid);
     };
     time.onclick = (e) => { const b = e.target.closest('[data-tid]'); if (b) select(b.dataset.tid); };
@@ -1103,11 +1161,36 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     document.getElementById('sch-search').oninput = (e) => {
       const q = e.target.value.trim().toLowerCase();
       if (!q) return;
-      const hit = rows.find((a) => (a.id || '').toLowerCase().includes(q) || (a.name || '').toLowerCase().includes(q));
+      const hit = acts.find((a) => (a.id || '').toLowerCase().includes(q) || (a.name || '').toLowerCase().includes(q));
       if (!hit) return;
-      select(hit.taskId);
+      let p = hit.wbsId; while (p && wbs[p]) { collapsed.delete(p); p = wbs[p].parentId; } // expand ancestors
+      paint(); select(hit.taskId);
       list.querySelector(`.g-row[data-tid="${hit.taskId}"]`)?.scrollIntoView({ block: 'center' });
     };
+
+    // P6-style timescale zoom: press on the date header and drag — right zooms
+    // in (months & bars grow), left zooms out — keeping the day under the cursor
+    // anchored in place. Repaints are coalesced so a fast drag stays smooth.
+    let zooming = false, zoomPending = false;
+    time.addEventListener('mousedown', (e) => {
+      if (!e.target.closest('#g-axis')) return;
+      e.preventDefault();
+      const startX = e.clientX, startPxd = pxd, rect = time.getBoundingClientRect();
+      const frac = (time.scrollLeft + (e.clientX - rect.left)) / widthOf();
+      const applyZoom = (clientX) => {
+        pxd = Math.max(0.12, Math.min(8, startPxd * (1 + (clientX - startX) / 250)));
+        paint();
+        time.scrollLeft = frac * widthOf() - (clientX - rect.left);
+      };
+      const mv = (ev) => {
+        if (zooming) { zoomPending = ev.clientX; return; } // drop intermediate frames
+        zooming = true; applyZoom(ev.clientX);
+        while (zoomPending !== false) { const x = zoomPending; zoomPending = false; applyZoom(x); }
+        zooming = false;
+      };
+      const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); };
+      document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+    });
 
     paint();
   }
