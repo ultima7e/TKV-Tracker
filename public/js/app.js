@@ -7,14 +7,15 @@
   const COL = { accent: '#2f7de1', accent2: '#36c5a8', muted: '#7b8aa0', grid: '#eef2f7' };
 
   function countUp(el, to, dec) {
-    if (document.hidden) { el.textContent = to.toFixed(dec); return; } // RAF is paused in hidden tabs — set value directly
+    const fmt = (n) => Number(n.toFixed(dec)).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+    if (document.hidden) { el.textContent = fmt(to); return; } // RAF is paused in hidden tabs — set value directly
     let start = null;
     const dur = 1100;
     function step(t) {
       if (!start) start = t;
       const p = Math.min((t - start) / dur, 1);
       const e = 1 - Math.pow(1 - p, 3);
-      el.textContent = (to * e).toFixed(dec);
+      el.textContent = fmt(to * e);
       if (p < 1) requestAnimationFrame(step);
     }
     requestAnimationFrame(step);
@@ -48,20 +49,22 @@
     return new Date(2000 + +m[2], MON[m[1]], 1);
   }
 
-  function renderTimeMeter() {
+  function renderTimeline() {
     const months = (data.scurve && data.scurve.months) || [];
     if (months.length < 2) return;
     const start = parseMonthLabel(months[0]);
     const end = parseMonthLabel(months[months.length - 1]);
     if (!start || !end) return;
-    const now = new Date();
-    const pct = Math.max(0, Math.min(100, Math.round(((now - start) / (end - start)) * 1000) / 10));
-    const monthsTotal = Math.round((end - start) / (30.44 * 86400000));
-    const monthsDone = Math.max(0, Math.min(monthsTotal, Math.round((now - start) / (30.44 * 86400000))));
-    setKpi('v-timepct', pct, 1);
-    const fmt = (d) => d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
-    $('#v-timesub').textContent = `${monthsDone} / ${monthsTotal} months · ${fmt(start)} → ${fmt(end)}`;
-    requestAnimationFrame(() => { $('#v-timebar').style.width = pct + '%'; });
+    const day = 86400000;
+    const total = Math.round((end - start) / day);
+    const elapsed = Math.max(0, Math.min(total, Math.round((new Date() - start) / day)));
+    const remain = total - elapsed;
+    const ePct = Math.round((elapsed / total) * 1000) / 10;
+    const fmt = (d) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    $('#tl-range').innerHTML = `${fmt(start)} → ${fmt(end)} · <b style="color:var(--navy)">${total.toLocaleString()} days</b>`;
+    $('#tl-elapsed-lab').textContent = `Elapsed ${elapsed.toLocaleString()} d · ${ePct}%`;
+    $('#tl-remain-lab').textContent = `Remaining ${remain.toLocaleString()} d · ${Math.round((100 - ePct) * 10) / 10}%`;
+    requestAnimationFrame(() => { $('#tl-elapsed').style.width = ePct + '%'; });
   }
 
   function renderKpis() {
@@ -70,11 +73,11 @@
     const b = (data.financeDetail && data.financeDetail.budget) || {};
     const rc = (data.financeDetail && data.financeDetail.received) || {};
     setKpi('v-budget-usd', b.workUSD != null ? b.workUSD / 1e6 : null, 2);
-    setKpi('v-budget-npr', b.workNPR != null ? b.workNPR / 1e9 : null, 2);
+    setKpi('v-budget-npr', b.workNPR != null ? b.workNPR / 1e6 : null, 0);
     setKpi('v-received-usd', rc.usd != null ? rc.usd / 1e6 : null, 2);
-    setKpi('v-received-npr', rc.npr != null ? rc.npr / 1e9 : null, 2);
+    setKpi('v-received-npr', rc.npr != null ? rc.npr / 1e6 : null, 0);
     setKpi('v-finprog', (b.workUSDEq && b.completeUSDEq != null) ? Math.round((b.completeUSDEq / b.workUSDEq) * 1000) / 10 : null, 1);
-    renderTimeMeter();
+    renderTimeline();
     // Earned Value card stays '—' until the EV data sheet is provided.
   }
 
@@ -99,7 +102,18 @@
     makeChart(id).setOption({
       grid: { left: 40, right: 16, top: 30, bottom: 26 },
       legend: { right: 0, top: 0, textStyle: { fontSize: 11, color: COL.muted } },
-      tooltip: { trigger: 'axis', valueFormatter: (v) => (v == null ? '—' : v + '%') },
+      tooltip: { trigger: 'axis', formatter: (ps) => {
+        let planned = null, actual = null;
+        ps.forEach((p) => { if (p.seriesName === 'Planned') planned = p.value; if (p.seriesName === 'Actual') actual = p.value; });
+        const dot = (c) => `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c};margin-right:6px"></span>`;
+        let s = `<b>${ps[0].axisValue}</b><br/>${dot(COL.accent)}Planned: ${planned == null ? '—' : planned + '%'}<br/>${dot(COL.accent2)}Actual: ${actual == null ? '—' : actual + '%'}`;
+        if (planned != null && actual != null) {
+          const v = Math.round((actual - planned) * 10) / 10;
+          const behind = v < 0;
+          s += `<br/><b style="color:${behind ? '#e5554e' : '#36b37e'}">Variance: ${v > 0 ? '+' : ''}${v}% ${behind ? '(behind)' : '(ahead)'}</b>`;
+        }
+        return s;
+      } },
       xAxis: { type: 'category', data: sc.months,
         axisLabel: { fontSize: 10, color: COL.muted },
         axisLine: { lineStyle: { color: '#cfd8e6' } } },

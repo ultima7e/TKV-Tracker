@@ -110,8 +110,10 @@ function assemble(buffers, xerText, source) {
   const schedule = xerText ? parseXer(xerText) : { activities: [], relationships: [], wbs: {}, warnings: [] };
   return {
     source,
-    warnings: [...tunnel.warnings, ...executive.warnings, ...scurve.warnings,
-      ...finance.warnings, ...manpower.warnings, ...ipc.warnings, ...schedule.warnings],
+    // tunnel/KPI "sheet not found" warnings are expected (those legacy sample
+    // sheets aren't part of the live data) — omit them so the banner stays quiet.
+    warnings: [...scurve.warnings, ...finance.warnings, ...manpower.warnings,
+      ...ipc.warnings, ...schedule.warnings],
     tunnel: { tunnels: tunnel.tunnels, monthlyAdvance: tunnel.monthlyAdvance },
     executive: { kpis: executive.kpis },
     scurve: { months: scurve.months, plannedPct: scurve.plannedPct, actualPct: scurve.actualPct },
