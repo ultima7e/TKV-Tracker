@@ -7,6 +7,7 @@
   const COL = { accent: '#2f7de1', accent2: '#36c5a8', muted: '#7b8aa0', grid: '#eef2f7' };
 
   function countUp(el, to, dec) {
+    if (document.hidden) { el.textContent = to.toFixed(dec); return; } // RAF is paused in hidden tabs — set value directly
     let start = null;
     const dur = 1100;
     function step(t) {
@@ -64,13 +65,15 @@
   }
 
   function renderKpis() {
-    const f = data.finance || {};
-    setKpi('v-budget-usd', f.budgetUSD != null ? f.budgetUSD / 1e6 : null, 2);
-    setKpi('v-budget-npr', f.budgetNPR != null ? f.budgetNPR / 1e9 : null, 2);
-    // Received EXCLUDING the mobilisation advance (IPC receipts only).
-    setKpi('v-received-usd', f.receivedExclAdvUSD != null ? f.receivedExclAdvUSD / 1e6 : null, 2);
-    setKpi('v-received-npr', f.receivedExclAdvNPR != null ? f.receivedExclAdvNPR / 1e9 : null, 2);
-    setKpi('v-finprog', f.financialProgressPct, 1);
+    // Source the financial KPIs from the SAME object the Financial panel uses
+    // (financeDetail) so the Executive Summary can never drift out of sync.
+    const b = (data.financeDetail && data.financeDetail.budget) || {};
+    const rc = (data.financeDetail && data.financeDetail.received) || {};
+    setKpi('v-budget-usd', b.workUSD != null ? b.workUSD / 1e6 : null, 2);
+    setKpi('v-budget-npr', b.workNPR != null ? b.workNPR / 1e9 : null, 2);
+    setKpi('v-received-usd', rc.usd != null ? rc.usd / 1e6 : null, 2);
+    setKpi('v-received-npr', rc.npr != null ? rc.npr / 1e9 : null, 2);
+    setKpi('v-finprog', (b.workUSDEq && b.completeUSDEq != null) ? Math.round((b.completeUSDEq / b.workUSDEq) * 1000) / 10 : null, 1);
     renderTimeMeter();
     // Earned Value card stays '—' until the EV data sheet is provided.
   }
@@ -172,11 +175,11 @@
   }
 
   function renderIpc() {
-    const ipc = data.ipc || {};
-    // Default: reverse-chronological (latest certified first).
-    const rows = (ipc.rows || []).slice()
+    // Same IPC data as the Financial panel register (financeDetail) so the
+    // Executive Summary stays in sync. Newest certified first.
+    const rows = ((data.financeDetail && data.financeDetail.ipcs) || []).slice()
       .sort((a, b) => (b.certifiedDate || '').localeCompare(a.certifiedDate || ''));
-    $('#ipc-count').textContent = ipc.total ? ipc.total.count : '—';
+    $('#ipc-count').textContent = rows.length;
     if (!rows.length) return;
     const fmtDate = (iso) => {
       if (!iso) return '—';
