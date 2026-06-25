@@ -203,7 +203,10 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .g-head{display:flex;align-items:center}
 .g-head span,.g-row span{padding:0 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .g-head span{font-size:9px;text-transform:uppercase;letter-spacing:.3px;color:var(--navy);font-weight:700}
-.g-cid{width:80px;flex-shrink:0} .g-cnm{flex:1;min-width:50px} .g-cas{width:62px;flex-shrink:0;text-align:right} .g-cbs{width:62px;flex-shrink:0;text-align:right} .g-cpc{width:34px;flex-shrink:0;text-align:right}
+.g-cid{width:var(--cid-w,80px);flex-shrink:0} .g-cnm{flex:1;min-width:50px} .g-cas{width:62px;flex-shrink:0;text-align:right} .g-cbs{width:62px;flex-shrink:0;text-align:right} .g-cpc{width:34px;flex-shrink:0;text-align:right}
+.g-head .g-cid{position:relative;overflow:visible}
+.g-col-resize{position:absolute;top:0;right:0;width:7px;height:100%;cursor:col-resize;border-right:2px solid #c6d4e6}
+.g-col-resize:hover{border-right-color:var(--accent)}
 
 .g-row{height:22px;display:flex;align-items:center;font-size:11.5px;border-bottom:1px solid #f3f6fa;cursor:pointer}
 .g-row:hover{background:#f6f9fd}
@@ -247,11 +250,16 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .g-vsplit{height:6px;background:#d3e2f4;cursor:row-resize;flex-shrink:0}
 .g-vsplit:hover{background:var(--accent)}
 .g-detail{height:170px;flex-shrink:0;overflow:auto;background:#fff;padding:12px 14px}
-.g-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g-detail-grid{display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start}
 .g-detail-grid h4{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:7px}
+.g-detail-rels{display:flex;flex-direction:column;gap:12px} /* predecessors over successors */
 .g-detail-title{font-size:12.5px;font-weight:800;color:var(--navy);margin-bottom:10px}
 .g-detail-title span{font-weight:600;color:var(--muted)}
 .g-detail .tbl td{cursor:pointer}
+.g-detail-status{background:#f6f9fd;border:1px solid var(--line);border-radius:8px;padding:9px 11px}
+.g-st-row{display:flex;justify-content:space-between;gap:10px;font-size:11px;padding:2.5px 0;border-bottom:1px dashed #e8eef6}
+.g-st-row:last-child{border-bottom:none}
+.g-st-row span{color:var(--muted)} .g-st-row b{color:var(--navy);font-weight:700}
 @media (max-width:880px){ .g-detail-grid{grid-template-columns:1fr} }
 
 /* ---- responsive ---- */

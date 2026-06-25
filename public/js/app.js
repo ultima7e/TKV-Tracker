@@ -624,7 +624,7 @@
       return out;
     };
 
-    const HEADER = '<div class="g-head"><span class="g-cid">Act ID</span><span class="g-cnm">Activity Name</span>' +
+    const HEADER = '<div class="g-head"><span class="g-cid">Act ID<span class="g-col-resize" title="Drag to resize the Activity ID column"></span></span><span class="g-cnm">Activity Name</span>' +
       '<span class="g-cas">Act Start</span><span class="g-cas">Act Finish</span>' +
       '<span class="g-cbs">BL Start</span><span class="g-cbs">BL Finish</span><span class="g-cpc">%</span></div>';
 
@@ -640,7 +640,7 @@
         }
         const a = r.act;
         return `<div class="g-row" data-i="${i}" data-tid="${a.taskId}">
-          <span class="g-cid">${a.id}</span><span class="g-cnm" style="padding-left:${r.depth * 12}px" title="${a.name || ''}">${a.name || ''}</span>
+          <span class="g-cid" title="${a.id}">${a.id}</span><span class="g-cnm" style="padding-left:${r.depth * 12}px" title="${a.name || ''}">${a.name || ''}</span>
           <span class="g-cas">${schFmt(a.actualStart) || '—'}</span><span class="g-cas">${schFmt(a.actualFinish) || '—'}</span>
           <span class="g-cbs">${schFmt(a.baselineStart)}</span><span class="g-cbs">${schFmt(a.baselineFinish)}</span><span class="g-cpc">${a.pct}%</span></div>`;
       }).join('');
@@ -702,13 +702,36 @@
     const detail = document.getElementById('g-detail');
     const tbl = (arr) => `<table class="tbl"><thead><tr><th>Activity ID</th><th>Activity Name</th><th>Type</th><th>Lag</th></tr></thead>
       <tbody>${arr.map((x) => `<tr data-tid="${x.act.taskId}"><td>${x.act.id}</td><td style="text-align:left">${x.act.name || ''}</td><td>${x.type}</td><td>${x.lag ? x.lag + 'd' : '0'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">None</td></tr>'}</tbody></table>`;
+    const stRow = (label, val) => `<div class="g-st-row"><span>${label}</span><b>${val}</b></div>`;
     const renderDetail = (a) => {
       const preds = (predMap[a.taskId] || []).map((r) => ({ act: byTask[r.predTaskId], type: r.type, lag: r.lagDays })).filter((x) => x.act);
       const succs = (succMap[a.taskId] || []).map((r) => ({ act: byTask[r.taskId], type: r.type, lag: r.lagDays })).filter((x) => x.act);
+      const od = (a.baselineStart && a.baselineFinish) ? (schDay(a.baselineFinish) - schDay(a.baselineStart)) : null;
+      // P6 "Status" panel: started/finished/% plus the key schedule dates.
+      const status =
+        `<div class="g-detail-status">
+          <h4>Status</h4>
+          ${stRow('Started', a.actualStart ? '☑ ' + schFmt(a.actualStart) : '☐ not started')}
+          ${stRow('Finished', a.actualFinish ? '☑ ' + schFmt(a.actualFinish) : '☐ —')}
+          ${stRow('% Complete', a.pct + '%')}
+          ${stRow('Activity Status', a.status)}
+          <h4 style="margin-top:9px">Schedule</h4>
+          ${stRow('Start', schFmt(a.start) || '—')}
+          ${stRow('Finish', schFmt(a.finish) || '—')}
+          ${stRow('Baseline Start', schFmt(a.baselineStart) || '—')}
+          ${stRow('Baseline Finish', schFmt(a.baselineFinish) || '—')}
+          ${stRow('Original Duration', od != null ? od + ' d' : '—')}
+          ${stRow('Total Float', (a.totalFloatDays != null ? a.totalFloatDays : '—') + ' d')}
+        </div>`;
       detail.innerHTML =
         `<div class="g-detail-title">${a.id} — ${a.name || ''} <span>· ${a.status} · ${a.pct}% complete</span></div>
-        <div class="g-detail-grid"><div><h4>Predecessors (${preds.length})</h4>${tbl(preds)}</div>
-          <div><h4>Successors (${succs.length})</h4>${tbl(succs)}</div></div>`;
+        <div class="g-detail-grid">
+          <div class="g-detail-rels">
+            <div><h4>Predecessors (${preds.length})</h4>${tbl(preds)}</div>
+            <div><h4>Successors (${succs.length})</h4>${tbl(succs)}</div>
+          </div>
+          ${status}
+        </div>`;
       detail.querySelectorAll('tr[data-tid]').forEach((tr) => tr.addEventListener('click', () => {
         select(tr.dataset.tid);
         list.querySelector(`.g-row[data-tid="${tr.dataset.tid}"]`)?.scrollIntoView({ block: 'center' });
@@ -730,6 +753,16 @@
       if (w) { const id = w.dataset.wbs; collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id); paint(); return; }
       const r = e.target.closest('.g-row[data-tid]'); if (r) select(r.dataset.tid);
     };
+    // Resizable Activity ID column — drag the handle on the header's right edge.
+    // Width is held in a CSS variable so every row's cell follows live.
+    list.addEventListener('mousedown', (e) => {
+      if (!e.target.closest('.g-col-resize')) return;
+      e.preventDefault(); e.stopPropagation();
+      const startX = e.clientX, startW = parseInt(getComputedStyle(list).getPropertyValue('--cid-w')) || 80;
+      const mv = (ev) => { list.style.setProperty('--cid-w', Math.max(54, Math.min(360, startW + ev.clientX - startX)) + 'px'); };
+      const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up); };
+      document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+    });
     time.onclick = (e) => { const b = e.target.closest('[data-tid]'); if (b) select(b.dataset.tid); };
 
     let lock = false;
