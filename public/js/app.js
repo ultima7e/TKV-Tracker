@@ -625,6 +625,7 @@
     };
 
     const HEADER = '<div class="g-head"><span class="g-cid">Act ID</span><span class="g-cnm">Activity Name</span>' +
+      '<span class="g-cas">Act Start</span><span class="g-cas">Act Finish</span>' +
       '<span class="g-cbs">BL Start</span><span class="g-cbs">BL Finish</span><span class="g-cpc">%</span></div>';
 
     const paint = () => {
@@ -635,11 +636,12 @@
         if (r.kind === 'wbs') {
           return `<div class="g-row g-wbs ${collapsed.has(r.id) ? 'collapsed' : ''}" data-i="${i}" data-wbs="${r.id}">
             <span class="g-cid"></span><span class="g-cnm" style="padding-left:${r.depth * 12}px"><span class="g-caret">▾</span>${wbs[r.id].name || ''}</span>
-            <span class="g-cbs"></span><span class="g-cbs"></span><span class="g-cpc"></span></div>`;
+            <span class="g-cas"></span><span class="g-cas"></span><span class="g-cbs"></span><span class="g-cbs"></span><span class="g-cpc"></span></div>`;
         }
         const a = r.act;
         return `<div class="g-row" data-i="${i}" data-tid="${a.taskId}">
           <span class="g-cid">${a.id}</span><span class="g-cnm" style="padding-left:${r.depth * 12}px" title="${a.name || ''}">${a.name || ''}</span>
+          <span class="g-cas">${schFmt(a.actualStart) || '—'}</span><span class="g-cas">${schFmt(a.actualFinish) || '—'}</span>
           <span class="g-cbs">${schFmt(a.baselineStart)}</span><span class="g-cbs">${schFmt(a.baselineFinish)}</span><span class="g-cpc">${a.pct}%</span></div>`;
       }).join('');
       if (selTask) list.querySelector(`.g-row[data-tid="${selTask}"]`)?.classList.add('sel');
@@ -648,11 +650,15 @@
       const bars = rows.map((r, i) => {
         if (r.kind === 'wbs') return ''; // no WBS summary bar in the Gantt
         const a = r.act, top = HEAD + i * ROW, x = xOf(schDay(a.start));
-        if (a.isMilestone) return `<div class="g-ms ${a.critical ? 'crit' : ''}" data-i="${i}" data-tid="${a.taskId}" style="left:${x - 5}px;top:${top + (ROW - 11) / 2}px"></div>`;
+        // Thin grey baseline (planned/target) bar beneath the activity — shows
+        // actual-vs-plan slippage at a glance (P6 style).
+        const base = (a.baselineStart && a.baselineFinish)
+          ? `<div class="g-base" style="left:${xOf(schDay(a.baselineStart))}px;width:${Math.max(2, (schDay(a.baselineFinish) - schDay(a.baselineStart)) * pxd)}px;top:${top + 17}px" title="Baseline: ${schFmt(a.baselineStart)} → ${schFmt(a.baselineFinish)}"></div>` : '';
+        if (a.isMilestone) return `${base}<div class="g-ms ${a.critical ? 'crit' : ''}" data-i="${i}" data-tid="${a.taskId}" style="left:${x - 5}px;top:${top + (ROW - 11) / 2}px"></div>`;
         const w = Math.max(3, (schDay(a.finish) - schDay(a.start)) * pxd);
         // Two-tone progress: solid "done" segment (left, = pct%) over a light
         // "remaining" track — clear even on the red critical bars.
-        return `<div class="g-bar ${a.critical ? 'crit' : 'norm'}" data-i="${i}" data-tid="${a.taskId}" style="left:${x}px;width:${w}px;top:${top + (ROW - 11) / 2}px" title="${a.id} · ${a.name || ''} · ${a.pct}%"><div class="g-done" style="width:${a.pct}%"></div></div>`;
+        return `${base}<div class="g-bar ${a.critical ? 'crit' : 'norm'}" data-i="${i}" data-tid="${a.taskId}" style="left:${x}px;width:${w}px;top:${top + (ROW - 11) / 2}px" title="${a.id} · ${a.name || ''} · ${a.pct}%"><div class="g-done" style="width:${a.pct}%"></div></div>`;
       }).join('');
       const H = HEAD + rows.length * ROW;
       const todayLine = (todayD >= minDay && todayD <= maxDay)
