@@ -196,13 +196,15 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .g-canvas{position:relative}
 .g-tick{position:absolute;top:0;bottom:0;border-left:1px solid #eef2f7;font-size:8.5px;color:var(--muted);padding:6px 0 0 2px;box-sizing:border-box}
 .g-tick.yr{border-left:1px solid #c6d4e6;font-weight:700;color:#5b6f8c}
-.g-bar{position:absolute;height:11px;border-radius:2px;cursor:pointer}
-.g-bar.norm{background:#4d8af0} .g-bar.crit{background:#ef6c57} .g-bar.done{background:#9fb3cc}
+/* Bar = light "remaining" track; inner .g-done = solid "completed" segment.
+   Strong tone contrast so progress reads clearly, even on the red critical bars. */
+.g-bar{position:absolute;height:11px;border-radius:2px;cursor:pointer;overflow:hidden}
+.g-bar.norm{background:#cfe0f7} .g-bar.norm .g-done{background:#2f7de1}
+.g-bar.crit{background:#f7c6c1} .g-bar.crit .g-done{background:#e5554e}
+.g-done{position:absolute;left:0;top:0;height:100%;border-radius:2px}
 .g-bar.hl{outline:2px solid var(--amber);outline-offset:1px;z-index:5}
-.g-fill{position:absolute;top:0;height:100%;border-radius:2px;background:rgba(255,255,255,.5)}
-.g-wbsbar{position:absolute;height:6px;background:#5a6577;border-radius:1px;cursor:pointer}
 .g-ms{position:absolute;width:11px;height:11px;background:#2c3e50;transform:rotate(45deg);cursor:pointer}
-.g-ms.crit{background:#ef6c57} .g-ms.hl{outline:2px solid var(--amber);outline-offset:1px}
+.g-ms.crit{background:#e5554e} .g-ms.hl{outline:2px solid var(--amber);outline-offset:1px}
 .g-today{position:absolute;width:0;border-left:2px dashed #ef6c57;z-index:2}
 .g-rellines{position:absolute;top:0;left:0;pointer-events:none;z-index:4;overflow:visible}
 .g-rellines path{stroke:#b3c1d4;stroke-width:.8;fill:none}
@@ -369,14 +371,14 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       </section>
       <section class="view" id="sched">
         <div class="card">
-          <h3>Project Schedule — <span id="sch-count">—</span> activities <span class="muted" style="font-weight:600">· grouped by WBS · click an activity for relationships</span> <span class="muted" id="sch-src" style="font-weight:600"></span></h3>
+          <h3>Project Schedule — <span id="sch-count">—</span> activities <span class="muted" style="font-weight:600">· click an activity for relationships</span> <span class="muted" id="sch-src" style="font-weight:600"></span></h3>
           <div class="sch-tools">
             <input id="sch-search" placeholder="Search Activity ID or name…">
             <button id="sch-rellines" class="sch-toggle">Show relationships</button>
+            <button id="sch-critical" class="sch-toggle">Critical Path</button>
             <label class="sch-toggle" style="cursor:pointer">⬆ Upload XER<input type="file" id="sch-upload" accept=".xer" style="display:none"></label>
-            <span class="leg"><i style="background:#4d8af0"></i>Normal</span>
-            <span class="leg"><i style="background:#ef6c57"></i>Critical</span>
-            <span class="leg"><i style="background:#5a6577"></i>WBS</span>
+            <span class="leg"><i style="background:#cfe0f7"></i><i style="background:#2f7de1;margin-left:-3px"></i>Normal (done/left)</span>
+            <span class="leg"><i style="background:#f7c6c1"></i><i style="background:#e5554e;margin-left:-3px"></i>Critical (done/left)</span>
             <span class="leg"><i style="width:9px;height:9px;background:#2c3e50;transform:rotate(45deg);border-radius:1px"></i>Milestone</span>
           </div>
           <div class="sched-wrap">
@@ -954,29 +956,8 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       (succMap[r.predTaskId] = succMap[r.predTaskId] || []).push(r);
     });
 
-    const kids = {};
-    Object.keys(wbs).forEach((id) => { const p = wbs[id].parentId; (kids[p] = kids[p] || []).push(id); });
-    Object.values(kids).forEach((a) => a.sort((x, y) => (wbs[x].seq || 0) - (wbs[y].seq || 0)));
-    const actsByWbs = {};
-    acts.forEach((a) => { (actsByWbs[a.wbsId] = actsByWbs[a.wbsId] || []).push(a); });
-    Object.values(actsByWbs).forEach((arr) => arr.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : (a.id < b.id ? -1 : 1))));
-    const roots = Object.keys(wbs).filter((id) => !wbs[wbs[id].parentId]);
-    const hasA = {};
-    const subHas = (id) => {
-      if (id in hasA) return hasA[id];
-      let h = (actsByWbs[id] || []).length > 0;
-      (kids[id] || []).forEach((c) => { if (subHas(c)) h = true; });
-      return (hasA[id] = h);
-    };
-    roots.forEach(subHas);
-    const span = {};
-    const calcSpan = (id) => {
-      let s = null, f = null;
-      (actsByWbs[id] || []).forEach((a) => { if (!s || a.start < s) s = a.start; if (!f || a.finish > f) f = a.finish; });
-      (kids[id] || []).forEach((c) => { const cs = calcSpan(c); if (cs.s && (!s || cs.s < s)) s = cs.s; if (cs.f && (!f || cs.f > f)) f = cs.f; });
-      return (span[id] = { s, f });
-    };
-    roots.forEach(calcSpan);
+    // Flat activity list, sorted by start date (WBS grouping removed — not needed).
+    acts.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : (a.id < b.id ? -1 : 1)));
 
     const minDay = Math.min(...acts.map((a) => schDay(a.start)));
     const maxDay = Math.max(...acts.map((a) => schDay(a.finish)));
@@ -998,47 +979,27 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 
     const list = document.getElementById('g-list');
     const time = document.getElementById('g-time');
-    const collapsed = new Set();
-    let rows = [], selTask = null, relOn = false;
-
-    const buildRows = () => {
-      const out = [];
-      const walk = (id, depth) => {
-        if (!subHas(id)) return;
-        out.push({ kind: 'wbs', id, depth });
-        if (collapsed.has(id)) return;
-        (kids[id] || []).forEach((c) => walk(c, depth + 1));
-        (actsByWbs[id] || []).forEach((a) => out.push({ kind: 'act', act: a, depth: depth + 1 }));
-      };
-      roots.forEach((r) => walk(r, 0));
-      return out;
-    };
+    let rows = [], selTask = null, relOn = false, critOnly = false;
 
     const HEADER = '<div class="g-head"><span class="g-cid">Act ID</span><span class="g-cnm">Activity Name</span>' +
       '<span class="g-cbs">BL Start</span><span class="g-cbs">BL Finish</span><span class="g-cpc">%</span></div>';
 
     const paint = () => {
-      rows = buildRows();
-      list.innerHTML = HEADER + rows.map((r, i) => {
-        if (r.kind === 'wbs') {
-          return `<div class="g-row g-wbs ${collapsed.has(r.id) ? 'collapsed' : ''}" data-i="${i}" data-wbs="${r.id}">
-            <span class="g-cid"></span><span class="g-cnm" style="padding-left:${r.depth * 12}px"><span class="g-caret">▾</span>${wbs[r.id].name || ''}</span>
-            <span class="g-cbs"></span><span class="g-cbs"></span><span class="g-cpc"></span></div>`;
-        }
-        const a = r.act;
-        return `<div class="g-row" data-i="${i}" data-tid="${a.taskId}">
-          <span class="g-cid">${a.id}</span><span class="g-cnm" style="padding-left:${r.depth * 12}px" title="${a.name || ''}">${a.name || ''}</span>
-          <span class="g-cbs">${schFmt(a.baselineStart)}</span><span class="g-cbs">${schFmt(a.baselineFinish)}</span><span class="g-cpc">${a.pct}%</span></div>`;
-      }).join('');
+      // Critical Path toggle: show only critical activities when on.
+      rows = critOnly ? acts.filter((a) => a.critical) : acts;
+      $('#sch-count').textContent = critOnly ? rows.length + ' critical' : acts.length;
+      list.innerHTML = HEADER + rows.map((a, i) => `<div class="g-row" data-i="${i}" data-tid="${a.taskId}">
+          <span class="g-cid">${a.id}</span><span class="g-cnm" title="${a.name || ''}">${a.name || ''}</span>
+          <span class="g-cbs">${schFmt(a.baselineStart)}</span><span class="g-cbs">${schFmt(a.baselineFinish)}</span><span class="g-cpc">${a.pct}%</span></div>`).join('');
 
-      const bars = rows.map((r, i) => {
-        const top = HEAD + i * ROW;
-        if (r.kind === 'wbs') return ''; // no summary bar in the Gantt
-        const a = r.act, x = xOf(schDay(a.start));
+      const bars = rows.map((a, i) => {
+        const top = HEAD + i * ROW, x = xOf(schDay(a.start));
         if (a.isMilestone) return `<div class="g-ms ${a.critical ? 'crit' : ''}" data-i="${i}" data-tid="${a.taskId}" style="left:${x - 5}px;top:${top + (ROW - 11) / 2}px"></div>`;
         const w = Math.max(3, (schDay(a.finish) - schDay(a.start)) * PXD);
-        const fill = a.pct > 0 && a.pct < 100 ? `<div class="g-fill" style="right:0;width:${100 - a.pct}%"></div>` : '';
-        return `<div class="g-bar ${a.pct >= 100 ? 'done' : a.critical ? 'crit' : 'norm'}" data-i="${i}" data-tid="${a.taskId}" style="left:${x}px;width:${w}px;top:${top + (ROW - 11) / 2}px" title="${a.id} · ${a.name || ''}">${fill}</div>`;
+        // Two-tone progress: solid "done" segment (left, = pct%) over a light
+        // "remaining" track — so progressed vs unprogressed reads clearly even
+        // on the red critical bars.
+        return `<div class="g-bar ${a.critical ? 'crit' : 'norm'}" data-i="${i}" data-tid="${a.taskId}" style="left:${x}px;width:${w}px;top:${top + (ROW - 11) / 2}px" title="${a.id} · ${a.name || ''} · ${a.pct}%"><div class="g-done" style="width:${a.pct}%"></div></div>`;
       }).join('');
       const todayLine = (todayD >= minDay && todayD <= maxDay)
         ? `<div class="g-today" style="left:${xOf(todayD)}px;top:${HEAD}px;height:${rows.length * ROW}px"></div>` : '';
@@ -1057,7 +1018,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       const svg = document.getElementById('g-rellines');
       if (!svg) return;
       if (!relOn) { svg.innerHTML = ''; return; }
-      const idxOf = {}; rows.forEach((r, i) => { if (r.kind === 'act') idxOf[r.act.taskId] = i; });
+      const idxOf = {}; rows.forEach((a, i) => { idxOf[a.taskId] = i; });
       const yOf = (i) => HEAD + i * ROW + ROW / 2;
       const xS = (a) => xOf(schDay(a.start)), xF = (a) => xOf(schDay(a.finish));
       let paths = '';
@@ -1105,8 +1066,6 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     };
 
     list.onclick = (e) => {
-      const w = e.target.closest('.g-wbs');
-      if (w) { const id = w.dataset.wbs; collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id); paint(); return; }
       const r = e.target.closest('.g-row[data-tid]'); if (r) select(r.dataset.tid);
     };
     time.onclick = (e) => { const b = e.target.closest('[data-tid]'); if (b) select(b.dataset.tid); };
@@ -1136,14 +1095,17 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     document.getElementById('sch-rellines').onclick = (e) => {
       relOn = !relOn; e.currentTarget.classList.toggle('on', relOn); drawRel();
     };
+    document.getElementById('sch-critical').onclick = (e) => {
+      critOnly = !critOnly; e.currentTarget.classList.toggle('on', critOnly);
+      paint();
+      if (selTask) select(selTask); // keep selection highlighted after re-paint
+    };
     document.getElementById('sch-search').oninput = (e) => {
       const q = e.target.value.trim().toLowerCase();
       if (!q) return;
-      const hit = acts.find((a) => (a.id || '').toLowerCase().includes(q) || (a.name || '').toLowerCase().includes(q));
+      const hit = rows.find((a) => (a.id || '').toLowerCase().includes(q) || (a.name || '').toLowerCase().includes(q));
       if (!hit) return;
-      let p = hit.wbsId;
-      while (p && wbs[p]) { collapsed.delete(p); p = wbs[p].parentId; }
-      paint(); select(hit.taskId);
+      select(hit.taskId);
       list.querySelector(`.g-row[data-tid="${hit.taskId}"]`)?.scrollIntoView({ block: 'center' });
     };
 

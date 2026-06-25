@@ -561,30 +561,8 @@
       (succMap[r.predTaskId] = succMap[r.predTaskId] || []).push(r);
     });
 
-    // WBS tree: children (sorted by seq), activities per node, subtree span
-    const kids = {};
-    Object.keys(wbs).forEach((id) => { const p = wbs[id].parentId; (kids[p] = kids[p] || []).push(id); });
-    Object.values(kids).forEach((a) => a.sort((x, y) => (wbs[x].seq || 0) - (wbs[y].seq || 0)));
-    const actsByWbs = {};
-    acts.forEach((a) => { (actsByWbs[a.wbsId] = actsByWbs[a.wbsId] || []).push(a); });
-    Object.values(actsByWbs).forEach((arr) => arr.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : (a.id < b.id ? -1 : 1))));
-    const roots = Object.keys(wbs).filter((id) => !wbs[wbs[id].parentId]);
-    const hasA = {};
-    const subHas = (id) => {
-      if (id in hasA) return hasA[id];
-      let h = (actsByWbs[id] || []).length > 0;
-      (kids[id] || []).forEach((c) => { if (subHas(c)) h = true; });
-      return (hasA[id] = h);
-    };
-    roots.forEach(subHas);
-    const span = {};
-    const calcSpan = (id) => {
-      let s = null, f = null;
-      (actsByWbs[id] || []).forEach((a) => { if (!s || a.start < s) s = a.start; if (!f || a.finish > f) f = a.finish; });
-      (kids[id] || []).forEach((c) => { const cs = calcSpan(c); if (cs.s && (!s || cs.s < s)) s = cs.s; if (cs.f && (!f || cs.f > f)) f = cs.f; });
-      return (span[id] = { s, f });
-    };
-    roots.forEach(calcSpan);
+    // Flat activity list, sorted by start date (WBS grouping removed — not needed).
+    acts.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : (a.id < b.id ? -1 : 1)));
 
     const minDay = Math.min(...acts.map((a) => schDay(a.start)));
     const maxDay = Math.max(...acts.map((a) => schDay(a.finish)));
@@ -606,47 +584,27 @@
 
     const list = document.getElementById('g-list');
     const time = document.getElementById('g-time');
-    const collapsed = new Set();
-    let rows = [], selTask = null, relOn = false;
-
-    const buildRows = () => {
-      const out = [];
-      const walk = (id, depth) => {
-        if (!subHas(id)) return;
-        out.push({ kind: 'wbs', id, depth });
-        if (collapsed.has(id)) return;
-        (kids[id] || []).forEach((c) => walk(c, depth + 1));
-        (actsByWbs[id] || []).forEach((a) => out.push({ kind: 'act', act: a, depth: depth + 1 }));
-      };
-      roots.forEach((r) => walk(r, 0));
-      return out;
-    };
+    let rows = [], selTask = null, relOn = false, critOnly = false;
 
     const HEADER = '<div class="g-head"><span class="g-cid">Act ID</span><span class="g-cnm">Activity Name</span>' +
       '<span class="g-cbs">BL Start</span><span class="g-cbs">BL Finish</span><span class="g-cpc">%</span></div>';
 
     const paint = () => {
-      rows = buildRows();
-      list.innerHTML = HEADER + rows.map((r, i) => {
-        if (r.kind === 'wbs') {
-          return `<div class="g-row g-wbs ${collapsed.has(r.id) ? 'collapsed' : ''}" data-i="${i}" data-wbs="${r.id}">
-            <span class="g-cid"></span><span class="g-cnm" style="padding-left:${r.depth * 12}px"><span class="g-caret">▾</span>${wbs[r.id].name || ''}</span>
-            <span class="g-cbs"></span><span class="g-cbs"></span><span class="g-cpc"></span></div>`;
-        }
-        const a = r.act;
-        return `<div class="g-row" data-i="${i}" data-tid="${a.taskId}">
-          <span class="g-cid">${a.id}</span><span class="g-cnm" style="padding-left:${r.depth * 12}px" title="${a.name || ''}">${a.name || ''}</span>
-          <span class="g-cbs">${schFmt(a.baselineStart)}</span><span class="g-cbs">${schFmt(a.baselineFinish)}</span><span class="g-cpc">${a.pct}%</span></div>`;
-      }).join('');
+      // Critical Path toggle: show only critical activities when on.
+      rows = critOnly ? acts.filter((a) => a.critical) : acts;
+      $('#sch-count').textContent = critOnly ? rows.length + ' critical' : acts.length;
+      list.innerHTML = HEADER + rows.map((a, i) => `<div class="g-row" data-i="${i}" data-tid="${a.taskId}">
+          <span class="g-cid">${a.id}</span><span class="g-cnm" title="${a.name || ''}">${a.name || ''}</span>
+          <span class="g-cbs">${schFmt(a.baselineStart)}</span><span class="g-cbs">${schFmt(a.baselineFinish)}</span><span class="g-cpc">${a.pct}%</span></div>`).join('');
 
-      const bars = rows.map((r, i) => {
-        const top = HEAD + i * ROW;
-        if (r.kind === 'wbs') return ''; // no summary bar in the Gantt
-        const a = r.act, x = xOf(schDay(a.start));
+      const bars = rows.map((a, i) => {
+        const top = HEAD + i * ROW, x = xOf(schDay(a.start));
         if (a.isMilestone) return `<div class="g-ms ${a.critical ? 'crit' : ''}" data-i="${i}" data-tid="${a.taskId}" style="left:${x - 5}px;top:${top + (ROW - 11) / 2}px"></div>`;
         const w = Math.max(3, (schDay(a.finish) - schDay(a.start)) * PXD);
-        const fill = a.pct > 0 && a.pct < 100 ? `<div class="g-fill" style="right:0;width:${100 - a.pct}%"></div>` : '';
-        return `<div class="g-bar ${a.pct >= 100 ? 'done' : a.critical ? 'crit' : 'norm'}" data-i="${i}" data-tid="${a.taskId}" style="left:${x}px;width:${w}px;top:${top + (ROW - 11) / 2}px" title="${a.id} · ${a.name || ''}">${fill}</div>`;
+        // Two-tone progress: solid "done" segment (left, = pct%) over a light
+        // "remaining" track — so progressed vs unprogressed reads clearly even
+        // on the red critical bars.
+        return `<div class="g-bar ${a.critical ? 'crit' : 'norm'}" data-i="${i}" data-tid="${a.taskId}" style="left:${x}px;width:${w}px;top:${top + (ROW - 11) / 2}px" title="${a.id} · ${a.name || ''} · ${a.pct}%"><div class="g-done" style="width:${a.pct}%"></div></div>`;
       }).join('');
       const todayLine = (todayD >= minDay && todayD <= maxDay)
         ? `<div class="g-today" style="left:${xOf(todayD)}px;top:${HEAD}px;height:${rows.length * ROW}px"></div>` : '';
@@ -665,7 +623,7 @@
       const svg = document.getElementById('g-rellines');
       if (!svg) return;
       if (!relOn) { svg.innerHTML = ''; return; }
-      const idxOf = {}; rows.forEach((r, i) => { if (r.kind === 'act') idxOf[r.act.taskId] = i; });
+      const idxOf = {}; rows.forEach((a, i) => { idxOf[a.taskId] = i; });
       const yOf = (i) => HEAD + i * ROW + ROW / 2;
       const xS = (a) => xOf(schDay(a.start)), xF = (a) => xOf(schDay(a.finish));
       let paths = '';
@@ -713,8 +671,6 @@
     };
 
     list.onclick = (e) => {
-      const w = e.target.closest('.g-wbs');
-      if (w) { const id = w.dataset.wbs; collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id); paint(); return; }
       const r = e.target.closest('.g-row[data-tid]'); if (r) select(r.dataset.tid);
     };
     time.onclick = (e) => { const b = e.target.closest('[data-tid]'); if (b) select(b.dataset.tid); };
@@ -746,15 +702,17 @@
     document.getElementById('sch-rellines').onclick = (e) => {
       relOn = !relOn; e.currentTarget.classList.toggle('on', relOn); drawRel();
     };
+    document.getElementById('sch-critical').onclick = (e) => {
+      critOnly = !critOnly; e.currentTarget.classList.toggle('on', critOnly);
+      paint();
+      if (selTask) select(selTask); // keep selection highlighted after re-paint
+    };
     document.getElementById('sch-search').oninput = (e) => {
       const q = e.target.value.trim().toLowerCase();
       if (!q) return;
-      const hit = acts.find((a) => (a.id || '').toLowerCase().includes(q) || (a.name || '').toLowerCase().includes(q));
+      const hit = rows.find((a) => (a.id || '').toLowerCase().includes(q) || (a.name || '').toLowerCase().includes(q));
       if (!hit) return;
-      // expand ancestors so the row is visible
-      let p = hit.wbsId;
-      while (p && wbs[p]) { collapsed.delete(p); p = wbs[p].parentId; }
-      paint(); select(hit.taskId);
+      select(hit.taskId);
       list.querySelector(`.g-row[data-tid="${hit.taskId}"]`)?.scrollIntoView({ block: 'center' });
     };
 

@@ -123,14 +123,14 @@
       </section>
       <section class="view" id="sched">
         <div class="card">
-          <h3>Project Schedule — <span id="sch-count">—</span> activities <span class="muted" style="font-weight:600">· grouped by WBS · click an activity for relationships</span> <span class="muted" id="sch-src" style="font-weight:600"></span></h3>
+          <h3>Project Schedule — <span id="sch-count">—</span> activities <span class="muted" style="font-weight:600">· click an activity for relationships</span> <span class="muted" id="sch-src" style="font-weight:600"></span></h3>
           <div class="sch-tools">
             <input id="sch-search" placeholder="Search Activity ID or name…">
             <button id="sch-rellines" class="sch-toggle">Show relationships</button>
+            <button id="sch-critical" class="sch-toggle">Critical Path</button>
             <label class="sch-toggle" style="cursor:pointer">⬆ Upload XER<input type="file" id="sch-upload" accept=".xer" style="display:none"></label>
-            <span class="leg"><i style="background:#4d8af0"></i>Normal</span>
-            <span class="leg"><i style="background:#ef6c57"></i>Critical</span>
-            <span class="leg"><i style="background:#5a6577"></i>WBS</span>
+            <span class="leg"><i style="background:#cfe0f7"></i><i style="background:#2f7de1;margin-left:-3px"></i>Normal (done/left)</span>
+            <span class="leg"><i style="background:#f7c6c1"></i><i style="background:#e5554e;margin-left:-3px"></i>Critical (done/left)</span>
             <span class="leg"><i style="width:9px;height:9px;background:#2c3e50;transform:rotate(45deg);border-radius:1px"></i>Milestone</span>
           </div>
           <div class="sched-wrap">
