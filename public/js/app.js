@@ -508,7 +508,9 @@
         </tbody>
       </table>`;
     const done = (s) => /complete/i.test(s);
-    document.getElementById('f-ipclist').innerHTML = ipcs.map((i, idx) => `
+    // Reverse chronological — newest IPC first (Advance Payment, the oldest, last).
+    const ipcsDesc = ipcs.slice().sort((a, b) => (b.certifiedDate || '').localeCompare(a.certifiedDate || ''));
+    document.getElementById('f-ipclist').innerHTML = ipcsDesc.map((i, idx) => `
       <div class="ipc" data-i="${idx}">
         <div class="ipc-head">
           <span class="ipc-name">${i.ipc}</span>

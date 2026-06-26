@@ -949,7 +949,9 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
         </tbody>
       </table>`;
     const done = (s) => /complete/i.test(s);
-    document.getElementById('f-ipclist').innerHTML = ipcs.map((i) => `
+    // Reverse chronological — newest IPC first (Advance Payment, the oldest, last).
+    const ipcsDesc = ipcs.slice().sort((a, b) => (b.certifiedDate || '').localeCompare(a.certifiedDate || ''));
+    document.getElementById('f-ipclist').innerHTML = ipcsDesc.map((i) => `
       <div class="ipc">
         <div class="ipc-head">
           <span class="ipc-name">${i.ipc}</span>
