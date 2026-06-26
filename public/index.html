@@ -132,6 +132,11 @@
         </div>
       </section>
       <section class="view" id="sched">
+        <div class="sched-tabs">
+          <button class="sched-tab on" data-stab="schedule">Schedule</button>
+          <button class="sched-tab" data-stab="delay">Delay &amp; Disruption</button>
+        </div>
+        <div class="stab-pane" id="stab-schedule">
         <div class="card">
           <h3>Project Schedule — <span id="sch-count">—</span> activities <span class="muted" style="font-weight:600">· click an activity for relationships</span> <span class="muted" id="sch-src" style="font-weight:600"></span></h3>
           <div class="sch-tools">
@@ -152,6 +157,18 @@
             </div>
             <div class="g-vsplit" id="g-vsplit"></div>
             <div class="g-detail" id="g-detail"><p class="muted">Select an activity to see its predecessors and successors.</p></div>
+          </div>
+        </div>
+        </div>
+        <div class="stab-pane" id="stab-delay" hidden>
+          <div class="card">
+            <h3>Delay &amp; Disruption Events <span class="muted" id="dd-summary" style="font-weight:600">· —</span></h3>
+            <div id="dd-legend" class="dd-legend"></div>
+            <div id="dd-table"><p class="muted">Awaiting schedule data.</p></div>
+          </div>
+          <div class="card" style="margin-top:16px">
+            <h3>Delay Timeline <span class="muted" style="font-weight:600">· each event start → finish, by window</span></h3>
+            <div id="dd-timeline" class="chart" style="height:460px"></div>
           </div>
         </div>
       </section>

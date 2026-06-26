@@ -530,6 +530,7 @@
   }
 
   let schedBuiltFor = null;
+  let schedTabsWired = false; // one-time wiring for the Schedule/Delay sub-tabs
   const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const schDay = (iso) => Math.floor(new Date(iso + 'T00:00:00Z').getTime() / 86400000);
   const schFmt = (iso) => { if (!iso) return ''; const p = iso.split('-'); return p[2] + '-' + MON[+p[1] - 1] + '-' + p[0].slice(2); };
@@ -879,10 +880,117 @@
     paint();
   }
 
+  // ---- Delay & Disruption sub-tab (derived from the XER delay-event windows) ----
+  // Each DE activity under a "Delay Event Window N" WBS is an event; its cause is
+  // inferred from the description and colour-coded.
+  const DD_CATS = [
+    { test: /land acquisition|tree cutting/i, name: 'Land Acquisition', color: '#b9772a' },
+    { test: /force majeure/i, name: 'Force Majeure', color: '#e5554e' },
+    { test: /employer instruction|suspension|gcap/i, name: 'Employer Instruction', color: '#5b46c9' },
+    { test: /disruption|supply chain|glof/i, name: 'Supply Chain / GLOF', color: '#2f7de1' },
+  ];
+  const ddCat = (name) => DD_CATS.find((c) => c.test.test(name || '')) || { name: 'Other', color: '#7b8aa0' };
+
+  function renderDelays() {
+    const sch = data.schedule || {};
+    const wbs = sch.wbs || {};
+    const winOf = (wbsId) => {
+      let p = wbsId, g = 0;
+      while (p && wbs[p] && g++ < 20) {
+        const m = (wbs[p].name || '').match(/delay\s*event[s]?\s*window\s*(\d+)/i);
+        if (m) return +m[1];
+        p = wbs[p].parentId;
+      }
+      return null;
+    };
+    const events = (sch.activities || [])
+      .map((a) => ({ a, win: winOf(a.wbsId) }))
+      .filter((x) => x.win != null || /^DE\d+/i.test(x.a.id || ''))
+      .map(({ a, win }) => ({
+        id: a.id, name: a.name || '', win: win || 0, start: a.start, finish: a.finish,
+        dur: (a.start && a.finish) ? (schDay(a.finish) - schDay(a.start)) : null,
+        float: a.totalFloatDays, critical: a.critical, status: a.status, cat: ddCat(a.name),
+      }))
+      .filter((e) => e.start && e.finish)
+      .sort((a, b) => (a.win - b.win) || (a.start < b.start ? -1 : 1));
+
+    const tableEl = document.getElementById('dd-table');
+    if (!events.length) { tableEl.innerHTML = '<p class="muted">No delay events found in the schedule.</p>'; return; }
+
+    const wins = new Set(events.map((e) => e.win)).size;
+    const crit = events.filter((e) => e.critical).length;
+    const minD = events.reduce((m, e) => (e.start < m ? e.start : m), events[0].start);
+    const maxD = events.reduce((m, e) => (e.finish > m ? e.finish : m), events[0].finish);
+    $('#dd-summary').textContent = `· ${events.length} events · ${wins} windows · ${crit} critical · ${schFmt(minD)} → ${schFmt(maxD)}`;
+
+    const cats = [];
+    events.forEach((e) => { if (!cats.find((c) => c.name === e.cat.name)) cats.push(e.cat); });
+    $('#dd-legend').innerHTML = cats.map((c) => `<span class="leg"><i style="background:${c.color}"></i>${c.name}</span>`).join('');
+
+    tableEl.innerHTML = `
+      <table class="tbl"><thead><tr>
+        <th>Event</th><th>Win</th><th>Cause</th><th>Description</th>
+        <th>Start</th><th>Finish</th><th>Days</th><th>Float</th><th>Status</th></tr></thead>
+      <tbody>${events.map((e, i) => `<tr data-i="${i}">
+        <td><b>${e.id}</b></td><td>${e.win || '–'}</td>
+        <td><span class="dd-cat" style="background:${e.cat.color}">${e.cat.name}</span></td>
+        <td class="dd-desc">${e.name}</td>
+        <td>${schFmt(e.start)}</td><td>${schFmt(e.finish)}</td>
+        <td>${e.dur != null ? e.dur : '–'}</td>
+        <td class="${e.critical ? 'dd-crit' : ''}">${e.float != null ? e.float : '–'}</td>
+        <td>${e.status}</td></tr>`).join('')}</tbody></table>`;
+    tableEl.querySelectorAll('tr[data-i]').forEach((tr) => tr.addEventListener('click', () => {
+      tableEl.querySelectorAll('tr.sel').forEach((x) => x.classList.remove('sel'));
+      tr.classList.add('sel');
+    }));
+
+    // Delay timeline — ECharts custom Gantt (one bar per event, coloured by cause).
+    const ms = (iso) => new Date(iso + 'T00:00:00Z').getTime();
+    const rows = events.map((e) => `W${e.win} · ${e.id}`);
+    const chart = makeChart('dd-timeline');
+    chart.setOption({
+      grid: { left: 118, right: 24, top: 10, bottom: 38 },
+      tooltip: { trigger: 'item', formatter: (p) => {
+        const e = events[p.dataIndex];
+        return `<b>${e.id}</b> · ${e.cat.name}<br/>${e.name}<br/>${schFmt(e.start)} → ${schFmt(e.finish)} · ${e.dur} d<br/>Float: ${e.float} d${e.critical ? ' · <b style="color:#e5554e">critical</b>' : ''}`;
+      } },
+      xAxis: { type: 'time', axisLabel: { fontSize: 10, color: COL.muted }, splitLine: { lineStyle: { color: COL.grid } } },
+      yAxis: { type: 'category', data: rows, inverse: true,
+        axisLabel: { fontSize: 9.5, color: COL.muted }, axisTick: { show: false }, axisLine: { lineStyle: { color: '#cfd8e6' } } },
+      series: [{
+        type: 'custom',
+        renderItem: (params, api) => {
+          const yi = api.value(0);
+          const s = api.coord([api.value(1), yi]);
+          const e = api.coord([api.value(2), yi]);
+          const h = Math.max(6, api.size([0, 1])[1] * 0.5);
+          const shape = echarts.graphic.clipRectByRect(
+            { x: s[0], y: s[1] - h / 2, width: Math.max(2, e[0] - s[0]), height: h },
+            { x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height });
+          return shape && { type: 'rect', shape, style: { fill: api.visual('color') } };
+        },
+        encode: { x: [1, 2], y: 0 },
+        data: events.map((e, i) => ({ value: [i, ms(e.start), ms(e.finish)], itemStyle: { color: e.cat.color } })),
+      }],
+    });
+    chart.resize();
+  }
+
   function renderAll() {
     renderKpis();
     renderFinancial();
     renderSchedule();
+    // Wire the Schedule/Delay sub-tabs once; render the delay view lazily on show.
+    if (!schedTabsWired) {
+      schedTabsWired = true;
+      document.querySelectorAll('.sched-tab').forEach((btn) => btn.addEventListener('click', () => {
+        const which = btn.dataset.stab;
+        document.querySelectorAll('.sched-tab').forEach((b) => b.classList.toggle('on', b === btn));
+        document.getElementById('stab-schedule').hidden = which !== 'schedule';
+        document.getElementById('stab-delay').hidden = which !== 'delay';
+        if (which === 'delay') renderDelays();
+      }));
+    }
     renderSCurve('ch-scurve');
     renderAdvanceChart('ch-tunnel-advance');
     renderTunnelBars();
