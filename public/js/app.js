@@ -1,6 +1,7 @@
 (() => {
   const charts = {};
   let data = null;
+  let advDocWired = false; // click-away handler for the advance-amortisation popover
 
   // ---------- helpers ----------
   const $ = (sel) => document.querySelector(sel);
@@ -353,25 +354,46 @@
     setKpi('f-out', b.outUSDEq / 1e6, 2);
     setKpi('f-prog', b.workUSDEq ? Math.round((b.completeUSDEq / b.workUSDEq) * 1000) / 10 : null, 1);
 
-    // Advance Payment amortisation summary
+    // Advance Payment amortisation — compact popover, one progress bar per
+    // advance × currency. There are two amortisable advances:
+    //  1) Mobilization Advance (USD + NPR) — live from the finance sheet.
+    //  2) Monsoon Material Advance (NPR only) — disbursed amount from the IPS;
+    //     deductions aren't in the live feed yet, so recovery shows 0 until then.
     const adv = fd.advance;
-    if (adv) {
-      const stat = (cls, lab, usd, npr) =>
-        `<div class="a-stat ${cls}"><div class="lab">${lab}</div>
-          <div class="num">$ ${usdM(usd)} M <small>/ NPR ${nprM(npr)} M</small></div></div>`;
-      document.getElementById('f-advance').innerHTML = `
-        <div class="amort">
-          ${stat('', 'Disbursed', adv.disbursedUSD, adv.disbursedNPR)}
-          ${stat('recovered', 'Recovered', adv.recoveredUSD, adv.recoveredNPR)}
-          ${stat('out', 'Outstanding', adv.outstandingUSD, adv.outstandingNPR)}
-          <div class="a-stat"><div class="lab">Amortised</div><div class="num">${adv.amortisedPct}%</div></div>
-          <div class="a-bar"><i data-w="${adv.amortisedPct}"></i></div>
-        </div>
-        <p class="muted" style="margin-top:10px">Recovery is deducted as 15% of each IPC${adv.recoveredNPR === 0 ? ' — not started yet' : ''}.</p>`;
-      requestAnimationFrame(() => {
-        const bar = document.querySelector('#f-advance .a-bar > i');
-        if (bar) bar.style.width = adv.amortisedPct + '%';
-      });
+    const MONSOON_DISBURSED_NPR = 110010016.97; // IPS-12: Monsoon Material Advance Paid
+    const advances = [];
+    if (adv) advances.push({ name: 'Mobilization Advance', lines: [
+      { cur: 'USD', disbursed: adv.disbursedUSD, recovered: adv.recoveredUSD },
+      { cur: 'NPR', disbursed: adv.disbursedNPR, recovered: adv.recoveredNPR },
+    ] });
+    advances.push({ name: 'Monsoon Material Advance', lines: [
+      { cur: 'NPR', disbursed: MONSOON_DISBURSED_NPR, recovered: (adv && adv.monsoonRecoveredNPR) || 0 },
+    ] });
+    const fmtAmt = (cur, v) => (cur === 'USD' ? `$ ${usdM(v)} M` : `NPR ${nprM(v)} M`);
+    const advPop = document.getElementById('f-advance');
+    advPop.innerHTML = `<div class="adv-pop-head">Advance Payment — Amortisation</div>` +
+      advances.map((a) => `<div class="adv-grp"><div class="adv-name">${a.name}</div>` +
+        a.lines.filter((l) => l.disbursed > 0).map((l) => {
+          const pct = l.disbursed > 0 ? Math.round((l.recovered / l.disbursed) * 1000) / 10 : 0;
+          return `<div class="adv-row">
+            <div class="adv-lab"><span>${l.cur}</span><b>${pct}%</b></div>
+            <div class="adv-track"><i data-w="${pct}" class="${pct >= 100 ? 'full' : ''}"></i></div>
+            <div class="adv-sub">Deducted ${fmtAmt(l.cur, l.recovered)} of ${fmtAmt(l.cur, l.disbursed)} · Balance ${fmtAmt(l.cur, l.disbursed - l.recovered)}</div>
+          </div>`;
+        }).join('') + `</div>`).join('') +
+      `<p class="adv-note">Recovered as advance deductions on each IPC${adv && adv.recoveredNPR === 0 ? ' — not started yet' : ''}.</p>`;
+    requestAnimationFrame(() => advPop.querySelectorAll('.adv-track > i').forEach((b) => { b.style.width = b.dataset.w + '%'; }));
+
+    // Wire the toggle once: icon opens/closes the popover; click-away closes it.
+    const advToggle = document.getElementById('adv-toggle');
+    if (advToggle) {
+      advToggle.onclick = (e) => { e.stopPropagation(); advPop.hidden = !advPop.hidden; };
+      if (!advDocWired) {
+        advDocWired = true;
+        document.addEventListener('click', (e) => {
+          if (!advPop.hidden && !advPop.contains(e.target) && !advToggle.contains(e.target)) advPop.hidden = true;
+        });
+      }
     }
 
     // Earned Value by category pie (work done, weighted by USD-equivalent)

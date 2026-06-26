@@ -152,14 +152,28 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .t3d-detail .pbar .track>i{display:block;height:100%;border-radius:6px;transition:width 1s cubic-bezier(.2,.8,.2,1)}
 
 /* ---- finance: advance amortisation ---- */
-.amort{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 18px;align-items:end}
-.amort .a-stat .lab{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700}
-.amort .a-stat .num{font-size:19px;font-weight:800;color:var(--navy);margin-top:3px;line-height:1.1}
-.amort .a-stat .num small{font-size:12px;font-weight:700;color:#41506a}
-.amort .a-stat.recovered .num{color:var(--green)} .amort .a-stat.out .num{color:var(--amber)}
-.amort .a-bar{grid-column:1/-1;height:10px;background:#eef2f7;border-radius:6px;overflow:hidden;margin-top:2px}
-.amort .a-bar>i{display:block;height:100%;border-radius:6px;width:0;
-  background:linear-gradient(90deg,var(--green),var(--accent-2));transition:width 1s cubic-bezier(.2,.8,.2,1)}
+/* ---- advance-payment amortisation: compact icon button + right-side popover ---- */
+.adv-wrap{position:relative;display:flex;justify-content:flex-end;margin-bottom:16px}
+.adv-btn{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid var(--line);
+  border-radius:9px;background:#fff;color:var(--navy);font-weight:700;font-size:12.5px;cursor:pointer;
+  box-shadow:0 1px 3px rgba(20,40,80,.06)}
+.adv-btn:hover{border-color:var(--accent);color:var(--accent)}
+.adv-btn svg{width:16px;height:16px;flex-shrink:0}
+.adv-pop{position:absolute;top:46px;right:0;width:380px;max-width:90vw;background:#fff;border:1px solid var(--line);
+  border-radius:12px;box-shadow:0 12px 34px rgba(20,40,80,.18);padding:14px 16px;z-index:30}
+.adv-pop[hidden]{display:none}
+.adv-pop-head{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;margin-bottom:12px}
+.adv-grp{margin-bottom:13px}
+.adv-name{font-size:12.5px;font-weight:800;color:var(--navy);margin-bottom:8px}
+.adv-row{margin-bottom:10px}
+.adv-lab{display:flex;justify-content:space-between;font-size:11.5px;color:#41506a;margin-bottom:3px}
+.adv-lab b{color:var(--navy);font-weight:800}
+.adv-track{height:9px;background:#eef2f7;border-radius:5px;overflow:hidden}
+.adv-track>i{display:block;height:100%;width:0;border-radius:5px;
+  background:linear-gradient(90deg,var(--accent),#2563c9);transition:width .8s cubic-bezier(.2,.8,.2,1)}
+.adv-track>i.full{background:linear-gradient(90deg,#2fa36b,var(--green))}
+.adv-sub{font-size:10px;color:var(--muted);margin-top:3px}
+.adv-note{font-size:10.5px;color:var(--muted);margin-top:4px;border-top:1px solid var(--line);padding-top:8px}
 
 /* ---- finance: IPC accordion ---- */
 .ipc{border:1px solid var(--line);border-radius:10px;margin-bottom:9px;overflow:hidden;background:#fff}
