@@ -389,17 +389,20 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
           </button>
           <div id="f-advance" class="adv-pop" hidden><p class="muted">Awaiting finance data.</p></div>
         </div>
-        <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px">
           <div class="card"><h3>Earned Value by Category <span class="muted" style="font-weight:600">· click a slice</span></h3>
-            <div id="f-evpie" class="chart" style="height:250px"></div>
-            <div id="f-evdetail" class="muted" style="text-align:center;margin-top:4px">Click a slice to see its contribution.</div>
+            <div id="f-evpie" class="chart" style="height:200px"></div>
+            <div id="f-evdetail" class="muted" style="text-align:center;margin-top:4px;font-size:11px">Click a slice to see its contribution.</div>
           </div>
           <div class="card"><h3>Work Value — Certified vs Outstanding <span class="muted" style="font-weight:600">· click a slice</span></h3>
-            <div id="f-donut" class="chart" style="height:250px"></div>
-            <div id="f-donut-detail" class="muted" style="text-align:center;margin-top:4px">Click “Certified” to see the earned-value breakdown.</div>
+            <div id="f-donut" class="chart" style="height:200px"></div>
+            <div id="f-donut-detail" class="muted" style="text-align:center;margin-top:4px;font-size:11px">Click “Certified” to see the breakdown.</div>
+          </div>
+          <div class="card"><h3>Cash Received per IPC</h3>
+            <div id="f-bar" class="chart" style="height:200px"></div>
+            <div class="muted" style="text-align:center;margin-top:4px;font-size:11px">NPR millions received per certificate.</div>
           </div>
         </div>
-        <div class="card" style="margin-bottom:16px"><h3>Cash Received per IPC</h3><div id="f-bar" class="chart" style="height:260px"></div></div>
         <div class="card">
           <h3>IPC Register — <span id="f-ipccount">—</span> certificates <span class="muted" style="font-weight:600">· click to expand items</span></h3>
           <div id="f-ipclist"><p class="muted">Awaiting finance data.</p></div>
