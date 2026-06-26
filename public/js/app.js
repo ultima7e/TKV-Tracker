@@ -348,9 +348,9 @@
     const nprB = (v) => (v / 1e9).toFixed(2);
     const nprM = (v) => (v / 1e6).toFixed(1);
     setKpi('f-cusd', b.workUSD / 1e6, 2);
-    setKpi('f-cnpr', b.workNPR / 1e9, 2);
+    setKpi('f-cnpr', b.workNPR / 1e6, 0); // NPR in millions — matches Executive Summary
     setKpi('f-rusd', rc.usd / 1e6, 2);
-    setKpi('f-rnpr', rc.npr / 1e9, 2);
+    setKpi('f-rnpr', rc.npr / 1e6, 0); // NPR in millions — matches Executive Summary
     setKpi('f-out', b.outUSDEq / 1e6, 2);
     setKpi('f-prog', b.workUSDEq ? Math.round((b.completeUSDEq / b.workUSDEq) * 1000) / 10 : null, 1);
 
