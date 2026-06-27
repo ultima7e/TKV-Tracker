@@ -27,7 +27,7 @@
   </aside>
   <div class="main">
     <header class="topbar">
-      <h1><span class="dot"></span>TAMAKOSHI-V HYDROELECTRIC PROJECT</h1>
+      <h1><button class="side-toggle" id="side-toggle" title="Collapse / expand sidebar" aria-label="Toggle sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><span class="dot"></span>TAMAKOSHI-V HYDROELECTRIC PROJECT</h1>
       <div class="right">
         <span id="today"></span>
         <button class="btn-refresh" id="refresh"><span class="ic">⟳</span>Refresh</button>
@@ -44,7 +44,7 @@
             <div class="tl-remain" id="tl-remain"><span id="tl-remain-lab"></span></div>
           </div>
         </div>
-        <div class="grid kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+        <div class="grid kpis" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px">
           <div class="card kpi"><h3>Contract Amount</h3>
             <div class="valm">$ <span id="v-budget-usd">—</span> M</div>
             <div class="valm">NPR <span id="v-budget-npr">—</span> M</div>
@@ -54,6 +54,7 @@
             <div class="valm">NPR <span id="v-received-npr">—</span> M</div>
             <div class="sub">incl. advances</div></div>
           <div class="card kpi"><h3>Financial Progress</h3><div class="val"><span id="v-finprog">—</span>%</div><div class="sub">certified work / contract value</div></div>
+          <div class="card kpi"><h3>Physical Progress</h3><div class="val"><span id="v-physprog">—</span>%</div><div class="sub">actual work completed (S-curve)</div></div>
           <div class="card kpi"><h3>Earned Value</h3><div class="val"><span id="v-ev">—</span></div><div class="sub">awaiting EV data sheet</div></div>
         </div>
         <div class="grid row-2">

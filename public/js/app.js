@@ -55,7 +55,7 @@
     const start = new Date(Date.UTC(2024, 5, 9));
     const end = new Date(Date.UTC(2028, 3, 11));
     const day = 86400000;
-    const total = Math.round((end - start) / day);
+    const total = Math.round((end - start) / day) + 1; // inclusive of both endpoints → 1,403 days
     const elapsed = Math.max(0, Math.min(total, Math.round((new Date() - start) / day)));
     const remain = total - elapsed;
     const ePct = Math.round((elapsed / total) * 1000) / 10;
@@ -76,6 +76,9 @@
     setKpi('v-received-usd', rc.usd != null ? rc.usd / 1e6 : null, 2);
     setKpi('v-received-npr', rc.npr != null ? rc.npr / 1e6 : null, 0);
     setKpi('v-finprog', (b.workUSDEq && b.completeUSDEq != null) ? Math.round((b.completeUSDEq / b.workUSDEq) * 1000) / 10 : null, 1);
+    // Physical progress = latest Actual cumulative % from the S-curve.
+    const phys = ((data.scurve && data.scurve.actualPct) || []).filter((x) => x != null).pop();
+    setKpi('v-physprog', phys != null ? phys : null, 1);
     renderTimeline();
     // Earned Value card stays '—' until the EV data sheet is provided.
   }
@@ -1039,6 +1042,12 @@
   });
 
   $('#refresh').addEventListener('click', load);
+  // Collapsible sidebar — toggle an icon-only rail to widen the content area.
+  const sideToggle = document.getElementById('side-toggle');
+  if (sideToggle) sideToggle.addEventListener('click', () => {
+    document.querySelector('.app').classList.toggle('collapsed');
+    setTimeout(() => Object.values(charts).forEach((c) => c.resize()), 230);
+  });
   window.addEventListener('resize', () => Object.values(charts).forEach((c) => c.resize()));
   $('#today').textContent = new Date().toLocaleDateString('en-GB',
     { day: '2-digit', month: 'short', year: 'numeric' });
