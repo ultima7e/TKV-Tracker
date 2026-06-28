@@ -5,7 +5,7 @@
 
   // ---------- helpers ----------
   const $ = (sel) => document.querySelector(sel);
-  const COL = { accent: '#2f7de1', accent2: '#36c5a8', muted: '#7b8aa0', grid: '#eef2f7' };
+  const COL = { accent: '#2f7de1', accent2: '#e23744', muted: '#7b8aa0', grid: '#eef2f7' };
 
   // Single NPR-equivalent of the combined USD+NPR totals, using the contract's
   // own implied rate (from the payment summary's USD-equivalent column). Received
