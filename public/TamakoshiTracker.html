@@ -11,6 +11,8 @@
   --accent:#2f7de1; --accent-2:#36c5a8; --amber:#f5a623; --red:#e5554e;
   --green:#36b37e; --bg:#eef2f7; --card:#ffffff; --ink:#1f2d3d; --muted:#7b8aa0;
   --line:#e3e9f2;
+  /* Sinohydro brand colours (sampled from the logo): deep blue chrome + red accent */
+  --brand-blue:#205a9c; --brand-blue-d:#15467e; --brand-red:#d8232a;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 img{max-width:100%;height:auto}
@@ -18,7 +20,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .app{display:flex;height:100vh}
 
 /* ---- Sidebar ---- */
-.sidebar{width:208px;background:linear-gradient(180deg,var(--navy),var(--navy-2));color:#cdd9ea;
+.sidebar{width:208px;background:linear-gradient(180deg,var(--brand-blue-d),var(--brand-blue));color:#d4e2f1;
   display:flex;flex-direction:column;flex-shrink:0;transition:width .2s ease;overflow:hidden}
 .app.collapsed .sidebar{width:0;border-right:0}
 .app.collapsed .brand{justify-content:center;font-size:0;padding:18px 0;gap:0}
@@ -40,17 +42,17 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .nav-item .ic svg{width:17px;height:17px}
 .nav-item.active .ic,.nav-item:hover .ic{opacity:1}
 .nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
-.nav-item.active{background:rgba(47,125,225,.22);border-left-color:var(--accent);color:#fff;font-weight:600}
+.nav-item.active{background:rgba(255,255,255,.14);border-left-color:var(--brand-red);color:#fff;font-weight:600}
 .nav-foot{padding:14px 18px;font-size:11px;color:#7e90ac;border-top:1px solid rgba(255,255,255,.08)}
 
 /* ---- Main ---- */
 .main{flex:1;display:flex;flex-direction:column;min-width:0}
-.topbar{background:var(--navy);color:#fff;padding:13px 22px;display:flex;align-items:center;justify-content:space-between;
-  box-shadow:0 2px 12px rgba(0,0,0,.12);z-index:2}
+.topbar{background:var(--brand-blue-d);color:#fff;padding:13px 22px;display:flex;align-items:center;justify-content:space-between;
+  box-shadow:0 2px 12px rgba(0,0,0,.12);z-index:2;border-bottom:2px solid var(--brand-red)}
 .topbar h1{font-size:15px;font-weight:600;letter-spacing:.3px;display:flex;align-items:center;gap:10px}
 .topbar .dot{width:9px;height:9px;border-radius:50%;background:var(--accent-2);box-shadow:0 0 0 4px rgba(54,197,168,.25)}
 .topbar .right{display:flex;align-items:center;gap:16px;font-size:12.5px;color:#b9c7dc}
-.btn-refresh{background:linear-gradient(135deg,var(--accent),#2563c9);color:#fff;border:none;padding:8px 16px;border-radius:7px;
+.btn-refresh{background:linear-gradient(135deg,var(--brand-blue),var(--brand-blue-d));color:#fff;border:none;padding:8px 16px;border-radius:7px;
   font-size:12.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;transition:.2s}
 .btn-refresh:hover{filter:brightness(1.08);transform:translateY(-1px)}
 .btn-refresh.spin .ic{animation:spin .8s linear infinite}
