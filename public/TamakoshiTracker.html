@@ -31,6 +31,8 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   border-bottom:1px solid rgba(255,255,255,.08)}
 .brand .logo{width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,var(--accent),var(--accent-2));
   display:grid;place-items:center;font-size:13px;font-weight:800}
+.brand-logo{width:100%;max-width:150px;height:auto;display:block;background:#fff;border-radius:8px;padding:7px;box-sizing:border-box}
+.app.collapsed .brand-logo{max-width:44px;padding:3px}
 .nav{padding:10px 0;overflow-y:auto;flex:1}
 .nav-item{display:flex;align-items:center;gap:11px;padding:11px 18px;font-size:13.5px;cursor:pointer;
   border-left:3px solid transparent;transition:.18s;white-space:nowrap}
@@ -312,7 +314,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 <body>
 <div class="app">
   <aside class="sidebar">
-    <div class="brand"><div class="logo">TV</div><div>TAMAKOSHI-V</div></div>
+    <div class="brand"><img class="brand-logo" src="https://tkv-tracker.vercel.app/assets/sinohydro.jpg" alt="Sinohydro"></div>
     <nav class="nav" id="nav">
       <div class="nav-item active" data-v="exec"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></span>Executive Summary</div>
       <div class="nav-item" data-v="fin"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="20" y2="20"/><rect x="5" y="11" width="3.4" height="7" rx="1"/><rect x="10.3" y="7" width="3.4" height="11" rx="1"/><rect x="15.6" y="13" width="3.4" height="5" rx="1"/></svg></span>Financial</div>
@@ -350,11 +352,11 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
           <div class="card kpi"><h3>Contract Amount</h3>
             <div class="valm">$ <span id="v-budget-usd">—</span> M</div>
             <div class="valm">NPR <span id="v-budget-npr">—</span> M</div>
-            <div class="sub">USD + NPR portions of contract</div></div>
+            <div class="sub" id="v-budget-eq">—</div></div>
           <div class="card kpi"><h3>Total Received</h3>
             <div class="valm">$ <span id="v-received-usd">—</span> M</div>
             <div class="valm">NPR <span id="v-received-npr">—</span> M</div>
-            <div class="sub">incl. advances</div></div>
+            <div class="sub" id="v-received-eq">—</div></div>
           <div class="card kpi"><h3>Financial Progress</h3><div class="val"><span id="v-finprog">—</span>%</div><div class="sub">certified work / contract value</div></div>
           <div class="card kpi"><h3>Physical Progress</h3><div class="val"><span id="v-physprog">—</span>%</div><div class="sub">actual work completed (S-curve)</div></div>
           <div class="card kpi"><h3>Earned Value</h3><div class="val"><span id="v-ev">—</span></div><div class="sub">awaiting EV data sheet</div></div>
@@ -372,7 +374,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
           </div>
         </div>
         <div class="card" style="margin-top:16px">
-          <h3>IPC Status — <span id="ipc-count">—</span> certified</h3>
+          <h3>Interim Payment Certificates <span class="muted" style="font-weight:600">· <span id="ipc-count">—</span></span></h3>
           <div id="ipc-table"><p class="muted">Awaiting IPC data.</p></div>
         </div>
       </section>
@@ -400,11 +402,11 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
           <div class="card kpi"><h3>Contract Amount</h3>
             <div class="valm">$ <span id="f-cusd">—</span> M</div>
             <div class="valm">NPR <span id="f-cnpr">—</span> M</div>
-            <div class="sub">USD + NPR portions of contract</div></div>
+            <div class="sub" id="f-c-eq">—</div></div>
           <div class="card kpi"><h3>Total Received</h3>
             <div class="valm">$ <span id="f-rusd">—</span> M</div>
             <div class="valm">NPR <span id="f-rnpr">—</span> M</div>
-            <div class="sub">incl. advances</div></div>
+            <div class="sub" id="f-r-eq">—</div></div>
           <div class="card kpi"><h3>Outstanding</h3><div class="val">$ <span id="f-out">—</span> M</div><div class="sub">USD-equivalent</div></div>
           <div class="card kpi"><h3>Financial Progress</h3><div class="val"><span id="f-prog">—</span>%</div><div class="sub">certified / contract value</div></div>
         </div>
@@ -476,7 +478,16 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
         </div>
       </section>
       <section class="view" id="claims"><div class="card"><h3>Claims &amp; Variations</h3><p class="muted">Awaiting claims data sheet (Phase 2).</p></div></section>
-      <section class="view" id="inv"><div class="card"><h3>Inventory &amp; Explosives</h3><p class="muted">Awaiting inventory data sheet (Phase 2).</p></div></section>
+      <section class="view" id="inv">
+        <div class="card" style="margin-bottom:16px">
+          <h3>Material Inventory Summary <span class="muted" style="font-weight:600">· data to be populated</span></h3>
+          <div id="inv-mat"></div>
+        </div>
+        <div class="card">
+          <h3>Explosives Summary <span class="muted" style="font-weight:600">· magazine stock · data to be populated</span></h3>
+          <div id="inv-exp"></div>
+        </div>
+      </section>
       <section class="view" id="man">
         <div class="grid row-2">
           <div class="card"><h3>Mobilized Manpower — <span id="mp-date">—</span></h3><div id="mp-mobilized"><p class="muted">Awaiting manpower data.</p></div></div>
@@ -497,6 +508,35 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 
   const $ = (sel) => document.querySelector(sel);
   const COL = { accent: '#2f7de1', accent2: '#36c5a8', muted: '#7b8aa0', grid: '#eef2f7' };
+
+  function nprEquivalents(b, rc) {
+    const rate = (b && b.workUSDEq > b.workUSD && b.workNPR) ? b.workNPR / (b.workUSDEq - b.workUSD) : 133;
+    const bn = (v) => (v / 1e9).toFixed(2);
+    return {
+      contract: (b && b.workUSDEq) ? `≈ NPR ${bn(b.workUSDEq * rate)} B total (USD + NPR)` : '—',
+      received: (rc && rc.nprEq) ? `≈ NPR ${bn(rc.nprEq)} B total received` : '—',
+    };
+  }
+  function ipcStatusLabel(s) {
+    const t = (s || '').toLowerCase();
+    if (/partial/.test(t)) return 'Partially Paid';
+    if (/reject/.test(t)) return 'Rejected';
+    if (/settl|complete|paid/.test(t)) return 'Settled';
+    if (/certif/.test(t)) return 'Certified';
+    if (/remain|pending|review|outstand|process|progress/.test(t)) return 'Under Review';
+    return s || '—';
+  }
+  const INV_MATERIALS = ['Cement (bags)', 'Reinforcement Steel (MT)', 'Aggregate (m³)', 'Sand (m³)', 'Shotcrete (m³)', 'Structural Steel / Liner (MT)', 'Diesel (L)', 'Cement Grout (bags)'];
+  const INV_EXPLOSIVES = ['Emulsion Explosive (kg)', 'Detonators — Electric (pcs)', 'Detonators — Non-electric (pcs)', 'Detonating Cord (m)', 'Safety Fuse (m)', 'ANFO (kg)'];
+  function renderInventory() {
+    const d = '—';
+    const matBody = INV_MATERIALS.map((m) => `<tr><td style="text-align:left">${m}</td><td>${d}</td><td>${d}</td><td>${d}</td><td>${d}</td></tr>`).join('');
+    const mat = document.getElementById('inv-mat');
+    if (mat) mat.innerHTML = `<table class="tbl"><thead><tr><th style="text-align:left">Material</th><th>Opening</th><th>Received</th><th>Consumed</th><th>Closing Balance</th></tr></thead><tbody>${matBody}</tbody></table>`;
+    const expBody = INV_EXPLOSIVES.map((m) => `<tr><td style="text-align:left">${m}</td><td>${d}</td><td>${d}</td><td>${d}</td></tr>`).join('');
+    const exp = document.getElementById('inv-exp');
+    if (exp) exp.innerHTML = `<table class="tbl"><thead><tr><th style="text-align:left">Explosive Item</th><th>Received</th><th>Consumed</th><th>Magazine Balance</th></tr></thead><tbody>${expBody}</tbody></table>`;
+  }
 
   function countUp(el, to, dec) {
     const fmt = (n) => Number(n.toFixed(dec)).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
@@ -567,6 +607,9 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     setKpi('v-finprog', (b.workUSDEq && b.completeUSDEq != null) ? Math.round((b.completeUSDEq / b.workUSDEq) * 1000) / 10 : null, 1);
     const phys = ((data.scurve && data.scurve.actualPct) || []).filter((x) => x != null).pop();
     setKpi('v-physprog', phys != null ? phys : null, 1);
+    const eq = nprEquivalents(b, rc);
+    document.getElementById('v-budget-eq').textContent = eq.contract;
+    document.getElementById('v-received-eq').textContent = eq.received;
     renderTimeline();
   }
 
@@ -699,11 +742,14 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   }
 
   function renderIpc() {
-    // Same IPC data as the Financial panel register (financeDetail) so the
-    // Executive Summary stays in sync. Newest certified first.
-    const rows = ((data.financeDetail && data.financeDetail.ipcs) || []).slice()
+    // Interim Payment Certificates only — the Advance Payment is a separate
+    // instrument, never listed under IPCs. The Exec Summary shows just the latest few.
+    const all = ((data.financeDetail && data.financeDetail.ipcs) || [])
+      .filter((i) => !i.isAdvance)
+      .slice()
       .sort((a, b) => (b.certifiedDate || '').localeCompare(a.certifiedDate || ''));
-    $('#ipc-count').textContent = rows.length;
+    const rows = all.slice(0, 4);
+    $('#ipc-count').textContent = all.length ? `latest ${rows.length} of ${all.length}` : '—';
     if (!rows.length) return;
     const fmtDate = (iso) => {
       if (!iso) return '—';
@@ -713,13 +759,14 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     };
     const usdM = (v) => (v ? (v / 1e6).toFixed(2) : '–');
     const nprM = (v) => (v ? (v / 1e6).toFixed(1) : '–');
-    const done = (s) => /complete/i.test(s);
-    const ipcRow = (r) => `
-      <tr class="${done(r.status) ? 'ok' : 'warn'}">
+    const ipcRow = (r) => {
+      const lab = ipcStatusLabel(r.status);
+      const cls = lab === 'Settled' ? 'ok' : 'warn';
+      return `<tr class="${cls}">
         <td>${r.ipc}</td><td>${fmtDate(r.certifiedDate)}</td>
         <td>${usdM(r.netUSD)}</td><td>${nprM(r.netNPR)}</td>
-        <td>${r.status}</td>
-      </tr>`;
+        <td>${lab}</td></tr>`;
+    };
     $('#ipc-table').innerHTML = `
       <table class="tbl">
         <thead><tr><th>IPC</th><th>Certified</th><th>Net (USD M)</th>
@@ -841,6 +888,9 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     setKpi('f-rnpr', rc.npr / 1e6, 0); // NPR in millions — matches Executive Summary
     setKpi('f-out', b.outUSDEq / 1e6, 2);
     setKpi('f-prog', b.workUSDEq ? Math.round((b.completeUSDEq / b.workUSDEq) * 1000) / 10 : null, 1);
+    const finEq = nprEquivalents(b, rc);
+    document.getElementById('f-c-eq').textContent = finEq.contract;
+    document.getElementById('f-r-eq').textContent = finEq.received;
 
     // Advance Payment amortisation — compact popover, one progress bar per
     // advance × currency. There are two amortisable advances:
@@ -1452,6 +1502,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   function renderAll() {
     renderKpis();
     renderFinancial();
+    renderInventory();
     renderSchedule();
     if (!schedTabsWired) {
       schedTabsWired = true;

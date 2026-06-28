@@ -24,6 +24,8 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   border-bottom:1px solid rgba(255,255,255,.08)}
 .brand .logo{width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,var(--accent),var(--accent-2));
   display:grid;place-items:center;font-size:13px;font-weight:800}
+.brand-logo{width:100%;max-width:150px;height:auto;display:block;background:#fff;border-radius:8px;padding:7px;box-sizing:border-box}
+.app.collapsed .brand-logo{max-width:44px;padding:3px}
 .nav{padding:10px 0;overflow-y:auto;flex:1}
 .nav-item{display:flex;align-items:center;gap:11px;padding:11px 18px;font-size:13.5px;cursor:pointer;
   border-left:3px solid transparent;transition:.18s;white-space:nowrap}

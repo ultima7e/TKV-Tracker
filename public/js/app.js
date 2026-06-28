@@ -7,6 +7,18 @@
   const $ = (sel) => document.querySelector(sel);
   const COL = { accent: '#2f7de1', accent2: '#36c5a8', muted: '#7b8aa0', grid: '#eef2f7' };
 
+  // Single NPR-equivalent of the combined USD+NPR totals, using the contract's
+  // own implied rate (from the payment summary's USD-equivalent column). Received
+  // uses the summary's "Total Received in NPR" figure directly.
+  function nprEquivalents(b, rc) {
+    const rate = (b && b.workUSDEq > b.workUSD && b.workNPR) ? b.workNPR / (b.workUSDEq - b.workUSD) : 133;
+    const bn = (v) => (v / 1e9).toFixed(2);
+    return {
+      contract: (b && b.workUSDEq) ? `≈ NPR ${bn(b.workUSDEq * rate)} B total (USD + NPR)` : '—',
+      received: (rc && rc.nprEq) ? `≈ NPR ${bn(rc.nprEq)} B total received` : '—',
+    };
+  }
+
   function countUp(el, to, dec) {
     const fmt = (n) => Number(n.toFixed(dec)).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
     if (document.hidden) { el.textContent = fmt(to); return; } // RAF is paused in hidden tabs — set value directly
@@ -79,6 +91,10 @@
     // Physical progress = latest Actual cumulative % from the S-curve.
     const phys = ((data.scurve && data.scurve.actualPct) || []).filter((x) => x != null).pop();
     setKpi('v-physprog', phys != null ? phys : null, 1);
+    // Total amount expressed as a single NPR-equivalent (from the payment summary).
+    const eq = nprEquivalents(b, rc);
+    $('#v-budget-eq').textContent = eq.contract;
+    $('#v-received-eq').textContent = eq.received;
     renderTimeline();
     // Earned Value card stays '—' until the EV data sheet is provided.
   }
@@ -212,12 +228,27 @@
     }
   }
 
+  // Map the sheet's casual status text to professional payment-cycle terms.
+  function ipcStatusLabel(s) {
+    const t = (s || '').toLowerCase();
+    if (/partial/.test(t)) return 'Partially Paid';
+    if (/reject/.test(t)) return 'Rejected';
+    if (/settl|complete|paid/.test(t)) return 'Settled';
+    if (/certif/.test(t)) return 'Certified';
+    if (/remain|pending|review|outstand|process|progress/.test(t)) return 'Under Review';
+    return s || '—';
+  }
+
   function renderIpc() {
-    // Same IPC data as the Financial panel register (financeDetail) so the
-    // Executive Summary stays in sync. Newest certified first.
-    const rows = ((data.financeDetail && data.financeDetail.ipcs) || []).slice()
+    // Interim Payment Certificates only — the Advance Payment is a separate
+    // instrument, never listed under IPCs. The Exec Summary shows just the
+    // latest few; the full register lives in the Financial panel.
+    const all = ((data.financeDetail && data.financeDetail.ipcs) || [])
+      .filter((i) => !i.isAdvance)
+      .slice()
       .sort((a, b) => (b.certifiedDate || '').localeCompare(a.certifiedDate || ''));
-    $('#ipc-count').textContent = rows.length;
+    const rows = all.slice(0, 4);
+    $('#ipc-count').textContent = all.length ? `latest ${rows.length} of ${all.length}` : '—';
     if (!rows.length) return;
     const fmtDate = (iso) => {
       if (!iso) return '—';
@@ -227,13 +258,14 @@
     };
     const usdM = (v) => (v ? (v / 1e6).toFixed(2) : '–');
     const nprM = (v) => (v ? (v / 1e6).toFixed(1) : '–');
-    const done = (s) => /complete/i.test(s);
-    const ipcRow = (r) => `
-      <tr class="${done(r.status) ? 'ok' : 'warn'}">
+    const ipcRow = (r) => {
+      const lab = ipcStatusLabel(r.status);
+      const cls = lab === 'Settled' ? 'ok' : lab === 'Rejected' ? 'warn' : 'warn';
+      return `<tr class="${cls}">
         <td>${r.ipc}</td><td>${fmtDate(r.certifiedDate)}</td>
         <td>${usdM(r.netUSD)}</td><td>${nprM(r.netNPR)}</td>
-        <td>${r.status}</td>
-      </tr>`;
+        <td>${lab}</td></tr>`;
+    };
     $('#ipc-table').innerHTML = `
       <table class="tbl">
         <thead><tr><th>IPC</th><th>Certified</th><th>Net (USD M)</th>
@@ -356,6 +388,9 @@
     setKpi('f-rnpr', rc.npr / 1e6, 0); // NPR in millions — matches Executive Summary
     setKpi('f-out', b.outUSDEq / 1e6, 2);
     setKpi('f-prog', b.workUSDEq ? Math.round((b.completeUSDEq / b.workUSDEq) * 1000) / 10 : null, 1);
+    const eq = nprEquivalents(b, rc);
+    $('#f-c-eq').textContent = eq.contract;
+    $('#f-r-eq').textContent = eq.received;
 
     // Advance Payment amortisation — compact popover, one progress bar per
     // advance × currency. There are two amortisable advances:
@@ -979,9 +1014,24 @@
     chart.resize();
   }
 
+  // Placeholder Inventory & Explosives tables — structure for seniors now; the
+  // cells auto-fill once the inventory sheet is linked.
+  const INV_MATERIALS = ['Cement (bags)', 'Reinforcement Steel (MT)', 'Aggregate (m³)', 'Sand (m³)', 'Shotcrete (m³)', 'Structural Steel / Liner (MT)', 'Diesel (L)', 'Cement Grout (bags)'];
+  const INV_EXPLOSIVES = ['Emulsion Explosive (kg)', 'Detonators — Electric (pcs)', 'Detonators — Non-electric (pcs)', 'Detonating Cord (m)', 'Safety Fuse (m)', 'ANFO (kg)'];
+  function renderInventory() {
+    const d = '—';
+    const matBody = INV_MATERIALS.map((m) => `<tr><td style="text-align:left">${m}</td><td>${d}</td><td>${d}</td><td>${d}</td><td>${d}</td></tr>`).join('');
+    const mat = document.getElementById('inv-mat');
+    if (mat) mat.innerHTML = `<table class="tbl"><thead><tr><th style="text-align:left">Material</th><th>Opening</th><th>Received</th><th>Consumed</th><th>Closing Balance</th></tr></thead><tbody>${matBody}</tbody></table>`;
+    const expBody = INV_EXPLOSIVES.map((m) => `<tr><td style="text-align:left">${m}</td><td>${d}</td><td>${d}</td><td>${d}</td></tr>`).join('');
+    const exp = document.getElementById('inv-exp');
+    if (exp) exp.innerHTML = `<table class="tbl"><thead><tr><th style="text-align:left">Explosive Item</th><th>Received</th><th>Consumed</th><th>Magazine Balance</th></tr></thead><tbody>${expBody}</tbody></table>`;
+  }
+
   function renderAll() {
     renderKpis();
     renderFinancial();
+    renderInventory();
     renderSchedule();
     // Wire the Schedule/Delay sub-tabs once; render the delay view lazily on show.
     if (!schedTabsWired) {
