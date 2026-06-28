@@ -1026,6 +1026,13 @@
     const expBody = INV_EXPLOSIVES.map((m) => `<tr><td style="text-align:left">${m}</td><td>${d}</td><td>${d}</td><td>${d}</td></tr>`).join('');
     const exp = document.getElementById('inv-exp');
     if (exp) exp.innerHTML = `<table class="tbl"><thead><tr><th style="text-align:left">Explosive Item</th><th>Received</th><th>Consumed</th><th>Magazine Balance</th></tr></thead><tbody>${expBody}</tbody></table>`;
+    // Compact snapshot for the Executive Summary (key items · balance only).
+    const exec = document.getElementById('inv-exec');
+    if (exec) {
+      const items = ['Cement (bags)', 'Reinforcement Steel (MT)', 'Aggregate (m³)', 'Diesel (L)', 'Emulsion Explosive (kg)', 'Detonators (pcs)'];
+      const body = items.map((m) => `<tr><td style="text-align:left">${m}</td><td>${d}</td><td>${d}</td></tr>`).join('');
+      exec.innerHTML = `<table class="tbl"><thead><tr><th style="text-align:left">Item</th><th>Consumed</th><th>Balance</th></tr></thead><tbody>${body}</tbody></table>`;
+    }
   }
 
   function renderAll() {
