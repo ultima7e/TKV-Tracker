@@ -10,6 +10,16 @@
   // Single NPR-equivalent of the combined USD+NPR totals, using the contract's
   // own implied rate (from the payment summary's USD-equivalent column). Received
   // uses the summary's "Total Received in NPR" figure directly.
+  // Financial progress on a consistent incl-VAT basis: add 13% VAT to the NPR
+  // portion of completed work (USD/foreign portion carries no VAT), then divide
+  // by the full contract value (which already includes VAT + Provisional Sum).
+  function finProgPct(b) {
+    if (!b || !b.workUSDEq || b.completeUSD == null) return null;
+    const rate = (b.workUSDEq > b.workUSD && b.workNPR) ? b.workNPR / (b.workUSDEq - b.workUSD) : 133;
+    const completeInclVatEq = b.completeUSD + (b.completeNPR * 1.13) / rate;
+    return Math.round((completeInclVatEq / b.workUSDEq) * 1000) / 10;
+  }
+
   function nprEquivalents(b, rc) {
     const rate = (b && b.workUSDEq > b.workUSD && b.workNPR) ? b.workNPR / (b.workUSDEq - b.workUSD) : 133;
     const bn = (v) => (v / 1e9).toFixed(2);
@@ -87,7 +97,7 @@
     setKpi('v-budget-npr', b.workNPR != null ? b.workNPR / 1e6 : null, 0);
     setKpi('v-received-usd', rc.usd != null ? rc.usd / 1e6 : null, 2);
     setKpi('v-received-npr', rc.npr != null ? rc.npr / 1e6 : null, 0);
-    setKpi('v-finprog', (b.workUSDEq && b.completeUSDEq != null) ? Math.round((b.completeUSDEq / b.workUSDEq) * 1000) / 10 : null, 1);
+    setKpi('v-finprog', finProgPct(b), 1);
     // Physical progress = latest Actual cumulative % from the S-curve.
     const phys = ((data.scurve && data.scurve.actualPct) || []).filter((x) => x != null).pop();
     setKpi('v-physprog', phys != null ? phys : null, 1);
@@ -387,10 +397,13 @@
     setKpi('f-rusd', rc.usd / 1e6, 2);
     setKpi('f-rnpr', rc.npr / 1e6, 0); // NPR in millions — matches Executive Summary
     setKpi('f-out', b.outUSDEq / 1e6, 2);
-    setKpi('f-prog', b.workUSDEq ? Math.round((b.completeUSDEq / b.workUSDEq) * 1000) / 10 : null, 1);
+    setKpi('f-prog', finProgPct(b), 1);
     const eq = nprEquivalents(b, rc);
     $('#f-c-eq').textContent = eq.contract;
     $('#f-r-eq').textContent = eq.received;
+    const ret = fd.retention || { usd: 0, npr: 0 };
+    setKpi('f-ret-usd', ret.usd / 1e6, 2);
+    setKpi('f-ret-npr', ret.npr / 1e6, 1);
 
     // Advance Payment amortisation — compact popover, one progress bar per
     // advance × currency. There are two amortisable advances:
@@ -398,14 +411,13 @@
     //  2) Monsoon Material Advance (NPR only) — disbursed amount from the IPS;
     //     deductions aren't in the live feed yet, so recovery shows 0 until then.
     const adv = fd.advance;
-    const MONSOON_DISBURSED_NPR = 110010016.97; // IPS-12: Monsoon Material Advance Paid
     const advances = [];
     if (adv) advances.push({ name: 'Mobilization Advance', lines: [
       { cur: 'USD', disbursed: adv.disbursedUSD, recovered: adv.recoveredUSD },
       { cur: 'NPR', disbursed: adv.disbursedNPR, recovered: adv.recoveredNPR },
     ] });
     advances.push({ name: 'Monsoon Material Advance', lines: [
-      { cur: 'NPR', disbursed: MONSOON_DISBURSED_NPR, recovered: (adv && adv.monsoonRecoveredNPR) || 0 },
+      { cur: 'NPR', disbursed: (adv && adv.monsoonDisbursedNPR) || 0, recovered: (adv && adv.monsoonRecoveredNPR) || 0 },
     ] });
     const fmtAmt = (cur, v) => (cur === 'USD' ? `$ ${usdM(v)} M` : `NPR ${nprM(v)} M`);
     const advPop = document.getElementById('f-advance');

@@ -29,7 +29,7 @@ const FRESH_WINDOW_MS = 20000;
 // with the same name is skipped. Dropbox returns an ETag that changes on every
 // edit, so a conditional GET both detects changes and avoids re-downloading.
 const DROPBOX_SOURCES = [
-  { name: 'Milestone Payment Summary.xlsx', url: 'https://www.dropbox.com/scl/fi/pn3b7yp72hhjnky8jg1de/Milestone-Payment-Summary.xlsx?rlkey=obqj3v3t9siif2ujqgb35511j&dl=1' },
+  { name: 'Milestone Payment Summary.xlsx', url: 'https://www.dropbox.com/scl/fi/6o3o2z7298cl66e1lpx8k/Milestone-Payment-Summary.xlsx?rlkey=alqgpm3j5hbubgw9gid9l5l6m&dl=1' },
 ];
 const dbxCache = new Map(); // url -> { etag, buffer }
 const normName = (s) => s.toLowerCase().replace(/[\s\-_]/g, '');
