@@ -200,6 +200,10 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .ipc.open .ipc-caret{transform:rotate(90deg)}
 .ipc-body{display:none;padding:4px 14px 14px;border-top:1px solid var(--line);background:#fbfdff}
 .ipc.open .ipc-body{display:block}
+/* IPC work-items grouped by ACS activity */
+.ipc-body .tbl tr.ipc-grp td{background:#eaf1f9;color:var(--navy);font-weight:800;text-align:left;
+  font-size:11px;letter-spacing:.2px;padding:7px 10px}
+.ipc-body .tbl td:nth-child(2){white-space:normal;text-align:left;min-width:200px;max-width:430px;color:#41506a}
 .ipc-sub{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);
   font-weight:700;margin:12px 2px 6px}
 .badge{font-size:10px;font-weight:800;padding:3px 9px;border-radius:20px;white-space:nowrap}

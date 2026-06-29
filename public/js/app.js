@@ -537,20 +537,27 @@
 
     // IPC register accordion
     document.getElementById('f-ipccount').textContent = ipcs.length;
-    const chip = (it) => {
-      const L = /^[A-F]/.test(it.code) ? it.code[0].toUpperCase() : '';
-      return `<span class="chip ${L}">${it.category}</span>`;
+    // Natural sort of activity codes (A.3.3 < B.1 < B.2 < B.10 < B.11 < C.2 …).
+    const codeKey = (c) => String(c).split(/[.\s]+/).map((s) => (/^\d+$/.test(s) ? s.padStart(4, '0') : s)).join('.');
+    const itemsTable = (items) => {
+      // Only items with a certified amount, sorted & grouped by ACS activity.
+      const rows = (items || []).filter((it) => it.netUSD || it.netNPR)
+        .sort((a, b) => (codeKey(a.code) < codeKey(b.code) ? -1 : 1));
+      let body = '', grp = null;
+      for (const it of rows) {
+        if (it.activityGroup !== grp) {
+          grp = it.activityGroup;
+          body += `<tr class="ipc-grp"><td colspan="5">Activity ${grp} — ${it.activityGroupName || ''}</td></tr>`;
+        }
+        body += `<tr><td>${it.code}</td><td style="text-align:left">${it.activityName || it.category || ''}</td>
+          <td>${it.paymentPct != null ? it.paymentPct + '%' : '–'}</td>
+          <td>${it.netUSD ? '$ ' + usdM(it.netUSD) + ' M' : '–'}</td>
+          <td>${it.netNPR ? nprM(it.netNPR) + ' M' : '–'}</td></tr>`;
+      }
+      return `<table class="tbl">
+        <thead><tr><th>Item</th><th>Activity</th><th>Payment&nbsp;%</th><th>Net (USD)</th><th>Net (NPR)</th></tr></thead>
+        <tbody>${body}</tbody></table>`;
     };
-    const itemsTable = (items) => `
-      <table class="tbl">
-        <thead><tr><th>Item</th><th>Category</th><th>Payment&nbsp;%</th><th>Net (USD)</th><th>Net (NPR)</th></tr></thead>
-        <tbody>${items.map((it) => `
-          <tr><td>${it.code}</td><td style="text-align:left">${chip(it)}</td>
-            <td>${it.paymentPct != null ? it.paymentPct + '%' : '–'}</td>
-            <td>${it.netUSD ? '$ ' + usdM(it.netUSD) + ' M' : '–'}</td>
-            <td>${it.netNPR ? nprM(it.netNPR) + ' M' : '–'}</td></tr>`).join('')}
-        </tbody>
-      </table>`;
     const instalTable = (ins) => `
       <table class="tbl">
         <thead><tr><th>Tranche</th><th>Date</th><th>USD</th><th>NPR</th></tr></thead>
