@@ -349,7 +349,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
             <div class="tl-remain" id="tl-remain"><span id="tl-remain-lab"></span></div>
           </div>
         </div>
-        <div class="grid kpis" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px">
+        <div class="grid kpis" style="grid-template-columns:repeat(6,1fr);margin-bottom:16px">
           <div class="card kpi"><h3>Contract Amount</h3>
             <div class="valm">$ <span id="v-budget-usd">—</span> M</div>
             <div class="valm">NPR <span id="v-budget-npr">—</span> M</div>
@@ -358,8 +358,12 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
             <div class="valm">$ <span id="v-received-usd">—</span> M</div>
             <div class="valm">NPR <span id="v-received-npr">—</span> M</div>
             <div class="sub" id="v-received-eq">—</div></div>
-          <div class="card kpi"><h3>Financial Progress</h3><div class="val"><span id="v-finprog">—</span>%</div><div class="sub">certified incl-VAT / contract</div></div>
-          <div class="card kpi"><h3>Physical Progress</h3><div class="val"><span id="v-physprog">—</span>%</div><div class="sub">actual work completed (S-curve)</div></div>
+          <div class="card kpi"><h3>Financial Progress</h3><div class="val"><span id="v-finprog">—</span>%</div></div>
+          <div class="card kpi"><h3>Physical Progress</h3><div class="val"><span id="v-physprog">—</span>%</div></div>
+          <div class="card kpi"><h3>Retention Held</h3>
+            <div class="valm">$ <span id="v-ret-usd">—</span> M</div>
+            <div class="valm">NPR <span id="v-ret-npr">—</span> M</div>
+            <div class="sub">5% retention to date</div></div>
           <div class="card kpi"><h3>Earned Value</h3><div class="val"><span id="v-ev">—</span></div><div class="sub">awaiting EV data sheet</div></div>
         </div>
         <div class="grid row-2">
@@ -370,9 +374,11 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
           <div class="card">
             <h3>Manpower Status — <span id="mp-exec-date">—</span></h3>
             <div id="mp-exec"><p class="muted">Awaiting manpower data.</p></div>
-            <h4 style="margin:16px 0 7px;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Inventory Summary <span style="text-transform:none;font-weight:600">· snapshot · data to be populated</span></h4>
-            <div id="inv-exec"></div>
           </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <h3>Inventory Summary <span class="muted" style="font-weight:600">· snapshot · data to be populated</span></h3>
+          <div id="inv-exec"></div>
         </div>
         <div class="card" style="margin-top:16px">
           <h3>Interim Payment Certificates <span class="muted" style="font-weight:600">· <span id="ipc-count">—</span></span></h3>
@@ -622,6 +628,9 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     setKpi('v-budget-npr', b.workNPR != null ? b.workNPR / 1e6 : null, 0);
     setKpi('v-received-usd', rc.usd != null ? rc.usd / 1e6 : null, 2);
     setKpi('v-received-npr', rc.npr != null ? rc.npr / 1e6 : null, 0);
+    const ret = (data.financeDetail && data.financeDetail.retention) || { usd: 0, npr: 0 };
+    setKpi('v-ret-usd', ret.usd / 1e6, 2);
+    setKpi('v-ret-npr', ret.npr / 1e6, 1);
     setKpi('v-finprog', finProgPct(b), 1);
     const phys = ((data.scurve && data.scurve.actualPct) || []).filter((x) => x != null).pop();
     setKpi('v-physprog', phys != null ? phys : null, 1);
@@ -676,7 +685,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
         if (ac != null && pr != null) {
           const v = Math.round((ac - pr) * 10) / 10;
           const behind = v < 0;
-          s += `<br/><b style="color:${behind ? '#e5554e' : '#36b37e'}">vs Projected: ${v > 0 ? '+' : ''}${v}% ${behind ? '(behind)' : '(ahead)'}</b>`;
+          s += `<br/><b style="color:${behind ? '#e5554e' : '#36b37e'}">Variance: ${v > 0 ? '+' : ''}${v}% ${behind ? '(behind)' : '(ahead)'}</b>`;
         }
         return s;
       } },

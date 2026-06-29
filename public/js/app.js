@@ -97,6 +97,9 @@
     setKpi('v-budget-npr', b.workNPR != null ? b.workNPR / 1e6 : null, 0);
     setKpi('v-received-usd', rc.usd != null ? rc.usd / 1e6 : null, 2);
     setKpi('v-received-npr', rc.npr != null ? rc.npr / 1e6 : null, 0);
+    const ret = (data.financeDetail && data.financeDetail.retention) || { usd: 0, npr: 0 };
+    setKpi('v-ret-usd', ret.usd / 1e6, 2);
+    setKpi('v-ret-npr', ret.npr / 1e6, 1);
     setKpi('v-finprog', finProgPct(b), 1);
     // Physical progress = latest Actual cumulative % from the S-curve.
     const phys = ((data.scurve && data.scurve.actualPct) || []).filter((x) => x != null).pop();
@@ -146,7 +149,7 @@
         if (ac != null && pr != null) {
           const v = Math.round((ac - pr) * 10) / 10;
           const behind = v < 0;
-          s += `<br/><b style="color:${behind ? '#e5554e' : '#36b37e'}">vs Projected: ${v > 0 ? '+' : ''}${v}% ${behind ? '(behind)' : '(ahead)'}</b>`;
+          s += `<br/><b style="color:${behind ? '#e5554e' : '#36b37e'}">Variance: ${v > 0 ? '+' : ''}${v}% ${behind ? '(behind)' : '(ahead)'}</b>`;
         }
         return s;
       } },
