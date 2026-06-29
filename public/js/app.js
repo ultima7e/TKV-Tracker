@@ -13,12 +13,17 @@
   // Financial progress on a consistent incl-VAT basis: add 13% VAT to the NPR
   // portion of completed work (USD/foreign portion carries no VAT), then divide
   // by the full contract value (which already includes VAT + Provisional Sum).
-  function finProgPct(b) {
-    if (!b || !b.workUSDEq || b.completeUSD == null) return null;
+  // Single source of truth for the certified/outstanding split on the consistent
+  // incl-VAT basis. The KPI %, the Outstanding figure and the Certified-vs-
+  // Outstanding donut all read from this, so they always move together.
+  function finBasis(b) {
+    if (!b || !b.workUSDEq || b.completeUSD == null) return { certifiedEq: 0, outstandingEq: 0, pct: null };
     const rate = (b.workUSDEq > b.workUSD && b.workNPR) ? b.workNPR / (b.workUSDEq - b.workUSD) : 133;
-    const completeInclVatEq = b.completeUSD + (b.completeNPR * 1.13) / rate;
-    return Math.round((completeInclVatEq / b.workUSDEq) * 1000) / 10;
+    const certifiedEq = b.completeUSD + (b.completeNPR * 1.13) / rate;
+    const outstandingEq = b.workUSDEq - certifiedEq;
+    return { certifiedEq, outstandingEq, pct: Math.round((certifiedEq / b.workUSDEq) * 1000) / 10 };
   }
+  function finProgPct(b) { return finBasis(b).pct; }
 
   function nprEquivalents(b, rc) {
     const rate = (b && b.workUSDEq > b.workUSD && b.workNPR) ? b.workNPR / (b.workUSDEq - b.workUSD) : 133;
@@ -399,7 +404,8 @@
     setKpi('f-cnpr', b.workNPR / 1e6, 0); // NPR in millions — matches Executive Summary
     setKpi('f-rusd', rc.usd / 1e6, 2);
     setKpi('f-rnpr', rc.npr / 1e6, 0); // NPR in millions — matches Executive Summary
-    setKpi('f-out', b.outUSDEq / 1e6, 2);
+    const fb = finBasis(b);
+    setKpi('f-out', fb.outstandingEq / 1e6, 2);
     setKpi('f-prog', finProgPct(b), 1);
     const eq = nprEquivalents(b, rc);
     $('#f-c-eq').textContent = eq.contract;
@@ -488,8 +494,8 @@
         itemStyle: { borderColor: '#fff', borderWidth: 2 },
         label: { show: true, formatter: '{d}%', fontSize: 11, fontWeight: 700, color: COL.muted },
         data: [
-          { name: 'Certified', value: Math.round(b.completeUSDEq), itemStyle: { color: '#2fae7a' } },
-          { name: 'Outstanding', value: Math.round(b.outUSDEq), itemStyle: { color: '#f2a65a' } },
+          { name: 'Certified', value: Math.round(fb.certifiedEq), itemStyle: { color: '#2fae7a' } },
+          { name: 'Outstanding', value: Math.round(fb.outstandingEq), itemStyle: { color: '#f2a65a' } },
         ],
       }],
     });
@@ -505,8 +511,8 @@
           <table class="tbl"><thead><tr><th>Category</th><th>Earned (USD-eq)</th><th>Weightage</th></tr></thead>
           <tbody>${body}</tbody></table>`;
       } else {
-        el.innerHTML = `<span>Outstanding work value: <b>$ ${usdM(b.outUSDEq)} M</b> ` +
-          `(${Math.round((b.outUSDEq / b.workUSDEq) * 1000) / 10}% of contract still to certify)</span>`;
+        el.innerHTML = `<span>Outstanding work value: <b>$ ${usdM(fb.outstandingEq)} M</b> ` +
+          `(${Math.round((fb.outstandingEq / b.workUSDEq) * 1000) / 10}% of contract still to certify)</span>`;
       }
     });
 
@@ -547,7 +553,8 @@
       for (const it of rows) {
         if (it.activityGroup !== grp) {
           grp = it.activityGroup;
-          body += `<tr class="ipc-grp"><td colspan="5">Activity ${grp} — ${it.activityGroupName || ''}</td></tr>`;
+          const label = grp ? `Activity ${grp} — ${it.activityGroupName || ''}` : (it.category || 'Other');
+          body += `<tr class="ipc-grp"><td colspan="5">${label}</td></tr>`;
         }
         body += `<tr><td>${it.code}</td><td style="text-align:left">${it.activityName || it.category || ''}</td>
           <td>${it.paymentPct != null ? it.paymentPct + '%' : '–'}</td>
@@ -555,7 +562,7 @@
           <td>${it.netNPR ? nprM(it.netNPR) + ' M' : '–'}</td></tr>`;
       }
       return `<table class="tbl">
-        <thead><tr><th>Item</th><th>Activity</th><th>Payment&nbsp;%</th><th>Net (USD)</th><th>Net (NPR)</th></tr></thead>
+        <thead><tr><th>Item</th><th></th><th>Payment&nbsp;%</th><th>Net (USD)</th><th>Net (NPR)</th></tr></thead>
         <tbody>${body}</tbody></table>`;
     };
     const instalTable = (ins) => `
@@ -582,7 +589,6 @@
         </div>
         <div class="ipc-body">
           ${i.items.length ? '<div class="ipc-sub">Work Items (' + i.items.length + ')</div>' + itemsTable(i.items) : ''}
-          ${i.installments.length ? '<div class="ipc-sub">Payment Tranches</div>' + instalTable(i.installments) : ''}
         </div>
       </div>`).join('');
     document.querySelectorAll('#f-ipclist .ipc-head').forEach((h) =>
