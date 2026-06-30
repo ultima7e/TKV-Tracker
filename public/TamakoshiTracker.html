@@ -148,6 +148,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .adv-pop{position:absolute;top:46px;right:0;width:380px;max-width:90vw;background:#fff;border:1px solid var(--line);
   border-radius:12px;box-shadow:0 12px 34px rgba(20,40,80,.18);padding:14px 16px;z-index:30}
 .adv-pop[hidden]{display:none}
+.adv-card{cursor:pointer} .adv-card:hover{border-color:var(--accent);box-shadow:0 2px 12px rgba(47,125,225,.14)}
 .adv-pop-head{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;margin-bottom:12px}
 .adv-grp{margin-bottom:13px}
 .adv-name{font-size:12.5px;font-weight:800;color:var(--navy);margin-bottom:8px}
@@ -374,17 +375,19 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
             <div id="ch-scurve" class="chart"></div>
           </div>
           <div class="card">
+            <h3>Interim Payment Certificates <span class="muted" style="font-weight:600">· <span id="ipc-count">—</span></span></h3>
+            <div id="ipc-table"><p class="muted">Awaiting IPC data.</p></div>
+          </div>
+        </div>
+        <div class="grid row-2" style="margin-top:16px">
+          <div class="card">
+            <h3>Inventory Summary <span class="muted" style="font-weight:600">· snapshot · data to be populated</span></h3>
+            <div id="inv-exec"></div>
+          </div>
+          <div class="card">
             <h3>Manpower Status — <span id="mp-exec-date">—</span></h3>
             <div id="mp-exec"><p class="muted">Awaiting manpower data.</p></div>
           </div>
-        </div>
-        <div class="card" style="margin-top:16px">
-          <h3>Inventory Summary <span class="muted" style="font-weight:600">· snapshot · data to be populated</span></h3>
-          <div id="inv-exec"></div>
-        </div>
-        <div class="card" style="margin-top:16px">
-          <h3>Interim Payment Certificates <span class="muted" style="font-weight:600">· <span id="ipc-count">—</span></span></h3>
-          <div id="ipc-table"><p class="muted">Awaiting IPC data.</p></div>
         </div>
       </section>
 
@@ -420,14 +423,10 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
             <div class="valm">$ <span id="f-ret-usd">—</span> M</div>
             <div class="valm">NPR <span id="f-ret-npr">—</span> M</div>
             <div class="sub">5% retention to date</div></div>
-          <div class="card kpi"><h3>Outstanding</h3><div class="val">$ <span id="f-out">—</span> M</div><div class="sub">USD-equivalent</div></div>
+          <div class="card kpi adv-card" id="adv-toggle" title="Click for the advance amortisation breakdown"><h3>Advance Amortisation</h3><div class="val"><span id="adv-pct">—</span>%</div><div class="sub">recovered · click for detail ▸</div></div>
           <div class="card kpi"><h3>Financial Progress</h3><div class="val"><span id="f-prog">—</span>%</div><div class="sub">certified incl-VAT / contract</div></div>
         </div>
         <div class="adv-wrap">
-          <button id="adv-toggle" class="adv-btn" title="Advance Payment amortisation tracker">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>
-            Advance Amortisation
-          </button>
           <div id="f-advance" class="adv-pop" hidden><p class="muted">Awaiting finance data.</p></div>
         </div>
         <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px">
@@ -918,7 +917,6 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     setKpi('f-rusd', rc.usd / 1e6, 2);
     setKpi('f-rnpr', rc.npr / 1e6, 0); // NPR in millions — matches Executive Summary
     const fb = finBasis(b);
-    setKpi('f-out', fb.outstandingEq / 1e6, 2);
     setKpi('f-prog', finProgPct(b), 1);
     const ret = fd.retention || { usd: 0, npr: 0 };
     setKpi('f-ret-usd', ret.usd / 1e6, 2);
@@ -941,6 +939,12 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     advances.push({ name: 'Monsoon Material Advance', lines: [
       { cur: 'NPR', disbursed: (adv && adv.monsoonDisbursedNPR) || 0, recovered: (adv && adv.monsoonRecoveredNPR) || 0 },
     ] });
+    const arate = (b.workUSDEq > b.workUSD && b.workNPR) ? b.workNPR / (b.workUSDEq - b.workUSD) : 133;
+    const advNpr = (a) => a.lines.reduce((s, l) => s + (l.cur === 'USD' ? l.disbursed * arate : l.disbursed), 0);
+    const recNpr = (a) => a.lines.reduce((s, l) => s + (l.cur === 'USD' ? l.recovered * arate : l.recovered), 0);
+    const totDisb = advances.reduce((s, a) => s + advNpr(a), 0);
+    const totRec = advances.reduce((s, a) => s + recNpr(a), 0);
+    setKpi('adv-pct', totDisb ? Math.round((totRec / totDisb) * 1000) / 10 : 0, 1);
     const fmtAmt = (cur, v) => (cur === 'USD' ? `$ ${usdM(v)} M` : `NPR ${nprM(v)} M`);
     const advPop = document.getElementById('f-advance');
     advPop.innerHTML = `<div class="adv-pop-head">Advance Payment — Amortisation</div>` +

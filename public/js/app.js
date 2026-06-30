@@ -405,7 +405,6 @@
     setKpi('f-rusd', rc.usd / 1e6, 2);
     setKpi('f-rnpr', rc.npr / 1e6, 0); // NPR in millions — matches Executive Summary
     const fb = finBasis(b);
-    setKpi('f-out', fb.outstandingEq / 1e6, 2);
     setKpi('f-prog', finProgPct(b), 1);
     const eq = nprEquivalents(b, rc);
     $('#f-c-eq').textContent = eq.contract;
@@ -428,6 +427,13 @@
     advances.push({ name: 'Monsoon Material Advance', lines: [
       { cur: 'NPR', disbursed: (adv && adv.monsoonDisbursedNPR) || 0, recovered: (adv && adv.monsoonRecoveredNPR) || 0 },
     ] });
+    // Headline amortised % for the KPI card (combined, NPR-equivalent).
+    const arate = (b.workUSDEq > b.workUSD && b.workNPR) ? b.workNPR / (b.workUSDEq - b.workUSD) : 133;
+    const advNpr = (a) => a.lines.reduce((s, l) => s + (l.cur === 'USD' ? l.disbursed * arate : l.disbursed), 0);
+    const recNpr = (a) => a.lines.reduce((s, l) => s + (l.cur === 'USD' ? l.recovered * arate : l.recovered), 0);
+    const totDisb = advances.reduce((s, a) => s + advNpr(a), 0);
+    const totRec = advances.reduce((s, a) => s + recNpr(a), 0);
+    setKpi('adv-pct', totDisb ? Math.round((totRec / totDisb) * 1000) / 10 : 0, 1);
     const fmtAmt = (cur, v) => (cur === 'USD' ? `$ ${usdM(v)} M` : `NPR ${nprM(v)} M`);
     const advPop = document.getElementById('f-advance');
     advPop.innerHTML = `<div class="adv-pop-head">Advance Payment — Amortisation</div>` +
