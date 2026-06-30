@@ -369,6 +369,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
             <div class="sub">5% retention to date</div></div>
           <div class="card kpi"><h3>Earned Value</h3><div class="val"><span id="v-ev">—</span></div><div class="sub">awaiting EV data sheet</div></div>
         </div>
+        <div id="weekly"></div>
         <div class="grid row-2">
           <div class="card">
             <h3>S-Curve <span class="muted" style="font-weight:600">· % of total</span></h3>
@@ -1541,10 +1542,61 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     chart.resize();
   }
 
+  // Weekly Progress snapshot — summarised from the Weekly Technical Progress
+  // Review PPT shown to the OE (Meeting No. 28, data date 26-Jun-2026).
+  const WEEKLY = {
+    meeting: 'No. 28', dataDate: '26 Jun 2026',
+    overall: { plan: 71.14, actual: 20.71, varc: -50.43, wk: 0.26 },
+    tunnels: [
+      { name: 'HRT F-1', pct: 33.48, week: 20.76, plan: 30 },
+      { name: 'HRT F-2', pct: 4.79, week: 14.76, plan: 25 },
+      { name: 'HRT F-3', pct: 2.79, week: 0.00, plan: 25 },
+      { name: 'Adit #3', pct: 93.27, week: 30.35, plan: 21.84 },
+      { name: 'Adit #4', pct: 90.92, week: 15.45, plan: 17.50 },
+      { name: 'Access to Valve Chamber', pct: 41.06, week: 11.62, plan: 15 },
+    ],
+    hse: { safeHrs: 2222781, safeHrsWk: 35805, recordable: 15, recordableWk: 1, lti: 1, nearMiss: 1, firstAid: 92, ch: 42, on: 85, ln: 341 },
+    explosives: [
+      { name: 'Explosives #32mm (kg)', week: 5316.1, stock: 111463.3 },
+      { name: 'Detonating Cord (m)', week: 1177, stock: 81401 },
+      { name: 'Electric Detonator (pcs)', week: 62, stock: 3717 },
+      { name: 'Non-Electric Detonator (pcs)', week: 6118, stock: 318560 },
+    ],
+    qc: { ncrTotal: 27, ncrOpen: 9, ncrClosed: 16, ncrWk: 1, rfiTotal: 1709, rfiApproved: 1485, rfiRejected: 224, rfiWk: 36 },
+  };
+  function renderWeekly() {
+    const el = document.getElementById('weekly');
+    if (!el) return;
+    const w = WEEKLY;
+    const n = (v) => Number(v).toLocaleString('en-US');
+    const sub = (t) => `<div class="ipc-sub" style="margin:0 0 6px">${t}</div>`;
+    const tun = w.tunnels.map((t) => `<tr><td style="text-align:left">${t.name}</td><td>${t.pct}%</td><td>${t.week.toFixed(2)}</td><td class="muted">${t.plan}</td></tr>`).join('');
+    const exp = w.explosives.map((e) => `<tr><td style="text-align:left">${e.name}</td><td>${n(e.week)}</td><td>${n(e.stock)}</td></tr>`).join('');
+    el.innerHTML = `<div class="card" style="margin-bottom:16px">
+      <h3>Weekly Progress <span class="muted" style="font-weight:600">· Meeting ${w.meeting} · data date ${w.dataDate}</span></h3>
+      <div style="font-size:12.5px;color:#41506a;margin:2px 0 14px">Overall progress (cost-based): Plan <b>${w.overall.plan}%</b> · Actual <b>${w.overall.actual}%</b> · <b style="color:var(--red)">Variance ${w.overall.varc}%</b> · this week <b>+${w.overall.wk}%</b></div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:14px 24px">
+        <div>${sub('Tunnel excavation — active faces')}<table class="tbl"><thead><tr><th style="text-align:left">Workface</th><th>Excav&nbsp;%</th><th>This&nbsp;wk&nbsp;(m)</th><th>Plan</th></tr></thead><tbody>${tun}</tbody></table></div>
+        <div>${sub('HSE &amp; safety')}<table class="tbl"><tbody>
+          <tr><td style="text-align:left">Safe man-hours</td><td>${n(w.hse.safeHrs)}</td><td class="muted">+${n(w.hse.safeHrsWk)}</td></tr>
+          <tr><td style="text-align:left">Recordable incidents</td><td>${w.hse.recordable}</td><td class="muted">+${w.hse.recordableWk}</td></tr>
+          <tr><td style="text-align:left">LTI · Near&nbsp;miss · First&nbsp;aid</td><td colspan="2">${w.hse.lti} · ${w.hse.nearMiss} · ${w.hse.firstAid}</td></tr>
+          <tr><td style="text-align:left">Manpower (CH/ON/LN)</td><td colspan="2">${w.hse.ch} / ${w.hse.on} / ${w.hse.ln} = <b>${w.hse.ch + w.hse.on + w.hse.ln}</b></td></tr>
+        </tbody></table></div>
+        <div>${sub('Explosives consumption')}<table class="tbl"><thead><tr><th style="text-align:left">Item</th><th>This&nbsp;wk</th><th>In&nbsp;stock</th></tr></thead><tbody>${exp}</tbody></table></div>
+        <div>${sub('QC — NCR &amp; RFI')}<table class="tbl"><tbody>
+          <tr><td style="text-align:left">NCR (total / open / closed)</td><td colspan="2">${w.qc.ncrTotal} / ${w.qc.ncrOpen} / ${w.qc.ncrClosed} <span class="muted">(+${w.qc.ncrWk} wk)</span></td></tr>
+          <tr><td style="text-align:left">RFI (total / approved / rejected)</td><td colspan="2">${n(w.qc.rfiTotal)} / ${n(w.qc.rfiApproved)} / ${w.qc.rfiRejected} <span class="muted">(+${w.qc.rfiWk} wk)</span></td></tr>
+        </tbody></table></div>
+      </div>
+    </div>`;
+  }
+
   function renderAll() {
     renderKpis();
     renderFinancial();
     renderInventory();
+    renderWeekly();
     renderSchedule();
     if (!schedTabsWired) {
       schedTabsWired = true;
