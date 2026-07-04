@@ -29,7 +29,9 @@ const FRESH_WINDOW_MS = 20000;
 // with the same name is skipped. Dropbox returns an ETag that changes on every
 // edit, so a conditional GET both detects changes and avoids re-downloading.
 const DROPBOX_SOURCES = [
-  { name: 'Milestone Payment Summary.xlsx', url: 'https://www.dropbox.com/scl/fi/6o3o2z7298cl66e1lpx8k/Milestone-Payment-Summary.xlsx?rlkey=alqgpm3j5hbubgw9gid9l5l6m&dl=1' },
+  // Earned Value Calculation workbook — the single source of truth for all
+  // financials (earned value, contract, received, financial-progress %).
+  { name: 'Earned Value Calculation_Tamakoshi-V.xlsx', url: 'https://www.dropbox.com/scl/fi/v4dij9hy9ki9qc6acxv9a/Earned-Value-Calculation_Tamakoshi-V.xlsx?rlkey=tshumcv26pkuc4ceh0r33wxfp&dl=1' },
 ];
 const dbxCache = new Map(); // url -> { etag, buffer }
 const normName = (s) => s.toLowerCase().replace(/[\s\-_]/g, '');

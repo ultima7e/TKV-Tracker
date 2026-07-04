@@ -367,7 +367,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
             <div class="valm">$ <span id="v-ret-usd">—</span> M</div>
             <div class="valm">NPR <span id="v-ret-npr">—</span> M</div>
             <div class="sub">5% retention to date</div></div>
-          <div class="card kpi"><h3>Earned Value</h3><div class="val"><span id="v-ev">—</span></div><div class="sub">awaiting EV data sheet</div></div>
+          <div class="card kpi"><h3>Earned Value</h3><div class="val"><span id="v-ev">—</span></div><div class="sub" id="v-ev-sub">awaiting EV data sheet</div></div>
         </div>
         <div id="weekly"></div>
         <div class="grid row-2">
@@ -523,7 +523,13 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   const COL = { accent: '#2f7de1', accent2: '#e23744', muted: '#7b8aa0', grid: '#eef2f7' };
 
   function finBasis(b) {
-    if (!b || !b.workUSDEq || b.completeUSD == null) return { certifiedEq: 0, outstandingEq: 0, pct: null };
+    if (!b) return { certifiedEq: 0, outstandingEq: 0, pct: null };
+    // Earned Value workbook supplies its own Financial-Progress % and the
+    // matching certified/outstanding split (USD-equivalent) — use them directly
+    // so the KPI, donut and Outstanding line always agree with the source file.
+    if (b.progressPct != null && b.certifiedUsdEq != null)
+      return { certifiedEq: b.certifiedUsdEq, outstandingEq: b.outstandingUsdEq, pct: b.progressPct };
+    if (!b.workUSDEq || b.completeUSD == null) return { certifiedEq: 0, outstandingEq: 0, pct: null };
     const rate = (b.workUSDEq > b.workUSD && b.workNPR) ? b.workNPR / (b.workUSDEq - b.workUSD) : 133;
     const certifiedEq = b.completeUSD + (b.completeNPR * 1.13) / rate;
     const outstandingEq = b.workUSDEq - certifiedEq;
@@ -641,6 +647,13 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const eq = nprEquivalents(b, rc);
     document.getElementById('v-budget-eq').textContent = eq.contract;
     document.getElementById('v-received-eq').textContent = eq.received;
+    // Earned Value = work done to date (USD-equivalent), from the EV workbook.
+    const evEl = document.getElementById('v-ev');
+    const evSub = document.getElementById('v-ev-sub');
+    if (evEl) evEl.textContent = b.completeUSDEq ? '$ ' + (b.completeUSDEq / 1e6).toFixed(2) + 'M' : '—';
+    if (evSub) evSub.textContent = b.completeUSD != null
+      ? `$${(b.completeUSD / 1e6).toFixed(2)}M + NPR ${(b.completeNPR / 1e6).toFixed(0)}M work done`
+      : 'awaiting EV data sheet';
     renderTimeline();
   }
 

@@ -17,7 +17,13 @@
   // incl-VAT basis. The KPI %, the Outstanding figure and the Certified-vs-
   // Outstanding donut all read from this, so they always move together.
   function finBasis(b) {
-    if (!b || !b.workUSDEq || b.completeUSD == null) return { certifiedEq: 0, outstandingEq: 0, pct: null };
+    if (!b) return { certifiedEq: 0, outstandingEq: 0, pct: null };
+    // Earned Value workbook supplies its own Financial-Progress % and the
+    // matching certified/outstanding split (USD-equivalent) — use them directly
+    // so the KPI, donut and Outstanding line always agree with the source file.
+    if (b.progressPct != null && b.certifiedUsdEq != null)
+      return { certifiedEq: b.certifiedUsdEq, outstandingEq: b.outstandingUsdEq, pct: b.progressPct };
+    if (!b.workUSDEq || b.completeUSD == null) return { certifiedEq: 0, outstandingEq: 0, pct: null };
     const rate = (b.workUSDEq > b.workUSD && b.workNPR) ? b.workNPR / (b.workUSDEq - b.workUSD) : 133;
     const certifiedEq = b.completeUSD + (b.completeNPR * 1.13) / rate;
     const outstandingEq = b.workUSDEq - certifiedEq;
@@ -113,8 +119,14 @@
     const eq = nprEquivalents(b, rc);
     $('#v-budget-eq').textContent = eq.contract;
     $('#v-received-eq').textContent = eq.received;
+    // Earned Value = work done to date (USD-equivalent), from the EV workbook.
+    const evEl = document.getElementById('v-ev');
+    const evSub = document.getElementById('v-ev-sub');
+    if (evEl) evEl.textContent = b.completeUSDEq ? '$ ' + (b.completeUSDEq / 1e6).toFixed(2) + 'M' : '—';
+    if (evSub) evSub.textContent = b.completeUSD != null
+      ? `$${(b.completeUSD / 1e6).toFixed(2)}M + NPR ${(b.completeNPR / 1e6).toFixed(0)}M work done`
+      : 'awaiting EV data sheet';
     renderTimeline();
-    // Earned Value card stays '—' until the EV data sheet is provided.
   }
 
   function renderAdvanceChart(id) {

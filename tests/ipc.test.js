@@ -2,28 +2,25 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { parseIpc } = require('../lib/parsers');
 
+// Mirrors the Earned Value workbook's 'IPC-Sum' sheet: an advance-payment row
+// (excluded from the IPC register) plus IPC rows. Columns: 0 label, 2 certified
+// date serial, 13/14 net payable USD/NPR, 18 status.
+const mk = (pairs) => { const r = []; for (const [i, v] of pairs) r[i] = v; return r; };
 function makeMatrices() {
-  // Mirrors 'IPCs and Details': header row 1, then IPC summary rows mixed
-  // with component sub-rows (B.1, F.3 …) that must be ignored. Columns:
-  // 0 Description, 4 Certified Date (serial), 21 Net USD, 22 Net NPR, 31 Status.
-  const row = (desc, certSerial, netUSD, netNPR, status) => {
-    const r = new Array(32).fill(null);
-    r[0] = desc; r[4] = certSerial; r[21] = netUSD; r[22] = netNPR; r[31] = status;
-    return r;
-  };
   return {
-    'IPCs and Details': [
-      ['Payment Details Summary'],
-      ['Description', 'Payment %', null, null, 'Certfied Date'],
-      row('IPC-01', 45728, 220778, 13454142, 'Completed'),
-      row('B.12.1', 45728, 220778, 13172310, null),       // component — ignore
-      row('IPC-02', 45734, 135186, 0, 'Completed'),
-      row('IPC-03', 45836, 227983, 14520353, 'Remaining'),
+    'EV Front': [mk([[1, 'Earned Value (A+C+D)'], [2, 10], [3, 1000]])],
+    'Summary': [mk([[1, 'Total Bid Price including Provisional Sum & VAT'], [2, 100], [3, 10000]])],
+    'IPC-Sum': [
+      mk([[0, 'Description'], [2, 'Certified Date'], [13, 'Net USD'], [14, 'Net NPR'], [18, 'Status']]),
+      mk([[0, '1st AP'], [2, 45500], [13, 3], [14, 300]]),                                  // advance — ignored
+      mk([[0, 'IPC-01'], [2, 45728], [13, 220778], [14, 13454142], [18, 'Completed']]),
+      mk([[0, 'IPC-02'], [2, 45734], [13, 135186], [14, 0], [18, 'Completed']]),
+      mk([[0, 'IPC-03'], [2, 45836], [13, 227983], [14, 14520353], [18, 'Remaining']]),
     ],
   };
 }
 
-test('parseIpc extracts only IPC summary rows', () => {
+test('parseIpc extracts only the IPC rows (advance excluded)', () => {
   const out = parseIpc(makeMatrices());
   assert.deepEqual(out.warnings, []);
   assert.equal(out.rows.length, 3);
@@ -32,13 +29,12 @@ test('parseIpc extracts only IPC summary rows', () => {
     netUSD: 220778, netNPR: 13454142, status: 'Completed',
   });
   assert.equal(out.rows[2].status, 'Remaining');
-  // totals across the three IPCs
   assert.equal(out.total.netUSD, 220778 + 135186 + 227983);
   assert.equal(out.total.netNPR, 13454142 + 0 + 14520353);
   assert.equal(out.total.count, 3);
 });
 
-test('parseIpc warns when the sheet is missing', () => {
+test('parseIpc warns when the EV sheets are missing', () => {
   const out = parseIpc({});
   assert.equal(out.rows.length, 0);
   assert.equal(out.warnings.length >= 1, true);
