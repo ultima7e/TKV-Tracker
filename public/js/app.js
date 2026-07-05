@@ -111,6 +111,9 @@
     const ret = (data.financeDetail && data.financeDetail.retention) || { usd: 0, npr: 0 };
     setKpi('v-ret-usd', ret.usd / 1e6, 2);
     setKpi('v-ret-npr', ret.npr / 1e6, 1);
+    // Combined retention held as a single USD-equivalent (NPR converted at 133.03).
+    const retEq = document.getElementById('v-ret-eq');
+    if (retEq) retEq.textContent = (ret.usd || ret.npr) ? `≈ $ ${((ret.usd + ret.npr / 133.03) / 1e6).toFixed(2)} M total` : '—';
     setKpi('v-finprog', finProgPct(b), 1);
     // Physical progress = latest Actual cumulative % from the S-curve.
     const phys = ((data.scurve && data.scurve.actualPct) || []).filter((x) => x != null).pop();
