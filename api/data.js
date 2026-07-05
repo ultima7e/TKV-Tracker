@@ -29,12 +29,15 @@ const FRESH_WINDOW_MS = 20000;
 // with the same name is skipped. Dropbox returns an ETag that changes on every
 // edit, so a conditional GET both detects changes and avoids re-downloading.
 const DROPBOX_SOURCES = [
+  // Milestone Payment Summary — provides ONLY each IPC's sub-activity work-item
+  // breakdown ('IPCs and Details' sheet); merged into the EV-derived IPC list.
+  // MUST be listed BEFORE the Earned Value workbook: this file also has a sheet
+  // named 'Summary', and later sources win on name collision — so the Earned
+  // Value workbook (loaded last) keeps ownership of the 'Summary' sheet.
+  { name: 'Milestone Payment Summary.xlsx', url: 'https://www.dropbox.com/scl/fi/7vj9upjzp3vikdwopnz89/Milestone-Payment-Summary-Govin-Bardewa-s-conflicted-copy-2026-07-02.xlsx?rlkey=nt7dyrdm50zuqrvt6lkseeada&dl=1' },
   // Earned Value Calculation workbook — source of truth for the headline
   // financials (earned value, contract, received, financial-progress %).
   { name: 'Earned Value Calculation_Tamakoshi-V.xlsx', url: 'https://www.dropbox.com/scl/fi/v4dij9hy9ki9qc6acxv9a/Earned-Value-Calculation_Tamakoshi-V.xlsx?rlkey=tshumcv26pkuc4ceh0r33wxfp&dl=1' },
-  // Milestone Summary Details — provides ONLY each IPC's sub-activity work-item
-  // breakdown ('IPCs and Details' sheet); merged into the EV-derived IPC list.
-  { name: 'Milestone Summary Details.xlsx', url: 'https://www.dropbox.com/scl/fi/eaigpvs681jo0jfxy0owi/Milestone-Summary-Details.xlsx?rlkey=7tu7c2hbsk5g1820j87qhwx4l&dl=1' },
 ];
 const dbxCache = new Map(); // url -> { etag, buffer }
 const normName = (s) => s.toLowerCase().replace(/[\s\-_]/g, '');
