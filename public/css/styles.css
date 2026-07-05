@@ -209,6 +209,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   font-weight:700;margin:12px 2px 6px}
 .badge{font-size:10px;font-weight:800;padding:3px 9px;border-radius:20px;white-space:nowrap}
 .badge.ok{background:#e4f5ee;color:#1c7a52} .badge.warn{background:#fdf0d8;color:#9a6b00}
+.badge.bad{background:#fdeaea;color:#b3261e} .badge.neu{background:#eef2f7;color:#5b6b82}
 .chip{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;
   background:#eef2f7;color:#51637e}
 .chip.A{background:#ede9fb;color:#5b46c9} .chip.B{background:#e6f0fd;color:#2f6fd0}

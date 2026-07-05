@@ -182,6 +182,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   font-weight:700;margin:12px 2px 6px}
 .badge{font-size:10px;font-weight:800;padding:3px 9px;border-radius:20px;white-space:nowrap}
 .badge.ok{background:#e4f5ee;color:#1c7a52} .badge.warn{background:#fdf0d8;color:#9a6b00}
+.badge.bad{background:#fdeaea;color:#b3261e} .badge.neu{background:#eef2f7;color:#5b6b82}
 .chip{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;
   background:#eef2f7;color:#51637e}
 .chip.A{background:#ede9fb;color:#5b46c9} .chip.B{background:#e6f0fd;color:#2f6fd0}
@@ -490,7 +491,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
           </div>
         </div>
       </section>
-      <section class="view" id="claims"><div class="card"><h3>Claims &amp; Variations</h3><p class="muted">Awaiting claims data sheet (Phase 2).</p></div></section>
+      <section class="view" id="claims"><div id="claims-body"></div></section>
       <section class="view" id="inv">
         <div class="card" style="margin-bottom:16px">
           <h3>Material Inventory Summary <span class="muted" style="font-weight:600">· data to be populated</span></h3>
@@ -1605,11 +1606,96 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     </div>`;
   }
 
+  // Claims & Variations — curated snapshot of the Claim & Variation Log
+  // (contractor's Statements of Claim, variations and EoT). Editorial summary
+  // for clarity, refreshed from the log; not a live parse.
+  const CLAIMS = {
+    totalUSD: 6.775, totalNPR: 483.334, socCount: 8, approvedNPR: 0.275, eotDays: 350,
+    claims: [
+      { no: 'SoC #1', desc: 'Force Majeure — initial notice & request', basis: 'Force Majeure', usd: 0.028, npr: null, status: 'Rejected' },
+      { no: 'SoC #2', desc: 'Road blockage due to landslide', basis: 'Force Majeure', usd: 0.020, npr: null, status: 'Not Approved' },
+      { no: 'SoC #3', desc: 'Work stopped by Bigu Rural Municipality', basis: 'Force Majeure', usd: 0.155, npr: null, status: 'Not Approved' },
+      { no: 'SoC #4', desc: 'Relocation of Adit-3 tunnel portal', basis: 'Site / design change', usd: 0.098, npr: null, status: 'Not Approved' },
+      { no: 'SoC #5', desc: 'Work stoppage at Crusher Plant & Adit', basis: 'Force Majeure', usd: 0.111, npr: null, status: 'Not Approved' },
+      { no: 'SoC #6', desc: 'Employer-instructed suspension of works', basis: 'Delays ordered by Employer', usd: 0.894, npr: 50.945, status: 'Not Approved' },
+      { no: 'SoC #7', desc: 'Increase in excise duty of cement', basis: 'Change in legislation', usd: null, npr: 1.490, status: 'Not Approved' },
+      { no: 'SoC #8', desc: 'Political insurrection, curfew & unrest', basis: 'Force Majeure', usd: 0.021, npr: 1.208, status: 'Not Approved' },
+      { no: 'Prolongation', desc: 'Prolongation cost claim (EoT-related)', basis: 'Employer risk event', usd: 5.476, npr: null, status: 'Under review' },
+    ],
+    variations: [
+      { desc: 'Additional Tailrace Surge Tunnel', basis: 'Value engineering', npr: 429.691, status: 'Estimating' },
+      { desc: 'Head Race Tunnel variation', basis: "Errors in Employer's Requirements", npr: null, status: 'Rejected' },
+      { desc: 'MAT / CVT relocation', basis: 'Cost & time', npr: null, status: 'Under review' },
+      { desc: 'Crushing plant relocation (BP1 → Gongar)', basis: 'Compensation event', npr: null, status: 'Under review' },
+    ],
+    eot: [
+      { desc: 'EoT-01 — Extension of Time application', period: '9 Jun 2024 – 30 Jun 2025', days: 350, status: 'Submitted' },
+      { desc: 'Extension of Intended Completion Date', period: 'Baseline (TIA) pending', days: null, status: 'Under review' },
+    ],
+  };
+  const claimBadge = (s) => {
+    // Order matters: 'Not Approved' contains 'approv', so test the negative first.
+    const cls = /reject|not\s*approv/i.test(s) ? 'bad' : /approv|submit|receiv|settl/i.test(s) ? 'ok' : 'neu';
+    return `<span class="badge ${cls}">${s}</span>`;
+  };
+  function renderClaims() {
+    const el = document.getElementById('claims-body');
+    if (!el) return;
+    const c = CLAIMS;
+    const amt = (u, n) => {
+      const p = [];
+      if (u) p.push('$ ' + u.toFixed(u < 0.1 ? 3 : 2) + 'M');
+      if (n) p.push('NPR ' + n.toFixed(1) + 'M');
+      return p.length ? p.join(' + ') : '—';
+    };
+    const claimRows = c.claims.map((x) => `<tr>
+      <td style="white-space:nowrap"><b>${x.no}</b></td>
+      <td style="text-align:left">${x.desc}</td>
+      <td style="text-align:left" class="muted">${x.basis}</td>
+      <td style="white-space:nowrap">${amt(x.usd, x.npr)}</td>
+      <td>${claimBadge(x.status)}</td></tr>`).join('');
+    const varRows = c.variations.map((x) => `<tr>
+      <td style="text-align:left">${x.desc}</td>
+      <td style="text-align:left" class="muted">${x.basis}</td>
+      <td style="white-space:nowrap">${x.npr ? 'NPR ' + x.npr.toFixed(1) + 'M' : '—'}</td>
+      <td>${claimBadge(x.status)}</td></tr>`).join('');
+    const eotRows = c.eot.map((x) => `<tr>
+      <td style="text-align:left">${x.desc}</td>
+      <td class="muted">${x.period}</td>
+      <td style="white-space:nowrap">${x.days ? '<b>' + x.days + ' d</b>' : '—'}</td>
+      <td>${claimBadge(x.status)}</td></tr>`).join('');
+    el.innerHTML = `
+      <div class="grid kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+        <div class="card kpi"><h3>Total Value Claimed</h3>
+          <div class="valm">$ <span>${c.totalUSD.toFixed(2)}</span> M</div>
+          <div class="valm">NPR <span>${c.totalNPR.toFixed(1)}</span> M</div>
+          <div class="sub">incl. surge-tunnel variation</div></div>
+        <div class="card kpi"><h3>Statements of Claim</h3><div class="val">${c.socCount}</div><div class="sub">SoC #1–#8 submitted</div></div>
+        <div class="card kpi"><h3>Approved &amp; Received</h3><div class="valm">NPR ${c.approvedNPR.toFixed(2)} M</div><div class="sub">Provisional Sum — landslide cost</div></div>
+        <div class="card kpi"><h3>EoT Sought</h3><div class="val">${c.eotDays} <span style="font-size:15px">days</span></div><div class="sub">baseline (TIA) pending</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <h3>Statements of Claim <span class="muted" style="font-weight:600">· amount claimed &amp; engineer's position</span></h3>
+        <table class="tbl"><thead><tr><th>Claim</th><th style="text-align:left">Description</th><th style="text-align:left">Contractual basis</th><th>Amount</th><th>Status</th></tr></thead>
+        <tbody>${claimRows}</tbody></table>
+        <div class="muted" style="font-size:11.5px;margin-top:8px">Total contractor's claim <b>$ ${c.totalUSD.toFixed(2)}M + NPR ${c.totalNPR.toFixed(1)}M</b> — of which NPR ${c.variations[0].npr.toFixed(1)}M is the Additional Surge Tunnel variation. Most claims remain pending or rejected by the Engineer.</div>
+      </div>
+      <div class="grid row-2">
+        <div class="card"><h3>Variations &amp; Value Engineering</h3>
+          <table class="tbl"><thead><tr><th style="text-align:left">Item</th><th style="text-align:left">Basis</th><th>Amount</th><th>Status</th></tr></thead>
+          <tbody>${varRows}</tbody></table></div>
+        <div class="card"><h3>Extensions of Time (EoT)</h3>
+          <table class="tbl"><thead><tr><th style="text-align:left">Item</th><th>Period</th><th>EoT</th><th>Status</th></tr></thead>
+          <tbody>${eotRows}</tbody></table></div>
+      </div>`;
+  }
+
   function renderAll() {
     renderKpis();
     renderFinancial();
     renderInventory();
     renderWeekly();
+    renderClaims();
     renderSchedule();
     if (!schedTabsWired) {
       schedTabsWired = true;
