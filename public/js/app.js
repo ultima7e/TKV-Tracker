@@ -427,6 +427,9 @@
     const ret = fd.retention || { usd: 0, npr: 0 };
     setKpi('f-ret-usd', ret.usd / 1e6, 2);
     setKpi('f-ret-npr', ret.npr / 1e6, 1);
+    // Combined retention held as a single USD-equivalent (NPR converted at 133.03).
+    const fRetEq = document.getElementById('f-ret-eq');
+    if (fRetEq) fRetEq.textContent = (ret.usd || ret.npr) ? `≈ $ ${((ret.usd + ret.npr / 133.03) / 1e6).toFixed(2)} M total` : '—';
 
     // Advance Payment amortisation — compact popover, one progress bar per
     // advance × currency. There are two amortisable advances:

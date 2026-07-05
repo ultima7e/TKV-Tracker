@@ -425,6 +425,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
           <div class="card kpi"><h3>Retention Held</h3>
             <div class="valm">$ <span id="f-ret-usd">—</span> M</div>
             <div class="valm">NPR <span id="f-ret-npr">—</span> M</div>
+            <div class="sub" id="f-ret-eq">—</div>
             <div class="sub">5% retention to date</div></div>
           <div class="card kpi adv-card" id="adv-toggle" title="Click for the advance amortisation breakdown"><h3>Advance Amortisation</h3><div class="val"><span id="adv-pct">—</span>%</div><div class="sub">recovered · click for detail ▸</div></div>
           <div class="card kpi"><h3>Financial Progress</h3><div class="val"><span id="f-prog">—</span>%</div><div class="sub">certified incl-VAT / contract</div></div>
@@ -940,6 +941,9 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const ret = fd.retention || { usd: 0, npr: 0 };
     setKpi('f-ret-usd', ret.usd / 1e6, 2);
     setKpi('f-ret-npr', ret.npr / 1e6, 1);
+    // Combined retention held as a single USD-equivalent (NPR converted at 133.03).
+    const fRetEq = document.getElementById('f-ret-eq');
+    if (fRetEq) fRetEq.textContent = (ret.usd || ret.npr) ? `≈ $ ${((ret.usd + ret.npr / 133.03) / 1e6).toFixed(2)} M total` : '—';
     const finEq = nprEquivalents(b, rc);
     document.getElementById('f-c-eq').textContent = finEq.contract;
     document.getElementById('f-r-eq').textContent = finEq.received;
