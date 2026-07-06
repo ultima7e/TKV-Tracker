@@ -1091,24 +1091,24 @@
   // Review PPT shown to the OE (Meeting No. 28, data date 26-Jun-2026). Embedded
   // as a fixed weekly snapshot (not part of the live feed).
   const WEEKLY = {
-    meeting: 'No. 28', dataDate: '26 Jun 2026',
-    overall: { plan: 71.14, actual: 20.71, varc: -50.43, wk: 0.26 },
+    meeting: 'No. 29', dataDate: '03 Jul 2026',
+    overall: { plan: 72.13, actual: 21.01, varc: -51.12, wk: 0.30 },
     tunnels: [
-      { name: 'HRT F-1', pct: 33.48, week: 20.76, plan: 30 },
-      { name: 'HRT F-2', pct: 4.79, week: 14.76, plan: 25 },
-      { name: 'HRT F-3', pct: 2.79, week: 0.00, plan: 25 },
-      { name: 'Adit #3', pct: 93.27, week: 30.35, plan: 21.84 },
-      { name: 'Adit #4', pct: 90.92, week: 15.45, plan: 17.50 },
-      { name: 'Access to Valve Chamber', pct: 41.06, week: 11.62, plan: 15 },
+      { name: 'HRT F-1', pct: 34.84, week: 20.90, plan: 30 },
+      { name: 'HRT F-2', pct: 7.20, week: 25.42, plan: 30 },
+      { name: 'HRT F-3', pct: 3.05, week: 3.19, plan: 18 },
+      { name: 'Adit #3', pct: 97.72, week: 26.59, plan: 21.84 },
+      { name: 'Adit #4', pct: 95.74, week: 19.65, plan: 15 },
+      { name: 'Access to Valve Chamber', pct: 46.34, week: 9.68, plan: 15 },
     ],
-    hse: { safeHrs: 2222781, safeHrsWk: 35805, recordable: 15, recordableWk: 1, lti: 1, nearMiss: 1, firstAid: 92, ch: 42, on: 85, ln: 341 },
+    hse: { safeHrs: 2266209, safeHrsWk: 43428, recordable: 15, recordableWk: 0, lti: 1, nearMiss: 1, firstAid: 92, ch: 42, on: 100, ln: 376, mpWk: 50 },
     explosives: [
-      { name: 'Explosives #32mm (kg)', week: 5316.1, stock: 111463.3 },
-      { name: 'Detonating Cord (m)', week: 1177, stock: 81401 },
-      { name: 'Electric Detonator (pcs)', week: 62, stock: 3717 },
-      { name: 'Non-Electric Detonator (pcs)', week: 6118, stock: 318560 },
+      { name: 'Explosives #32mm (kg)', week: 7239.7, stock: 103364.5 },
+      { name: 'Detonating Cord (m)', week: 2424.49, stock: 78724 },
+      { name: 'Electric Detonator (pcs)', week: 74, stock: 3634 },
+      { name: 'Non-Electric Detonator (pcs)', week: 6939, stock: 310702 },
     ],
-    qc: { ncrTotal: 27, ncrOpen: 9, ncrClosed: 16, ncrWk: 1, rfiTotal: 1709, rfiApproved: 1485, rfiRejected: 224, rfiWk: 36 },
+    qc: { ncrTotal: 29, ncrOpen: 11, ncrClosed: 16, ncrWk: 2, rfiTotal: 1749, rfiApproved: 1511, rfiRejected: 238, rfiWk: 40 },
   };
   function renderWeekly() {
     const el = document.getElementById('weekly');
@@ -1118,17 +1118,46 @@
     const sub = (t) => `<div class="ipc-sub" style="margin:0 0 6px">${t}</div>`;
     const tun = w.tunnels.map((t) => `<tr><td style="text-align:left">${t.name}</td><td>${t.pct}%</td><td>${t.week.toFixed(2)}</td><td class="muted">${t.plan}</td></tr>`).join('');
     const exp = w.explosives.map((e) => `<tr><td style="text-align:left">${e.name}</td><td>${n(e.week)}</td><td>${n(e.stock)}</td></tr>`).join('');
+    // HSE & safety — stat tiles (nicer than a table for these headline metrics).
+    const h = w.hse;
+    const mpTot = h.ch + h.on + h.ln;
+    const evTile = (val, label, color) => `<div style="background:#f4f7fb;border-radius:9px;padding:8px 4px;text-align:center">
+      <div style="font-size:16px;font-weight:800;color:${color};line-height:1">${val}</div>
+      <div style="font-size:8.5px;text-transform:uppercase;letter-spacing:.3px;color:#8595aa;font-weight:700;margin-top:3px">${label}</div></div>`;
+    const hseCard = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="background:linear-gradient(135deg,#edf7f1,#e2f1e9);border-radius:11px;padding:10px 12px">
+          <div style="font-size:19px;font-weight:800;color:#15764e;letter-spacing:-.5px;line-height:1">${n(h.safeHrs)}</div>
+          <div style="font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#5b7c6c;font-weight:700;margin-top:4px">Safe man-hours</div>
+          <div style="font-size:10.5px;color:#1c9c66;font-weight:700;margin-top:3px">▲ ${n(h.safeHrsWk)} this week</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#fbf3ee,#f7e9e0);border-radius:11px;padding:10px 12px">
+          <div style="font-size:19px;font-weight:800;color:#b5502a;letter-spacing:-.5px;line-height:1">${h.recordable}</div>
+          <div style="font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#9a6f5c;font-weight:700;margin-top:4px">Recordable incidents</div>
+          <div style="font-size:10.5px;color:#9a6f5c;font-weight:700;margin-top:3px">${h.recordableWk > 0 ? '+' + h.recordableWk + ' this week' : 'no change this week'}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px">
+        ${evTile(h.lti, 'LTI', h.lti > 0 ? '#c0392b' : '#1f3b66')}
+        ${evTile(h.nearMiss, 'Near miss', h.nearMiss > 0 ? '#b5802a' : '#1f3b66')}
+        ${evTile(h.firstAid, 'First aid', '#1f3b66')}
+      </div>
+      <div style="background:#eef2fb;border-radius:11px;padding:9px 13px;margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#7b8aa0;font-weight:700">Manpower on site</div>
+          <div style="font-size:11px;color:#51637e;font-weight:600;margin-top:3px">CH ${h.ch} · ON ${h.on} · LN ${h.ln}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:20px;font-weight:800;color:#1f3b66;letter-spacing:-.5px;line-height:1">${mpTot}</div>
+          <div style="font-size:10px;color:#1c9c66;font-weight:700;margin-top:2px">▲ +${h.mpWk} this week</div>
+        </div>
+      </div>`;
     el.innerHTML = `<div class="card" style="margin-bottom:16px">
       <h3>Weekly Progress <span class="muted" style="font-weight:600">· Meeting ${w.meeting} · data date ${w.dataDate}</span></h3>
       <div style="font-size:12.5px;color:#41506a;margin:2px 0 14px">Overall progress (cost-based): Plan <b>${w.overall.plan}%</b> · Actual <b>${w.overall.actual}%</b> · <b style="color:var(--red)">Variance ${w.overall.varc}%</b> · this week <b>+${w.overall.wk}%</b></div>
       <div class="grid" style="grid-template-columns:1fr 1fr;gap:14px 24px">
         <div>${sub('Tunnel excavation — active faces')}<table class="tbl"><thead><tr><th style="text-align:left">Workface</th><th>Excav&nbsp;%</th><th>This&nbsp;wk&nbsp;(m)</th><th>Plan</th></tr></thead><tbody>${tun}</tbody></table></div>
-        <div>${sub('HSE &amp; safety')}<table class="tbl"><tbody>
-          <tr><td style="text-align:left">Safe man-hours</td><td>${n(w.hse.safeHrs)}</td><td class="muted">+${n(w.hse.safeHrsWk)}</td></tr>
-          <tr><td style="text-align:left">Recordable incidents</td><td>${w.hse.recordable}</td><td class="muted">+${w.hse.recordableWk}</td></tr>
-          <tr><td style="text-align:left">LTI · Near&nbsp;miss · First&nbsp;aid</td><td colspan="2">${w.hse.lti} · ${w.hse.nearMiss} · ${w.hse.firstAid}</td></tr>
-          <tr><td style="text-align:left">Manpower (CH/ON/LN)</td><td colspan="2">${w.hse.ch} / ${w.hse.on} / ${w.hse.ln} = <b>${w.hse.ch + w.hse.on + w.hse.ln}</b></td></tr>
-        </tbody></table></div>
+        <div>${sub('HSE &amp; safety')}${hseCard}</div>
         <div>${sub('Explosives consumption')}<table class="tbl"><thead><tr><th style="text-align:left">Item</th><th>This&nbsp;wk</th><th>In&nbsp;stock</th></tr></thead><tbody>${exp}</tbody></table></div>
         <div>${sub('QC — NCR &amp; RFI')}<table class="tbl"><tbody>
           <tr><td style="text-align:left">NCR (total / open / closed)</td><td colspan="2">${w.qc.ncrTotal} / ${w.qc.ncrOpen} / ${w.qc.ncrClosed} <span class="muted">(+${w.qc.ncrWk} wk)</span></td></tr>
