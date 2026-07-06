@@ -826,29 +826,29 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   }
 
   // Interactive 3D tunnel areas — section progress + on-image hotspot coords
-  // (% of render), extracted from the 3D deck (Data Date 31-Oct-2025).
-  // Progress is embedded for now; it will later come from Excel.
+  // (% of render). Progress synced to the Weekly Technical Progress Review
+  // (Meeting No. 29 / PPT 45, data date 03-Jul-2026).
   const T3D_ASSET_BASE = 'https://tkv-tracker.vercel.app/assets/';
   const TUNNEL_AREAS = [
-    { id: 'headwork', label: 'Headwork & HRT', image: 'tunnel-headwork.png', dataDate: '31 Oct 2025', sections: [
+    { id: 'headwork', label: 'Headwork & HRT', image: 'tunnel-headwork.png', dataDate: '03 Jul 2026', sections: [
       { name: 'Adit #1', design: '167.77 m', excavated: '167.77 m', pct: 100, x: 58.4, y: 32.6 },
       { name: 'Connecting Tunnel', design: '93.85 m', excavated: '59.75 m', pct: 63.67, x: 45.8, y: 34.4 },
       { name: 'Construction Adit Tunnel', design: '21.60 m', excavated: '21.60 m', pct: 100, x: 43.3, y: 51.7 },
       { name: 'Headpond Layer 1~4', design: '11,959.47 m³', excavated: '11,959.47 m³', pct: 100, x: 25.1, y: 54.7 },
-      { name: 'Spillway Tunnel', design: '277.75 m', excavated: '160.13 m', pct: 57.65, x: 60.3, y: 67.1 },
-      { name: 'HRT-F1', design: '1,568.00 m', excavated: '150.85 m', pct: 9.62, x: 14.8, y: 66.8 },
+      { name: 'Spillway Tunnel', design: '291.00 m', excavated: '291.00 m', pct: 100, x: 60.3, y: 67.1 },
+      { name: 'HRT-F1', design: '1,535.57 m', excavated: '534.97 m', pct: 34.84, x: 14.8, y: 66.8 },
     ] },
-    { id: 'headrace', label: 'Headrace', image: 'tunnel-headrace.jpg', dataDate: '31 Oct 2025', sections: [
-      { name: 'Adit #4', design: '407.34 m', excavated: '234.98 m', pct: 57.69, x: 69.0, y: 60.8 },
-      { name: 'Access to Valve Chamber', design: '183.21 m', excavated: '0.00 m', pct: 0, x: 52.4, y: 46.5 },
+    { id: 'headrace', label: 'Headrace', image: 'tunnel-headrace.jpg', dataDate: '03 Jul 2026', sections: [
+      { name: 'Adit #4', design: '407.34 m', excavated: '390.00 m', pct: 95.74, x: 69.0, y: 60.8 },
+      { name: 'Access to Valve Chamber', design: '183.21 m', excavated: '84.90 m', pct: 46.34, x: 52.4, y: 46.5 },
       { name: 'Surge Chamber', design: '14,392.35 m³', pct: null, x: 35.6, y: 17.6 },
       { name: 'Valve Chamber', design: '14,518.80 m³', pct: null, x: 28.4, y: 21.8 },
       { name: 'Vertical Pressure Shaft', design: '114.44 m', pct: null, x: 22.0, y: 56.3 },
-      { name: 'Lower Bend Shaft', design: '28.72 m', excavated: '5.95 m', pct: 20.72, x: 21.9, y: 65.8 },
+      { name: 'Lower Bend Shaft', design: '28.72 m', excavated: '7.20 m', pct: 25.07, x: 21.9, y: 65.8 },
       { name: 'Upper Bend Shaft', design: '28.72 m', pct: null, x: 28.8, y: 36.5 },
-      { name: 'Headrace Tunnel', design: '8,110.28 m', pct: null, x: 61.5, y: 22.3 },
+      { name: 'Headrace Tunnel (F1~F7)', design: '8,110.28 m', excavated: '564.66 m', pct: 6.96, x: 61.5, y: 22.3 },
     ] },
-    { id: 'powerhouse', label: 'Powerhouse', image: 'tunnel-powerhouse.jpg', dataDate: '31 Oct 2025', sections: [
+    { id: 'powerhouse', label: 'Powerhouse', image: 'tunnel-powerhouse.jpg', dataDate: '03 Jul 2026', sections: [
       { name: 'Cable Ventilation Tunnel', design: '95.89 m', excavated: '95.89 m', pct: 100, x: 33.3, y: 74.7 },
       { name: 'Construction Tunnel', design: '57.92 m', excavated: '57.92 m', pct: 100, x: 53.0, y: 70.6 },
       { name: 'Main Access Tunnel', design: '285.63 m', excavated: '285.63 m', pct: 100, x: 66.7, y: 79.5 },
@@ -858,7 +858,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       { name: 'Access to TRC', design: '65.77 m', excavated: '65.77 m', pct: 100, x: 32.4, y: 66.4 },
       { name: 'TRC Layer-1~2', design: '12,360.00 m³', excavated: '12,360.00 m³', pct: 100, x: 28.8, y: 44.7 },
       { name: 'PHC Layer-1~6', design: '29,184.41 m³', excavated: '17,581.17 m³', pct: 60.24, x: 44.7, y: 33.1 },
-      { name: 'Tailrace Surge Tunnel', design: '383.77 m', pct: null, x: 17.6, y: 54.8 },
+      { name: 'Tailrace Tunnel', design: '602.50 m', excavated: '18.10 m', pct: 3.22, x: 17.6, y: 54.8 },
     ] },
   ];
   const t3dColor = (p) =>
