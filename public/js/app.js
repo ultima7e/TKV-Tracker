@@ -355,6 +355,40 @@
     const detail = document.getElementById('t3d-detail');
     if (!tabs || !img || !wrap || !legend || !detail) return;
     const pctTxt = (p) => (p == null ? '—' : p + '%');
+    // Calibration mode (?cal=1): drag the hotspot dots onto their tunnels, then
+    // "Copy coords" to get the updated x/y JSON to bake back into TUNNEL_AREAS.
+    const CAL = new URLSearchParams(location.search).get('cal') === '1' || location.hash.includes('cal');
+    const enableCal = (area) => {
+      const readout = () => {
+        detail.innerHTML =
+          '<div class="dn">Calibration — drag each dot onto its tunnel</div>' +
+          '<pre style="white-space:pre-wrap;font-size:10.5px;max-height:200px;overflow:auto;background:#eef2f7;padding:8px;border-radius:6px;margin:8px 0">' +
+          area.sections.map((s) => s.name + ' → x:' + s.x + ' y:' + s.y).join('\n') + '</pre>' +
+          '<button id="cal-copy" class="t3d-tab active" style="cursor:pointer">Copy coords JSON</button>';
+        const btn = document.getElementById('cal-copy');
+        if (btn) btn.onclick = () => {
+          navigator.clipboard.writeText(JSON.stringify(area.sections.map((s) => ({ name: s.name, x: s.x, y: s.y }))));
+          btn.textContent = 'Copied ✓';
+        };
+      };
+      wrap.querySelectorAll('.t3d-dot').forEach((d, i) => {
+        d.classList.remove('pulse');
+        d.style.cursor = 'grab';
+        d.addEventListener('mousedown', (e) => {
+          e.preventDefault(); e.stopPropagation();
+          const r = wrap.getBoundingClientRect();
+          const move = (ev) => {
+            const x = Math.min(100, Math.max(0, Math.round((ev.clientX - r.left) / r.width * 1000) / 10));
+            const y = Math.min(100, Math.max(0, Math.round((ev.clientY - r.top) / r.height * 1000) / 10));
+            area.sections[i].x = x; area.sections[i].y = y;
+            d.style.left = x + '%'; d.style.top = y + '%'; readout();
+          };
+          const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+          document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+        });
+      });
+      readout();
+    };
 
     const selectSection = (i) => {
       const s = t3dArea.sections[i];
@@ -383,9 +417,10 @@
         d.style.top = s.y + '%';
         d.style.background = t3dColor(s.pct);
         d.title = s.name + ' — ' + pctTxt(s.pct);
-        d.addEventListener('click', () => selectSection(i));
+        if (!CAL) d.addEventListener('click', () => selectSection(i));
         wrap.appendChild(d);
       });
+      if (CAL) enableCal(area);
       legend.innerHTML = area.sections.map((s, i) =>
         '<li data-i="' + i + '"><span class="ld" style="background:' + t3dColor(s.pct) + '"></span>' +
         '<span class="nm">' + s.name + '</span>' +
