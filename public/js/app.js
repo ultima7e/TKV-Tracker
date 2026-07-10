@@ -1145,7 +1145,8 @@
   const ddCat = (name) => DD_CATS.find((c) => c.test.test(name || '')) || { name: 'Other', color: '#7b8aa0' };
 
   function renderDelays() {
-    const sch = data.schedule || {};
+    // Delay & Disruption reads the TIA schedule (separate from the baseline).
+    const sch = data.delaySchedule || data.schedule || {};
     const wbs = sch.wbs || {};
     const winOf = (wbsId) => {
       let p = wbsId, g = 0;

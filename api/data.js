@@ -13,12 +13,15 @@ const { parseXer } = require('../lib/xer');
 const { currentUser } = require('../lib/auth');
 
 const DAV_BASE = 'https://dav.jianguoyun.com/dav/';
-const DEFAULT_XER_PATH = 'Shared Folder/Schedule/TKV-BL-A-2 (TIA-Bishan).xer';
+// Two P6 schedules: the Schedule tab shows the accepted BASELINE; the Delay &
+// Disruption tab shows the TIA (Time Impact Analysis) schedule with delay events.
+const DEFAULT_XER_PATH = 'Shared Folder/Schedule/Baseline Schedule/accepted baseline-Final/TKV-BL-A.xer';
+const DELAY_XER_PATH = 'Shared Folder/Schedule/TKV-BL-A-2 (TIA-Bishan).xer';
 const encPath = (p) => p.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
 
 // Module-level caches survive across requests on a warm serverless instance.
 const fileCache = new Map(); // path -> { mtime, buffer }
-let xerCache = null;         // { path, mtime, text }
+const xerCache = new Map();  // path -> { mtime, text }  (baseline + delay schedules)
 let payloadCache = null;     // { sig, payload, ts }
 // Within this window a refresh is served straight from memory without even
 // checking Nutstore. Kept short, and safe because Nutstore's own upload/sync
@@ -93,16 +96,17 @@ async function getBuffer(p, mtime, headers) {
 }
 
 async function getXer(p, mtime, headers) {
-  if (xerCache && xerCache.path === p && xerCache.mtime && xerCache.mtime === mtime) return xerCache.text;
+  const c = xerCache.get(p);
+  if (c && c.mtime && c.mtime === mtime) return c.text;
   const res = await fetch(DAV_BASE + encPath(p), { headers });
   if (!res.ok) return null;
   const text = Buffer.from(await res.arrayBuffer()).toString('latin1');
-  xerCache = { path: p, mtime, text };
+  xerCache.set(p, { mtime, text });
   return text;
 }
 
 // Parse buffers + XER into the API payload (no generatedAt — added fresh each send).
-function assemble(buffers, xerText, source) {
+function assemble(buffers, xerText, delayXerText, source) {
   const sheets = {}, matrices = {};
   for (const buffer of buffers) {
     const { rows, matrices: m } = workbookToBoth(buffer);
@@ -117,6 +121,9 @@ function assemble(buffers, xerText, source) {
   const ipc = parseIpc(matrices);
   const financeDetail = parseFinanceDetail(matrices);
   const schedule = xerText ? parseXer(xerText) : { activities: [], relationships: [], wbs: {}, warnings: [] };
+  // Delay/TIA schedule for the Delay & Disruption tab; falls back to the main
+  // schedule if a separate delay XER isn't available.
+  const delaySchedule = delayXerText ? parseXer(delayXerText) : schedule;
   return {
     source,
     // tunnel/KPI "sheet not found" warnings are expected (those legacy sample
@@ -134,6 +141,7 @@ function assemble(buffers, xerText, source) {
     ipc: { rows: ipc.rows, total: ipc.total },
     financeDetail,
     schedule: { activities: schedule.activities, relationships: schedule.relationships, wbs: schedule.wbs },
+    delaySchedule: { activities: delaySchedule.activities, relationships: delaySchedule.relationships, wbs: delaySchedule.wbs },
   };
 }
 
@@ -149,11 +157,13 @@ async function buildPayload() {
     const first = process.env.NUTSTORE_FILE_PATH.split(';')[0].trim().replace(/^\/+/, '');
     const dir = first.includes('/') ? first.slice(0, first.lastIndexOf('/')) : '';
     const xerPath = process.env.NUTSTORE_XER_PATH || DEFAULT_XER_PATH;
+    const delayXerPath = process.env.NUTSTORE_DELAY_XER_PATH || DELAY_XER_PATH;
 
-    // Nutstore folder PROPFIND + XER PROPFIND + Dropbox conditional fetches, all parallel.
-    const [listing, xerInfo, dbx] = await Promise.all([
+    // Nutstore folder PROPFIND + both XER PROPFINDs + Dropbox fetches, all parallel.
+    const [listing, xerInfo, delayXerInfo, dbx] = await Promise.all([
       propfind(DAV_BASE + encPath(dir) + '/', headers, 1),
       propfind(DAV_BASE + encPath(xerPath), headers, 0),
+      propfind(DAV_BASE + encPath(delayXerPath), headers, 0),
       fetchDropbox(),
     ]);
     let entries = listing.filter((e) => /\.xlsx$/i.test(e.path) && !/\/~\$/.test(e.path));
@@ -162,10 +172,12 @@ async function buildPayload() {
     entries = entries.filter((e) => !DBX_NAMEKEYS.has(normName(e.path.split('/').pop())));
     entries.sort((a, b) => a.path.localeCompare(b.path));
     const xerMtime = (xerInfo[0] && xerInfo[0].mtime) || '';
+    const delayXerMtime = (delayXerInfo[0] && delayXerInfo[0].mtime) || '';
 
     const sig = JSON.stringify({
       wb: entries.map((e) => e.path + '|' + e.mtime),
       xer: xerPath + '|' + xerMtime,
+      dxer: delayXerPath + '|' + delayXerMtime,
       dbx: dbx.map((d) => d.name + '|' + d.etag),
     });
     if (payloadCache && payloadCache.sig === sig) { // nothing changed — reuse parsed payload
@@ -173,12 +185,13 @@ async function buildPayload() {
       return stamp(payloadCache.payload);
     }
 
-    const [nutBuffers, xerText] = await Promise.all([
+    const [nutBuffers, xerText, delayXerText] = await Promise.all([
       Promise.all(entries.map((e) => getBuffer(e.path, e.mtime, headers))),
       getXer(xerPath, xerMtime, headers),
+      getXer(delayXerPath, delayXerMtime, headers),
     ]);
     const buffers = [...nutBuffers, ...dbx.filter((d) => d.buffer).map((d) => d.buffer)];
-    const payload = assemble(buffers, xerText, 'nutstore');
+    const payload = assemble(buffers, xerText, delayXerText, 'nutstore');
     payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
     payloadCache = { sig, payload, ts: Date.now() };
     return stamp(payload);
@@ -196,9 +209,11 @@ async function buildPayload() {
   const localBuffers = files.filter((f) => f.endsWith('.xlsx') && !DBX_NAMEKEYS.has(normName(f)))
     .map((f) => fs.readFileSync(path.join(dir, f)));
   const buffers = [...localBuffers, ...dbx.filter((d) => d.buffer).map((d) => d.buffer)];
-  const xf = files.find((f) => f.endsWith('.xer'));
-  const xerText = xf ? fs.readFileSync(path.join(dir, xf), 'latin1') : null;
-  const payload = assemble(buffers, xerText, 'local-file');
+  const xerFiles = files.filter((f) => f.endsWith('.xer'));
+  const baselineXf = xerFiles.find((f) => /baseline|TKV-BL-A\.xer/i.test(f)) || xerFiles[0];
+  const delayXf = xerFiles.find((f) => /tia|delay|BL-A-2/i.test(f)) || baselineXf;
+  const readXer = (f) => (f ? fs.readFileSync(path.join(dir, f), 'latin1') : null);
+  const payload = assemble(buffers, readXer(baselineXf), readXer(delayXf), 'local-file');
   payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
   payloadCache = { sig, payload, ts: Date.now() };
   return stamp(payload);
