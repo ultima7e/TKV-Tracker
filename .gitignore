@@ -21,3 +21,6 @@ _acad_log.txt
 
 # P6 schedule source files (the parsed data is served from Nutstore)
 *.xer
+
+# Local dev user store (production uses Vercel KV / Upstash)
+data/.users.json

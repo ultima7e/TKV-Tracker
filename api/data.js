@@ -10,6 +10,7 @@ const path = require('path');
 const { workbookToBoth } = require('../lib/workbook');
 const { parseTunnel, parseKpis, parseSCurve, parseFinance, parseManpower, parseIpc, parseFinanceDetail } = require('../lib/parsers');
 const { parseXer } = require('../lib/xer');
+const { currentUser } = require('../lib/auth');
 
 const DAV_BASE = 'https://dav.jianguoyun.com/dav/';
 const DEFAULT_XER_PATH = 'Shared Folder/Schedule/TKV-BL-A-2 (TIA-Bishan).xer';
@@ -207,7 +208,11 @@ module.exports = async (req, res) => {
   // Allow the standalone TamakoshiTracker.html (opened from disk) to call this.
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
+  // The dashboard data is private — a valid session is required.
+  const me = await currentUser(req);
+  if (!me) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const payload = await buildPayload();
     res.setHeader('Cache-Control', 'no-store');
