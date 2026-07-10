@@ -349,7 +349,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .login-card{width:340px;max-width:92vw;background:#fff;border-radius:16px;padding:28px 26px 24px;
   box-shadow:0 24px 60px rgba(0,0,0,.35)}
 .login-card .lg{display:flex;justify-content:center;margin-bottom:14px}
-.login-card .lg img{height:46px}
+.login-card .lg img{height:62px}
 .login-card h2{font-size:17px;color:var(--navy);text-align:center;margin-bottom:2px}
 .login-card p.sub{font-size:12px;color:var(--muted);text-align:center;margin-bottom:18px}
 .login-card label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
