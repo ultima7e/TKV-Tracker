@@ -314,10 +314,57 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   #today{display:none}
   .topbar h1{font-size:11px}
 }
+#login-screen{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;
+  background:linear-gradient(150deg,var(--navy),var(--navy-2) 60%,#0a1f38)}
+.login-card{width:340px;max-width:92vw;background:#fff;border-radius:16px;padding:28px 26px 24px;box-shadow:0 24px 60px rgba(0,0,0,.35)}
+.login-card .lg{display:flex;justify-content:center;margin-bottom:14px}
+.login-card .lg img{height:46px}
+.login-card h2{font-size:17px;color:var(--navy);text-align:center;margin-bottom:2px}
+.login-card p.sub{font-size:12px;color:var(--muted);text-align:center;margin-bottom:18px}
+.login-card label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:0 0 5px 2px}
+.login-card input{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:9px;font-size:14px;margin-bottom:14px;background:#f8fbff;color:var(--ink)}
+.login-card input:focus{outline:none;border-color:var(--accent);background:#fff}
+.login-card button{width:100%;padding:12px;border:none;border-radius:9px;cursor:pointer;font-size:14px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--accent),#2563c9)}
+.login-card button:hover{filter:brightness(1.05)}
+.login-card button:disabled{opacity:.6;cursor:default}
+.login-err{color:var(--accent-2);font-size:12.5px;font-weight:600;text-align:center;min-height:18px;margin-top:10px}
+.nav-foot .who{color:#e7eefb;font-weight:700}
+.nav-foot .logout{margin-top:8px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:#aebfd8;font-weight:700;background:none;border:none;padding:0;font-size:12px}
+.nav-foot .logout:hover{color:#fff}
+.denied-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:60vh;color:var(--muted)}
+.denied-wrap .lock{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;background:#fdeaea;color:var(--accent-2);margin-bottom:16px}
+.denied-wrap h2{color:var(--navy);font-size:20px;margin-bottom:6px}
+.denied-wrap p{font-size:13px;max-width:360px}
+.admin-grid{display:grid;grid-template-columns:1fr 1.3fr;gap:16px;align-items:start}
+.adm-field{margin-bottom:12px}
+.adm-field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:0 0 5px 2px}
+.adm-field input[type=text],.adm-field input[type=password]{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#f8fbff}
+.adm-field input:focus{outline:none;border-color:var(--accent);background:#fff}
+.adm-secs{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px}
+.adm-secs label{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--ink);text-transform:none;letter-spacing:0;cursor:pointer}
+.adm-secs input{width:auto}
+.adm-btn{padding:10px 16px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--accent),#2563c9)}
+.adm-btn.ghost{background:#eef2f7;color:var(--navy)}
+.adm-btn.danger{background:#fdeaea;color:var(--accent-2)}
+.adm-msg{font-size:12.5px;font-weight:600;margin-top:10px;min-height:16px}
+.adm-users td .chip{margin:1px 2px}
 </style>
 </head>
 <body>
-<div class="app">
+<div id="login-screen">
+  <form class="login-card" id="login-form" autocomplete="on">
+    <div class="lg"><img src="https://tkv-tracker.vercel.app/assets/sinohydro.png" alt="Sinohydro"></div>
+    <h2>Tamakoshi-V Project Tracker</h2>
+    <p class="sub">Please sign in to continue</p>
+    <label for="login-user">Username</label>
+    <input id="login-user" name="username" type="text" autocomplete="username" required>
+    <label for="login-pass">Password</label>
+    <input id="login-pass" name="password" type="password" autocomplete="current-password" required>
+    <button type="submit" id="login-btn">Sign in</button>
+    <div class="login-err" id="login-err"></div>
+  </form>
+</div>
+<div class="app" style="display:none">
   <aside class="sidebar">
     <div class="brand"><img class="brand-logo" src="https://tkv-tracker.vercel.app/assets/sinohydro.png" alt="Sinohydro"></div>
     <nav class="nav" id="nav">
@@ -330,9 +377,13 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       <div class="nav-item" data-v="man"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0"/><path d="M16 5.2a3 3 0 0 1 0 5.6"/><path d="M18.5 19.5a5.5 5.5 0 0 0-2.8-4.8"/></svg></span>Manpower</div>
       <div class="nav-item" data-v="equip"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2.1 2.1M16.9 16.9 19 19M19 5l-2.1 2.1M7.1 16.9 5 19"/></svg></span>Equipment</div>
       <div class="nav-item" data-v="safety"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 20 6v6c0 5-3.5 7.8-8 9-4.5-1.2-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></span>Safety</div>
+      <div class="nav-item" data-v="admin" id="nav-admin" style="display:none"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/><path d="M18.5 4.5l1.2 1.2M20.5 8h-1.7"/></svg></span>Admin</div>
     </nav>
-    <div class="nav-foot">Data source: <span id="data-source">—</span><br>
-      <span class="last-refresh" id="last-refresh">Not loaded yet</span></div>
+    <div class="nav-foot">
+      <div>Signed in as <span class="who" id="who">—</span></div>
+      <button class="logout" id="logout" type="button"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Log out</button>
+      <div style="margin-top:8px">Data source: <span id="data-source">—</span><br>
+        <span class="last-refresh" id="last-refresh">Not loaded yet</span></div></div>
   </aside>
   <div class="main">
     <header class="topbar">
@@ -512,6 +563,30 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       </section>
       <section class="view" id="equip"><div class="card"><h3>Equipment</h3><p class="muted">Awaiting equipment data sheet (Phase 2).</p></div></section>
       <section class="view" id="safety"><div class="card"><h3>Safety</h3><p class="muted">Awaiting safety data sheet (Phase 2).</p></div></section>
+      <section class="view" id="denied"><div class="card"><div class="denied-wrap">
+        <div class="lock"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+        <h2>Permission not granted</h2>
+        <p>You don't have access to this section. Contact the project admin if you need it.</p>
+      </div></div></section>
+      <section class="view" id="admin"><div class="card">
+        <h3>User Management <span class="muted" style="font-weight:600">· create accounts &amp; control access</span></h3>
+        <div class="admin-grid">
+          <div>
+            <div class="ipc-sub" style="margin:2px 0 10px">Add / edit user</div>
+            <div class="adm-field"><label>Username</label><input id="adm-user" type="text" placeholder="e.g. ram.thapa"></div>
+            <div class="adm-field"><label>Password <span style="text-transform:none;font-weight:600">(leave blank to keep unchanged when editing)</span></label><input id="adm-pass" type="password" placeholder="Set a password"></div>
+            <div class="adm-field"><label>Sections this user can view</label><div class="adm-secs" id="adm-secs"></div></div>
+            <div class="adm-field"><label class="adm-secs" style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;color:var(--ink);font-size:12.5px"><input id="adm-isadmin" type="checkbox"> Administrator (full access + user management)</label></div>
+            <button class="adm-btn" id="adm-save">Save user</button>
+            <button class="adm-btn ghost" id="adm-clear" type="button" style="margin-left:6px">Clear</button>
+            <div class="adm-msg" id="adm-msg"></div>
+          </div>
+          <div>
+            <div class="ipc-sub" style="margin:2px 0 10px">Users</div>
+            <div id="adm-list"><p class="muted">Loading…</p></div>
+          </div>
+        </div>
+      </div></section>
     </div>
   </div>
 </div>
@@ -521,6 +596,133 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   const charts = {};
   let data = null;
   let advDocWired = false; // click-away handler for the advance-amortisation popover
+
+  // ---------- auth / access control ----------
+  const API_BASE = 'https://tkv-tracker.vercel.app'; // this standalone file calls the hosted API
+  let me = null; // { username, isAdmin, sections }
+  const TOKEN_KEY = 'tkv_token';
+  const SECTION_LABELS = { exec: 'Executive Summary', fin: 'Financial', sched: 'Schedule & Progress',
+    tunnel: 'Tunnel', claims: 'Claims & Variations', inv: 'Inventory & Explosives', man: 'Manpower',
+    equip: 'Equipment', safety: 'Safety' };
+  const ALL_SECTIONS = Object.keys(SECTION_LABELS);
+  // Cross-origin from a local file: use a Bearer token (cookies won't apply).
+  function authFetch(url, opts = {}) {
+    const t = localStorage.getItem(TOKEN_KEY);
+    const headers = Object.assign({}, opts.headers);
+    if (t) headers.Authorization = 'Bearer ' + t;
+    return fetch(API_BASE + url, Object.assign({}, opts, { headers }));
+  }
+  const canSee = (v) => !!me && (me.isAdmin || (me.sections || []).includes(v));
+
+  async function checkAuth() {
+    try { const r = await authFetch('/api/me'); if (r.ok) { me = await r.json(); return true; } } catch (e) { /* offline */ }
+    me = null; return false;
+  }
+  function showLogin(msg) {
+    const ls = document.getElementById('login-screen');
+    if (ls) ls.style.display = 'flex';
+    const app = document.querySelector('.app'); if (app) app.style.display = 'none';
+    if (msg) { const e = document.getElementById('login-err'); if (e) e.textContent = msg; }
+  }
+  function wireAuthUI() {
+    const form = document.getElementById('login-form');
+    if (form) form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const btn = document.getElementById('login-btn'), err = document.getElementById('login-err');
+      err.textContent = ''; btn.disabled = true; btn.textContent = 'Signing in…';
+      try {
+        const r = await authFetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: document.getElementById('login-user').value.trim(), password: document.getElementById('login-pass').value }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || 'Login failed');
+        if (j.token) localStorage.setItem(TOKEN_KEY, j.token);
+        me = { username: j.username, isAdmin: j.isAdmin, sections: j.sections };
+        startApp();
+      } catch (ex) { err.textContent = ex.message; }
+      finally { btn.disabled = false; btn.textContent = 'Sign in'; }
+    });
+    const lo = document.getElementById('logout');
+    if (lo) lo.addEventListener('click', async () => {
+      try { await authFetch('/api/logout', { method: 'POST' }); } catch (e) { /* ignore */ }
+      localStorage.removeItem(TOKEN_KEY); location.reload();
+    });
+  }
+  function startApp() {
+    const ls = document.getElementById('login-screen'); if (ls) ls.style.display = 'none';
+    const app = document.querySelector('.app'); if (app) app.style.display = '';
+    const who = document.getElementById('who'); if (who) who.textContent = me.username + (me.isAdmin ? ' · admin' : '');
+    const na = document.getElementById('nav-admin'); if (na) na.style.display = me.isAdmin ? '' : 'none';
+    const first = me.isAdmin ? 'exec' : (me.sections || [])[0];
+    document.querySelectorAll('.nav-item').forEach((n) => n.classList.remove('active'));
+    document.querySelectorAll('.view').forEach((s) => s.classList.remove('active'));
+    if (first) {
+      const nEl = document.querySelector('.nav-item[data-v="' + first + '"]'); if (nEl) nEl.classList.add('active');
+      const vEl = document.getElementById(first); if (vEl) vEl.classList.add('active');
+    } else {
+      document.getElementById('denied').classList.add('active');
+    }
+    renderTunnel3D();
+    load();
+  }
+  async function renderAdmin() {
+    const secBox = document.getElementById('adm-secs');
+    const msg = document.getElementById('adm-msg');
+    const listEl = document.getElementById('adm-list');
+    if (secBox && !secBox.children.length) {
+      secBox.innerHTML = ALL_SECTIONS.map((s) => '<label><input type="checkbox" value="' + s + '"> ' + SECTION_LABELS[s] + '</label>').join('');
+    }
+    const clearForm = () => {
+      document.getElementById('adm-user').value = ''; document.getElementById('adm-pass').value = '';
+      document.getElementById('adm-isadmin').checked = false;
+      secBox.querySelectorAll('input').forEach((c) => { c.checked = false; });
+      if (msg) msg.textContent = '';
+    };
+    const refresh = async () => {
+      const r = await authFetch('/api/users');
+      if (!r.ok) { listEl.innerHTML = '<p class="muted">Could not load users.</p>'; return; }
+      const { users } = await r.json();
+      listEl.innerHTML = '<table class="tbl adm-users"><thead><tr><th style="text-align:left">Username</th><th style="text-align:left">Access</th><th></th></tr></thead><tbody>' +
+        users.map((u) => '<tr><td style="text-align:left"><b>' + u.username + '</b></td><td style="text-align:left">' +
+          (u.isAdmin ? '<span class="chip" style="background:#e4f5ee;color:#1c7a52">All · admin</span>'
+            : (u.sections.length ? u.sections.map((s) => '<span class="chip">' + (SECTION_LABELS[s] || s) + '</span>').join(' ') : '<span class="muted">none</span>')) +
+          '</td><td style="white-space:nowrap;text-align:right"><button class="adm-btn ghost adm-edit" data-u="' + u.username + '" style="padding:5px 10px">Edit</button> ' +
+          '<button class="adm-btn danger adm-del" data-u="' + u.username + '" style="padding:5px 10px">Delete</button></td></tr>').join('') +
+        '</tbody></table>';
+      listEl.querySelectorAll('.adm-edit').forEach((b) => { b.onclick = () => {
+        const u = users.find((x) => x.username === b.dataset.u);
+        document.getElementById('adm-user').value = u.username; document.getElementById('adm-pass').value = '';
+        document.getElementById('adm-isadmin').checked = u.isAdmin;
+        secBox.querySelectorAll('input').forEach((c) => { c.checked = u.sections.includes(c.value); });
+        if (msg) { msg.textContent = 'Editing ' + u.username + ' — leave password blank to keep it.'; msg.style.color = 'var(--muted)'; }
+      }; });
+      listEl.querySelectorAll('.adm-del').forEach((b) => { b.onclick = async () => {
+        if (!confirm('Delete user "' + b.dataset.u + '"?')) return;
+        const rr = await authFetch('/api/users?u=' + encodeURIComponent(b.dataset.u), { method: 'DELETE' });
+        const jj = await rr.json().catch(() => ({}));
+        if (!rr.ok) { msg.textContent = jj.error || 'Delete failed'; msg.style.color = 'var(--accent-2)'; return; }
+        refresh();
+      }; });
+    };
+    const saveBtn = document.getElementById('adm-save');
+    if (saveBtn && !saveBtn.dataset.wired) {
+      saveBtn.dataset.wired = '1';
+      saveBtn.onclick = async () => {
+        const username = document.getElementById('adm-user').value.trim();
+        const password = document.getElementById('adm-pass').value;
+        const isAdmin = document.getElementById('adm-isadmin').checked;
+        const sections = [...secBox.querySelectorAll('input:checked')].map((c) => c.value);
+        if (msg) msg.textContent = '';
+        const r = await authFetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, sections, isAdmin }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { msg.textContent = j.error || 'Save failed'; msg.style.color = 'var(--accent-2)'; return; }
+        msg.textContent = 'Saved ✓'; msg.style.color = 'var(--green)';
+        clearForm(); refresh();
+      };
+      document.getElementById('adm-clear').onclick = clearForm;
+    }
+    refresh();
+  }
 
   const $ = (sel) => document.querySelector(sel);
   const COL = { accent: '#2f7de1', accent2: '#e23744', muted: '#7b8aa0', grid: '#eef2f7' };
@@ -1795,7 +1997,8 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const btn = $('#refresh');
     btn.classList.add('spin');
     try {
-      const res = await fetch('https://tkv-tracker.vercel.app/api/data');
+      const res = await authFetch('/api/data');
+      if (res.status === 401) { showLogin('Your session has expired — please sign in again.'); return; }
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
       data = json;
@@ -1816,10 +2019,18 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   document.getElementById('nav').addEventListener('click', (e) => {
     const item = e.target.closest('.nav-item');
     if (!item) return;
+    const v = item.dataset.v;
     document.querySelectorAll('.nav-item').forEach((n) => n.classList.remove('active'));
     item.classList.add('active');
     document.querySelectorAll('.view').forEach((s) => s.classList.remove('active'));
-    document.getElementById(item.dataset.v).classList.add('active');
+    if (v === 'admin') {
+      if (!me || !me.isAdmin) { document.getElementById('denied').classList.add('active'); return; }
+      document.getElementById('admin').classList.add('active');
+      renderAdmin();
+      return;
+    }
+    if (!canSee(v)) { document.getElementById('denied').classList.add('active'); return; }
+    document.getElementById(v).classList.add('active');
     if (data) renderAll();
     setTimeout(() => Object.values(charts).forEach((c) => c.resize()), 60);
   });
@@ -1834,8 +2045,6 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   $('#today').textContent = new Date().toLocaleDateString('en-GB',
     { day: '2-digit', month: 'short', year: 'numeric' });
 
-  renderTunnel3D(); // embedded data — independent of the API fetch
-
   const xerInput = document.getElementById('sch-upload');
   if (xerInput) xerInput.addEventListener('change', (e) => {
     const f = e.target.files[0];
@@ -1843,7 +2052,12 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     e.target.value = '';
   });
 
-  load();
+  // ---------- boot: gate the whole app behind login ----------
+  wireAuthUI();
+  (async () => {
+    if (await checkAuth()) startApp(); // renderTunnel3D + load() run inside startApp
+    else showLogin();
+  })();
 })();
 </script>
 </body>

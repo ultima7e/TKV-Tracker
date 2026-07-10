@@ -342,3 +342,51 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   #today{display:none}
   .topbar h1{font-size:11px}
 }
+
+/* ===== Auth: login screen, admin panel, permission-denied ===== */
+#login-screen{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;
+  background:linear-gradient(150deg,var(--navy),var(--navy-2) 60%,#0a1f38)}
+.login-card{width:340px;max-width:92vw;background:#fff;border-radius:16px;padding:28px 26px 24px;
+  box-shadow:0 24px 60px rgba(0,0,0,.35)}
+.login-card .lg{display:flex;justify-content:center;margin-bottom:14px}
+.login-card .lg img{height:46px}
+.login-card h2{font-size:17px;color:var(--navy);text-align:center;margin-bottom:2px}
+.login-card p.sub{font-size:12px;color:var(--muted);text-align:center;margin-bottom:18px}
+.login-card label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+  color:var(--muted);margin:0 0 5px 2px}
+.login-card input{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:9px;font-size:14px;
+  margin-bottom:14px;background:#f8fbff;color:var(--ink)}
+.login-card input:focus{outline:none;border-color:var(--accent);background:#fff}
+.login-card button{width:100%;padding:12px;border:none;border-radius:9px;cursor:pointer;font-size:14px;font-weight:700;
+  color:#fff;background:linear-gradient(135deg,var(--accent),#2563c9)}
+.login-card button:hover{filter:brightness(1.05)}
+.login-card button:disabled{opacity:.6;cursor:default}
+.login-err{color:var(--accent-2);font-size:12.5px;font-weight:600;text-align:center;min-height:18px;margin-top:10px}
+
+.nav-foot .who{color:#e7eefb;font-weight:700}
+.nav-foot .logout{margin-top:8px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;
+  color:#aebfd8;font-weight:700;background:none;border:none;padding:0;font-size:12px}
+.nav-foot .logout:hover{color:#fff}
+
+/* Permission denied */
+.denied-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+  min-height:60vh;color:var(--muted)}
+.denied-wrap .lock{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;
+  background:#fdeaea;color:var(--accent-2);margin-bottom:16px}
+.denied-wrap h2{color:var(--navy);font-size:20px;margin-bottom:6px}
+.denied-wrap p{font-size:13px;max-width:360px}
+
+/* Admin panel */
+.admin-grid{display:grid;grid-template-columns:1fr 1.3fr;gap:16px;align-items:start}
+.adm-field{margin-bottom:12px}
+.adm-field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:0 0 5px 2px}
+.adm-field input[type=text],.adm-field input[type=password]{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#f8fbff}
+.adm-field input:focus{outline:none;border-color:var(--accent);background:#fff}
+.adm-secs{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px}
+.adm-secs label{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--ink);text-transform:none;letter-spacing:0;cursor:pointer}
+.adm-secs input{width:auto}
+.adm-btn{padding:10px 16px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--accent),#2563c9)}
+.adm-btn.ghost{background:#eef2f7;color:var(--navy)}
+.adm-btn.danger{background:#fdeaea;color:var(--accent-2)}
+.adm-msg{font-size:12.5px;font-weight:600;margin-top:10px;min-height:16px}
+.adm-users td .chip{margin:1px 2px}

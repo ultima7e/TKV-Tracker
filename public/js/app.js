@@ -3,6 +3,134 @@
   let data = null;
   let advDocWired = false; // click-away handler for the advance-amortisation popover
 
+  // ---------- auth / access control ----------
+  const API_BASE = ''; // same-origin on the hosted site (standalone overrides this)
+  let me = null; // { username, isAdmin, sections }
+  const TOKEN_KEY = 'tkv_token';
+  const SECTION_LABELS = { exec: 'Executive Summary', fin: 'Financial', sched: 'Schedule & Progress',
+    tunnel: 'Tunnel', claims: 'Claims & Variations', inv: 'Inventory & Explosives', man: 'Manpower',
+    equip: 'Equipment', safety: 'Safety' };
+  const ALL_SECTIONS = Object.keys(SECTION_LABELS);
+  // Same-origin (hosted) uses the session cookie; the standalone file adds a Bearer token.
+  function authFetch(url, opts = {}) {
+    const t = localStorage.getItem(TOKEN_KEY);
+    const headers = Object.assign({}, opts.headers);
+    if (t) headers.Authorization = 'Bearer ' + t;
+    return fetch(API_BASE + url, Object.assign({}, opts, { headers }));
+  }
+  const canSee = (v) => !!me && (me.isAdmin || (me.sections || []).includes(v));
+
+  async function checkAuth() {
+    try { const r = await authFetch('/api/me'); if (r.ok) { me = await r.json(); return true; } } catch (e) { /* offline */ }
+    me = null; return false;
+  }
+  function showLogin(msg) {
+    const ls = document.getElementById('login-screen');
+    if (ls) ls.style.display = 'flex';
+    const app = document.querySelector('.app'); if (app) app.style.display = 'none';
+    if (msg) { const e = document.getElementById('login-err'); if (e) e.textContent = msg; }
+  }
+  function wireAuthUI() {
+    const form = document.getElementById('login-form');
+    if (form) form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const btn = document.getElementById('login-btn'), err = document.getElementById('login-err');
+      err.textContent = ''; btn.disabled = true; btn.textContent = 'Signing in…';
+      try {
+        const r = await authFetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: document.getElementById('login-user').value.trim(), password: document.getElementById('login-pass').value }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || 'Login failed');
+        if (j.token) localStorage.setItem(TOKEN_KEY, j.token);
+        me = { username: j.username, isAdmin: j.isAdmin, sections: j.sections };
+        startApp();
+      } catch (ex) { err.textContent = ex.message; }
+      finally { btn.disabled = false; btn.textContent = 'Sign in'; }
+    });
+    const lo = document.getElementById('logout');
+    if (lo) lo.addEventListener('click', async () => {
+      try { await authFetch('/api/logout', { method: 'POST' }); } catch (e) { /* ignore */ }
+      localStorage.removeItem(TOKEN_KEY); location.reload();
+    });
+  }
+  function startApp() {
+    const ls = document.getElementById('login-screen'); if (ls) ls.style.display = 'none';
+    const app = document.querySelector('.app'); if (app) app.style.display = '';
+    const who = document.getElementById('who'); if (who) who.textContent = me.username + (me.isAdmin ? ' · admin' : '');
+    const na = document.getElementById('nav-admin'); if (na) na.style.display = me.isAdmin ? '' : 'none';
+    // Land on the first section this account may see.
+    const first = me.isAdmin ? 'exec' : (me.sections || [])[0];
+    document.querySelectorAll('.nav-item').forEach((n) => n.classList.remove('active'));
+    document.querySelectorAll('.view').forEach((s) => s.classList.remove('active'));
+    if (first) {
+      const nEl = document.querySelector('.nav-item[data-v="' + first + '"]'); if (nEl) nEl.classList.add('active');
+      const vEl = document.getElementById(first); if (vEl) vEl.classList.add('active');
+    } else {
+      document.getElementById('denied').classList.add('active');
+    }
+    renderTunnel3D();
+    load();
+  }
+  async function renderAdmin() {
+    const secBox = document.getElementById('adm-secs');
+    const msg = document.getElementById('adm-msg');
+    const listEl = document.getElementById('adm-list');
+    if (secBox && !secBox.children.length) {
+      secBox.innerHTML = ALL_SECTIONS.map((s) => '<label><input type="checkbox" value="' + s + '"> ' + SECTION_LABELS[s] + '</label>').join('');
+    }
+    const clearForm = () => {
+      document.getElementById('adm-user').value = ''; document.getElementById('adm-pass').value = '';
+      document.getElementById('adm-isadmin').checked = false;
+      secBox.querySelectorAll('input').forEach((c) => { c.checked = false; });
+      if (msg) msg.textContent = '';
+    };
+    const refresh = async () => {
+      const r = await authFetch('/api/users');
+      if (!r.ok) { listEl.innerHTML = '<p class="muted">Could not load users.</p>'; return; }
+      const { users } = await r.json();
+      listEl.innerHTML = '<table class="tbl adm-users"><thead><tr><th style="text-align:left">Username</th><th style="text-align:left">Access</th><th></th></tr></thead><tbody>' +
+        users.map((u) => '<tr><td style="text-align:left"><b>' + u.username + '</b></td><td style="text-align:left">' +
+          (u.isAdmin ? '<span class="chip" style="background:#e4f5ee;color:#1c7a52">All · admin</span>'
+            : (u.sections.length ? u.sections.map((s) => '<span class="chip">' + (SECTION_LABELS[s] || s) + '</span>').join(' ') : '<span class="muted">none</span>')) +
+          '</td><td style="white-space:nowrap;text-align:right"><button class="adm-btn ghost adm-edit" data-u="' + u.username + '" style="padding:5px 10px">Edit</button> ' +
+          '<button class="adm-btn danger adm-del" data-u="' + u.username + '" style="padding:5px 10px">Delete</button></td></tr>').join('') +
+        '</tbody></table>';
+      listEl.querySelectorAll('.adm-edit').forEach((b) => { b.onclick = () => {
+        const u = users.find((x) => x.username === b.dataset.u);
+        document.getElementById('adm-user').value = u.username; document.getElementById('adm-pass').value = '';
+        document.getElementById('adm-isadmin').checked = u.isAdmin;
+        secBox.querySelectorAll('input').forEach((c) => { c.checked = u.sections.includes(c.value); });
+        if (msg) { msg.textContent = 'Editing ' + u.username + ' — leave password blank to keep it.'; msg.style.color = 'var(--muted)'; }
+      }; });
+      listEl.querySelectorAll('.adm-del').forEach((b) => { b.onclick = async () => {
+        if (!confirm('Delete user "' + b.dataset.u + '"?')) return;
+        const rr = await authFetch('/api/users?u=' + encodeURIComponent(b.dataset.u), { method: 'DELETE' });
+        const jj = await rr.json().catch(() => ({}));
+        if (!rr.ok) { msg.textContent = jj.error || 'Delete failed'; msg.style.color = 'var(--accent-2)'; return; }
+        refresh();
+      }; });
+    };
+    const saveBtn = document.getElementById('adm-save');
+    if (saveBtn && !saveBtn.dataset.wired) {
+      saveBtn.dataset.wired = '1';
+      saveBtn.onclick = async () => {
+        const username = document.getElementById('adm-user').value.trim();
+        const password = document.getElementById('adm-pass').value;
+        const isAdmin = document.getElementById('adm-isadmin').checked;
+        const sections = [...secBox.querySelectorAll('input:checked')].map((c) => c.value);
+        if (msg) msg.textContent = '';
+        const r = await authFetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, sections, isAdmin }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { msg.textContent = j.error || 'Save failed'; msg.style.color = 'var(--accent-2)'; return; }
+        msg.textContent = 'Saved ✓'; msg.style.color = 'var(--green)';
+        clearForm(); refresh();
+      };
+      document.getElementById('adm-clear').onclick = clearForm;
+    }
+    refresh();
+  }
+
   // ---------- helpers ----------
   const $ = (sel) => document.querySelector(sel);
   const COL = { accent: '#2f7de1', accent2: '#e23744', muted: '#7b8aa0', grid: '#eef2f7' };
@@ -1321,7 +1449,8 @@
     const btn = $('#refresh');
     btn.classList.add('spin');
     try {
-      const res = await fetch('/api/data');
+      const res = await authFetch('/api/data');
+      if (res.status === 401) { showLogin('Your session has expired — please sign in again.'); return; }
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
       data = json;
@@ -1343,10 +1472,19 @@
   document.getElementById('nav').addEventListener('click', (e) => {
     const item = e.target.closest('.nav-item');
     if (!item) return;
+    const v = item.dataset.v;
     document.querySelectorAll('.nav-item').forEach((n) => n.classList.remove('active'));
     item.classList.add('active');
     document.querySelectorAll('.view').forEach((s) => s.classList.remove('active'));
-    document.getElementById(item.dataset.v).classList.add('active');
+    // Admin section is admin-only; other sections need an explicit grant.
+    if (v === 'admin') {
+      if (!me || !me.isAdmin) { document.getElementById('denied').classList.add('active'); return; }
+      document.getElementById('admin').classList.add('active');
+      renderAdmin();
+      return;
+    }
+    if (!canSee(v)) { document.getElementById('denied').classList.add('active'); return; }
+    document.getElementById(v).classList.add('active');
     if (data) renderAll(); // re-trigger animations on the newly visible view
     setTimeout(() => Object.values(charts).forEach((c) => c.resize()), 60);
   });
@@ -1362,8 +1500,6 @@
   $('#today').textContent = new Date().toLocaleDateString('en-GB',
     { day: '2-digit', month: 'short', year: 'numeric' });
 
-  renderTunnel3D(); // embedded data — independent of the API fetch
-
   const xerInput = document.getElementById('sch-upload');
   if (xerInput) xerInput.addEventListener('change', (e) => {
     const f = e.target.files[0];
@@ -1371,5 +1507,10 @@
     e.target.value = ''; // allow re-uploading the same file
   });
 
-  load();
+  // ---------- boot: gate the whole app behind login ----------
+  wireAuthUI();
+  (async () => {
+    if (await checkAuth()) startApp(); // renderTunnel3D + load() run inside startApp
+    else showLogin();
+  })();
 })();

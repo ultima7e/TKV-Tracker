@@ -8,7 +8,20 @@
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-<div class="app">
+<div id="login-screen">
+  <form class="login-card" id="login-form" autocomplete="on">
+    <div class="lg"><img src="assets/sinohydro.png" alt="Sinohydro"></div>
+    <h2>Tamakoshi-V Project Tracker</h2>
+    <p class="sub">Please sign in to continue</p>
+    <label for="login-user">Username</label>
+    <input id="login-user" name="username" type="text" autocomplete="username" required>
+    <label for="login-pass">Password</label>
+    <input id="login-pass" name="password" type="password" autocomplete="current-password" required>
+    <button type="submit" id="login-btn">Sign in</button>
+    <div class="login-err" id="login-err"></div>
+  </form>
+</div>
+<div class="app" style="display:none">
   <aside class="sidebar">
     <div class="brand"><img class="brand-logo" src="assets/sinohydro.png" alt="Sinohydro"></div>
     <nav class="nav" id="nav">
@@ -21,9 +34,13 @@
       <div class="nav-item" data-v="man"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0"/><path d="M16 5.2a3 3 0 0 1 0 5.6"/><path d="M18.5 19.5a5.5 5.5 0 0 0-2.8-4.8"/></svg></span>Manpower</div>
       <div class="nav-item" data-v="equip"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2.1 2.1M16.9 16.9 19 19M19 5l-2.1 2.1M7.1 16.9 5 19"/></svg></span>Equipment</div>
       <div class="nav-item" data-v="safety"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 20 6v6c0 5-3.5 7.8-8 9-4.5-1.2-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></span>Safety</div>
+      <div class="nav-item" data-v="admin" id="nav-admin" style="display:none"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/><path d="M18.5 4.5l1.2 1.2M20.5 8h-1.7"/></svg></span>Admin</div>
     </nav>
-    <div class="nav-foot">Data source: <span id="data-source">—</span><br>
-      <span class="last-refresh" id="last-refresh">Not loaded yet</span></div>
+    <div class="nav-foot">
+      <div>Signed in as <span class="who" id="who">—</span></div>
+      <button class="logout" id="logout" type="button"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Log out</button>
+      <div style="margin-top:8px">Data source: <span id="data-source">—</span><br>
+        <span class="last-refresh" id="last-refresh">Not loaded yet</span></div></div>
   </aside>
   <div class="main">
     <header class="topbar">
@@ -203,6 +220,30 @@
       </section>
       <section class="view" id="equip"><div class="card"><h3>Equipment</h3><p class="muted">Awaiting equipment data sheet (Phase 2).</p></div></section>
       <section class="view" id="safety"><div class="card"><h3>Safety</h3><p class="muted">Awaiting safety data sheet (Phase 2).</p></div></section>
+      <section class="view" id="denied"><div class="card"><div class="denied-wrap">
+        <div class="lock"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+        <h2>Permission not granted</h2>
+        <p>You don't have access to this section. Contact the project admin if you need it.</p>
+      </div></div></section>
+      <section class="view" id="admin"><div class="card">
+        <h3>User Management <span class="muted" style="font-weight:600">· create accounts &amp; control access</span></h3>
+        <div class="admin-grid">
+          <div>
+            <div class="ipc-sub" style="margin:2px 0 10px">Add / edit user</div>
+            <div class="adm-field"><label>Username</label><input id="adm-user" type="text" placeholder="e.g. ram.thapa"></div>
+            <div class="adm-field"><label>Password <span style="text-transform:none;font-weight:600">(leave blank to keep unchanged when editing)</span></label><input id="adm-pass" type="password" placeholder="Set a password"></div>
+            <div class="adm-field"><label>Sections this user can view</label><div class="adm-secs" id="adm-secs"></div></div>
+            <div class="adm-field"><label class="adm-secs" style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;color:var(--ink);font-size:12.5px"><input id="adm-isadmin" type="checkbox"> Administrator (full access + user management)</label></div>
+            <button class="adm-btn" id="adm-save">Save user</button>
+            <button class="adm-btn ghost" id="adm-clear" type="button" style="margin-left:6px">Clear</button>
+            <div class="adm-msg" id="adm-msg"></div>
+          </div>
+          <div>
+            <div class="ipc-sub" style="margin:2px 0 10px">Users</div>
+            <div id="adm-list"><p class="muted">Loading…</p></div>
+          </div>
+        </div>
+      </div></section>
     </div>
   </div>
 </div>
