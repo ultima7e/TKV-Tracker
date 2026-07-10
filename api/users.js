@@ -48,6 +48,10 @@ module.exports = async (req, res) => {
 
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (e) {
-    return res.status(500).json({ error: String(e.message || e) });
+    const msg = String(e.message || e);
+    if (/EROFS|read-only|KV (get|set) failed|ENOENT/i.test(msg)) {
+      return res.status(503).json({ error: 'User database not connected yet. In Vercel, add a KV / Upstash Redis store (Storage → Create → Upstash for Redis → Connect to project), then redeploy.' });
+    }
+    return res.status(500).json({ error: msg });
   }
 };
