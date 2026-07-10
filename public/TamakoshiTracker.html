@@ -515,6 +515,10 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
             <input id="sch-search" placeholder="Search Activity ID or name…">
             <button id="sch-rellines" class="sch-toggle">Show relationships</button>
             <button id="sch-critical" class="sch-toggle">Critical Path</button>
+            <span id="sch-admin-tools" style="display:none">
+              <label class="sch-toggle" style="cursor:pointer">⬆ Upload XER<input type="file" id="sch-upload" accept=".xer" style="display:none"></label>
+              <button id="sch-reset" class="sch-toggle" title="Revert to the baseline schedule from the project files">↺ Reset</button>
+            </span>
             <span class="leg"><i style="background:#cfe0f7"></i><i style="background:#2f7de1;margin-left:-3px"></i>Normal (done/left)</span>
             <span class="leg"><i style="background:#f7c6c1"></i><i style="background:#e5554e;margin-left:-3px"></i>Critical (done/left)</span>
             <span class="leg"><i style="width:14px;height:4px;background:#aab6c8"></i>Baseline</span>
@@ -651,6 +655,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const app = document.querySelector('.app'); if (app) app.style.display = '';
     const who = document.getElementById('who'); if (who) who.textContent = me.username + (me.isAdmin ? ' · admin' : '');
     const na = document.getElementById('nav-admin'); if (na) na.style.display = me.isAdmin ? '' : 'none';
+    const schTools = document.getElementById('sch-admin-tools'); if (schTools) schTools.style.display = me.isAdmin ? '' : 'none';
     const first = me.isAdmin ? 'exec' : (me.sections || [])[0];
     document.querySelectorAll('.nav-item').forEach((n) => n.classList.remove('active'));
     document.querySelectorAll('.view').forEach((s) => s.classList.remove('active'));
@@ -1405,19 +1410,42 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 
   function handleXerUpload(file) {
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
+      let parsed;
       try {
-        const parsed = parseXerClient(reader.result);
+        parsed = parseXerClient(reader.result);
         if (!parsed.activities.length) { alert('No activities (TASK table) found in this XER file.'); return; }
-        data = data || {};
-        data.schedule = parsed;
-        schedBuiltFor = null;
-        renderSchedule();
-        const src = $('#sch-src');
-        if (src) src.textContent = '· uploaded: ' + file.name;
-      } catch (err) { alert('Could not read this XER file: ' + err.message); }
+      } catch (err) { alert('Could not read this XER file: ' + err.message); return; }
+      data = data || {};
+      data.schedule = parsed;
+      schedBuiltFor = null;
+      renderSchedule();
+      const src = $('#sch-src');
+      if (src) src.textContent = '· uploaded: ' + file.name + ' (saving…)';
+      try {
+        const r = await authFetch('/api/schedule', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ activities: parsed.activities, relationships: parsed.relationships, wbs: parsed.wbs }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+        if (src) src.textContent = '· uploaded: ' + file.name + ' (saved)';
+      } catch (err) {
+        if (src) src.textContent = '· uploaded: ' + file.name + ' — NOT saved';
+        alert('The schedule is shown but could not be saved permanently: ' + err.message);
+      }
     };
     reader.readAsText(file);
+  }
+
+  async function resetSchedule() {
+    if (!confirm('Reset the Schedule tab back to the baseline from the project files?')) return;
+    try {
+      const r = await authFetch('/api/schedule', { method: 'DELETE' });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+      const src = $('#sch-src'); if (src) src.textContent = '';
+      schedBuiltFor = null;
+      load();
+    } catch (err) { alert('Could not reset the schedule: ' + err.message); }
   }
 
   function renderSchedule() {
@@ -2051,6 +2079,8 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     if (f) handleXerUpload(f);
     e.target.value = '';
   });
+  const schResetBtn = document.getElementById('sch-reset');
+  if (schResetBtn) schResetBtn.addEventListener('click', resetSchedule);
 
   // ---------- boot: gate the whole app behind login ----------
   wireAuthUI();

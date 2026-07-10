@@ -58,6 +58,7 @@
     const app = document.querySelector('.app'); if (app) app.style.display = '';
     const who = document.getElementById('who'); if (who) who.textContent = me.username + (me.isAdmin ? ' · admin' : '');
     const na = document.getElementById('nav-admin'); if (na) na.style.display = me.isAdmin ? '' : 'none';
+    const schTools = document.getElementById('sch-admin-tools'); if (schTools) schTools.style.display = me.isAdmin ? '' : 'none';
     // Land on the first section this account may see.
     const first = me.isAdmin ? 'exec' : (me.sections || [])[0];
     document.querySelectorAll('.nav-item').forEach((n) => n.classList.remove('active'));
@@ -827,19 +828,44 @@
 
   function handleXerUpload(file) {
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
+      let parsed;
       try {
-        const parsed = parseXerClient(reader.result);
+        parsed = parseXerClient(reader.result);
         if (!parsed.activities.length) { alert('No activities (TASK table) found in this XER file.'); return; }
-        data = data || {};
-        data.schedule = parsed;
-        schedBuiltFor = null;
-        renderSchedule();
-        const src = $('#sch-src');
-        if (src) src.textContent = '· uploaded: ' + file.name;
-      } catch (err) { alert('Could not read this XER file: ' + err.message); }
+      } catch (err) { alert('Could not read this XER file: ' + err.message); return; }
+      // Show it immediately…
+      data = data || {};
+      data.schedule = parsed;
+      schedBuiltFor = null;
+      renderSchedule();
+      const src = $('#sch-src');
+      if (src) src.textContent = '· uploaded: ' + file.name + ' (saving…)';
+      // …then persist so it permanently replaces the baseline (survives refresh).
+      try {
+        const r = await authFetch('/api/schedule', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ activities: parsed.activities, relationships: parsed.relationships, wbs: parsed.wbs }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+        if (src) src.textContent = '· uploaded: ' + file.name + ' (saved)';
+      } catch (err) {
+        if (src) src.textContent = '· uploaded: ' + file.name + ' — NOT saved';
+        alert('The schedule is shown but could not be saved permanently: ' + err.message);
+      }
     };
     reader.readAsText(file);
+  }
+
+  async function resetSchedule() {
+    if (!confirm('Reset the Schedule tab back to the baseline from the project files?')) return;
+    try {
+      const r = await authFetch('/api/schedule', { method: 'DELETE' });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+      const src = $('#sch-src'); if (src) src.textContent = '';
+      schedBuiltFor = null;
+      load(); // refetch the baseline
+    } catch (err) { alert('Could not reset the schedule: ' + err.message); }
   }
 
   function renderSchedule() {
@@ -1507,6 +1533,8 @@
     if (f) handleXerUpload(f);
     e.target.value = ''; // allow re-uploading the same file
   });
+  const schResetBtn = document.getElementById('sch-reset');
+  if (schResetBtn) schResetBtn.addEventListener('click', resetSchedule);
 
   // ---------- boot: gate the whole app behind login ----------
   wireAuthUI();

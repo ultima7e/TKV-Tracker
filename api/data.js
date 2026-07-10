@@ -11,6 +11,22 @@ const { workbookToBoth } = require('../lib/workbook');
 const { parseTunnel, parseKpis, parseSCurve, parseFinance, parseManpower, parseIpc, parseFinanceDetail } = require('../lib/parsers');
 const { parseXer } = require('../lib/xer');
 const { currentUser } = require('../lib/auth');
+const { kvGet } = require('../lib/store');
+
+// If an admin uploaded a schedule (stored in KV), it permanently replaces the
+// Schedule tab's baseline. Only read the (larger) blob when rebuilding.
+async function applyScheduleOverride(payload) {
+  try {
+    const raw = await kvGet('tkv:schedule');
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (s && Array.isArray(s.activities) && s.activities.length) {
+        payload.schedule = { activities: s.activities, relationships: s.relationships || [], wbs: s.wbs || {} };
+      }
+    }
+  } catch (e) { /* keep the baseline on any store error */ }
+  return payload;
+}
 
 const DAV_BASE = 'https://dav.jianguoyun.com/dav/';
 // Two P6 schedules: the Schedule tab shows the accepted BASELINE; the Delay &
@@ -159,12 +175,14 @@ async function buildPayload() {
     const xerPath = process.env.NUTSTORE_XER_PATH || DEFAULT_XER_PATH;
     const delayXerPath = process.env.NUTSTORE_DELAY_XER_PATH || DELAY_XER_PATH;
 
-    // Nutstore folder PROPFIND + both XER PROPFINDs + Dropbox fetches, all parallel.
-    const [listing, xerInfo, delayXerInfo, dbx] = await Promise.all([
+    // Nutstore folder PROPFIND + both XER PROPFINDs + Dropbox fetches + the small
+    // schedule-override version marker, all parallel.
+    const [listing, xerInfo, delayXerInfo, dbx, schedVer] = await Promise.all([
       propfind(DAV_BASE + encPath(dir) + '/', headers, 1),
       propfind(DAV_BASE + encPath(xerPath), headers, 0),
       propfind(DAV_BASE + encPath(delayXerPath), headers, 0),
       fetchDropbox(),
+      kvGet('tkv:schedule_ver').catch(() => null),
     ]);
     let entries = listing.filter((e) => /\.xlsx$/i.test(e.path) && !/\/~\$/.test(e.path));
     if (!entries.length) entries = process.env.NUTSTORE_FILE_PATH.split(';').map((p) => ({ path: p.trim(), mtime: '' })).filter((e) => e.path);
@@ -178,6 +196,7 @@ async function buildPayload() {
       wb: entries.map((e) => e.path + '|' + e.mtime),
       xer: xerPath + '|' + xerMtime,
       dxer: delayXerPath + '|' + delayXerMtime,
+      sched: schedVer || '',
       dbx: dbx.map((d) => d.name + '|' + d.etag),
     });
     if (payloadCache && payloadCache.sig === sig) { // nothing changed — reuse parsed payload
@@ -193,6 +212,7 @@ async function buildPayload() {
     const buffers = [...nutBuffers, ...dbx.filter((d) => d.buffer).map((d) => d.buffer)];
     const payload = assemble(buffers, xerText, delayXerText, 'nutstore');
     payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
+    if (schedVer) await applyScheduleOverride(payload);
     payloadCache = { sig, payload, ts: Date.now() };
     return stamp(payload);
   }
@@ -201,8 +221,10 @@ async function buildPayload() {
   const dir = path.join(__dirname, '..', 'data');
   const files = fs.readdirSync(dir).filter((f) => (f.endsWith('.xlsx') || f.endsWith('.xer')) && !f.startsWith('~$')).sort();
   const dbx = await fetchDropbox();
+  const schedVer = await kvGet('tkv:schedule_ver').catch(() => null);
   const sig = JSON.stringify({
     local: files.map((f) => f + '|' + fs.statSync(path.join(dir, f)).mtimeMs),
+    sched: schedVer || '',
     dbx: dbx.map((d) => d.name + '|' + d.etag),
   });
   if (payloadCache && payloadCache.sig === sig) return stamp(payloadCache.payload);
@@ -215,6 +237,7 @@ async function buildPayload() {
   const readXer = (f) => (f ? fs.readFileSync(path.join(dir, f), 'latin1') : null);
   const payload = assemble(buffers, readXer(baselineXf), readXer(delayXf), 'local-file');
   payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
+  if (schedVer) await applyScheduleOverride(payload);
   payloadCache = { sig, payload, ts: Date.now() };
   return stamp(payload);
 }

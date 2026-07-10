@@ -24,3 +24,4 @@ _acad_log.txt
 
 # Local dev user store (production uses Vercel KV / Upstash)
 data/.users.json
+data/.tkv_*.json
