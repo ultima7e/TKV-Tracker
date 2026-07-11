@@ -59,6 +59,7 @@
     const who = document.getElementById('who'); if (who) who.textContent = me.username + (me.isAdmin ? ' · admin' : '');
     const na = document.getElementById('nav-admin'); if (na) na.style.display = me.isAdmin ? '' : 'none';
     const schTools = document.getElementById('sch-admin-tools'); if (schTools) schTools.style.display = me.isAdmin ? '' : 'none';
+    const calBtn = document.getElementById('t3d-cal-btn'); if (calBtn) calBtn.style.display = me.isAdmin ? '' : 'none';
     // Land on the first section this account may see.
     const first = me.isAdmin ? 'exec' : (me.sections || [])[0];
     document.querySelectorAll('.nav-item').forEach((n) => n.classList.remove('active'));
@@ -484,9 +485,9 @@
     const detail = document.getElementById('t3d-detail');
     if (!tabs || !img || !wrap || !legend || !detail) return;
     const pctTxt = (p) => (p == null ? '—' : p + '%');
-    // Calibration mode (?cal=1): drag the hotspot dots onto their tunnels, then
-    // "Copy coords" to get the updated x/y JSON to bake back into TUNNEL_AREAS.
-    const CAL = new URLSearchParams(location.search).get('cal') === '1' || location.hash.includes('cal');
+    // Calibration mode (admin "Calibrate dots" button, or ?cal=1): drag the
+    // hotspot dots onto their tunnels, then "Copy coords" to get the x/y JSON.
+    let calMode = new URLSearchParams(location.search).get('cal') === '1' || location.hash.includes('cal');
     const enableCal = (area) => {
       const readout = () => {
         detail.innerHTML =
@@ -546,10 +547,10 @@
         d.style.top = s.y + '%';
         d.style.background = t3dColor(s.pct);
         d.title = s.name + ' — ' + pctTxt(s.pct);
-        if (!CAL) d.addEventListener('click', () => selectSection(i));
+        if (!calMode) d.addEventListener('click', () => selectSection(i));
         wrap.appendChild(d);
       });
-      if (CAL) enableCal(area);
+      if (calMode) enableCal(area);
       legend.innerHTML = area.sections.map((s, i) =>
         '<li data-i="' + i + '"><span class="ld" style="background:' + t3dColor(s.pct) + '"></span>' +
         '<span class="nm">' + s.name + '</span>' +
@@ -567,6 +568,13 @@
         b.textContent = area.label;
         b.addEventListener('click', () => selectArea(area));
         tabs.appendChild(b);
+      });
+      const calBtn = document.getElementById('t3d-cal-btn');
+      if (calBtn) calBtn.addEventListener('click', () => {
+        calMode = !calMode;
+        calBtn.textContent = calMode ? '✓ Done — Copy coords from the panel' : '⊹ Calibrate dots';
+        calBtn.classList.toggle('active', calMode);
+        selectArea(t3dArea); // re-render with dragging on/off
       });
     }
     selectArea(t3dArea);
