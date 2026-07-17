@@ -49,14 +49,13 @@ const FRESH_WINDOW_MS = 20000;
 // with the same name is skipped. Dropbox returns an ETag that changes on every
 // edit, so a conditional GET both detects changes and avoids re-downloading.
 const DROPBOX_SOURCES = [
-  // Milestone Payment Summary — provides ONLY each IPC's sub-activity work-item
-  // breakdown ('IPCs and Details' sheet); merged into the EV-derived IPC list.
-  // MUST be listed BEFORE the Earned Value workbook: this file also has a sheet
-  // named 'Summary', and later sources win on name collision — so the Earned
-  // Value workbook (loaded last) keeps ownership of the 'Summary' sheet.
-  { name: 'Milestone Payment Summary.xlsx', url: 'https://www.dropbox.com/scl/fi/7vj9upjzp3vikdwopnz89/Milestone-Payment-Summary-Govin-Bardewa-s-conflicted-copy-2026-07-02.xlsx?rlkey=nt7dyrdm50zuqrvt6lkseeada&dl=1' },
   // Earned Value Calculation workbook — source of truth for the headline
   // financials (earned value, contract, received, financial-progress %).
+  // The Milestone Payment Summary (per-IPC sub-activity breakdown) now comes from
+  // Nutstore (Shared Folder/ProgressTracker/Milestone Payment Summary.xlsx) — the
+  // old Dropbox "conflicted copy" link was deleted and started returning HTML.
+  // Nutstore files load BEFORE Dropbox, so the EV workbook still wins the shared
+  // 'Summary' sheet name.
   { name: 'Earned Value Calculation_Tamakoshi-V.xlsx', url: 'https://www.dropbox.com/scl/fi/v4dij9hy9ki9qc6acxv9a/Earned-Value-Calculation_Tamakoshi-V.xlsx?rlkey=tshumcv26pkuc4ceh0r33wxfp&dl=1' },
 ];
 const dbxCache = new Map(); // url -> { etag, buffer }
@@ -124,10 +123,17 @@ async function getXer(p, mtime, headers) {
 // Parse buffers + XER into the API payload (no generatedAt — added fresh each send).
 function assemble(buffers, xerText, delayXerText, source) {
   const sheets = {}, matrices = {};
+  const skipWarnings = [];
   for (const buffer of buffers) {
-    const { rows, matrices: m } = workbookToBoth(buffer);
-    Object.assign(sheets, rows);
-    Object.assign(matrices, m);
+    // A single unreadable source (e.g. a Dropbox link that now returns an HTML
+    // error page instead of the .xlsx) must not blank the whole dashboard.
+    try {
+      const { rows, matrices: m } = workbookToBoth(buffer);
+      Object.assign(sheets, rows);
+      Object.assign(matrices, m);
+    } catch (e) {
+      skipWarnings.push('Skipped an unreadable source file (' + String(e.message || e) + ')');
+    }
   }
   const tunnel = parseTunnel(sheets);
   const executive = parseKpis(sheets);
@@ -144,7 +150,7 @@ function assemble(buffers, xerText, delayXerText, source) {
     source,
     // tunnel/KPI "sheet not found" warnings are expected (those legacy sample
     // sheets aren't part of the live data) — omit them so the banner stays quiet.
-    warnings: [...scurve.warnings, ...finance.warnings, ...manpower.warnings,
+    warnings: [...skipWarnings, ...scurve.warnings, ...finance.warnings, ...manpower.warnings,
       ...ipc.warnings, ...schedule.warnings],
     tunnel: { tunnels: tunnel.tunnels, monthlyAdvance: tunnel.monthlyAdvance },
     executive: { kpis: executive.kpis },
