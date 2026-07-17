@@ -685,7 +685,8 @@
     };
     const evChart = makeChart('f-evpie');
     evChart.setOption({
-      tooltip: { trigger: 'item', formatter: (p) => `${p.name}<br/><b>$ ${usdM(p.value)} M</b> (${p.percent}%)` },
+      // 1 dp, matching the share shown in the slice's detail table below.
+      tooltip: { trigger: 'item', formatter: (p) => `${p.name}<br/><b>$ ${usdM(p.value)} M</b> (${Number(p.percent).toFixed(1)}%)` },
       series: [{
         type: 'pie', radius: ['40%', '70%'], center: ['50%', '50%'],
         itemStyle: { borderColor: '#fff', borderWidth: 2 },
@@ -731,15 +732,19 @@
     });
 
     // donut: certified vs outstanding work value (USD-equivalent)
+    // Label off the workbook's own Financial-Progress % (fb.pct) — the exact
+    // value the KPI shows — rather than letting ECharts recompute and round its
+    // own percentage, so the donut and the KPI can never disagree.
+    const donutPct = (name) => (name === 'Certified' ? fb.pct : Math.round((100 - fb.pct) * 10) / 10);
     const donut = makeChart('f-donut');
     donut.setOption({
       tooltip: { trigger: 'item',
-        formatter: (p) => `${p.name}<br/><b>$ ${usdM(p.value)} M</b> (${p.percent}%)` },
+        formatter: (p) => `${p.name}<br/><b>$ ${usdM(p.value)} M</b> (${donutPct(p.name)}%)` },
       legend: { bottom: 0, textStyle: { fontSize: 11, color: COL.muted } },
       series: [{
         type: 'pie', radius: ['48%', '72%'], center: ['50%', '45%'], avoidLabelOverlap: true,
         itemStyle: { borderColor: '#fff', borderWidth: 2 },
-        label: { show: true, formatter: '{d}%', fontSize: 11, fontWeight: 700, color: COL.muted },
+        label: { show: true, formatter: (p) => donutPct(p.name) + '%', fontSize: 11, fontWeight: 700, color: COL.muted },
         data: [
           { name: 'Certified', value: Math.round(fb.certifiedEq), itemStyle: { color: '#2fae7a' } },
           { name: 'Outstanding', value: Math.round(fb.outstandingEq), itemStyle: { color: '#f2a65a' } },
@@ -758,7 +763,7 @@
           <tbody>${body}</tbody></table>`);
       } else {
         expandDetail('f-donut-detail', `<span>Outstanding work value: <b>$ ${usdM(fb.outstandingEq)} M</b> ` +
-          `(${Math.round((fb.outstandingEq / b.workUSDEq) * 1000) / 10}% of contract still to certify)</span>`);
+          `(${donutPct('Outstanding')}% of contract still to certify)</span>`);
       }
     });
 
