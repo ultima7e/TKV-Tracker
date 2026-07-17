@@ -1262,13 +1262,41 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       }],
     });
     const evTotal = cats.reduce((s, c) => s + c.usdEquiv, 0) || 1;
+    // Clicking a slice breaks the category open into its Activity Schedule
+    // lines (ACS_D -> D.1…D.8), so you can see which activity earned what.
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const trunc = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+    const pct1 = (a, b) => Math.round((a / (b || 1)) * 1000) / 10;
     evChart.off('click');
     evChart.on('click', (p) => {
       const c = cats[p.dataIndex];
-      document.getElementById('f-evdetail').innerHTML =
-        `<b style="color:${catColor(c.category)}">${c.category}</b> — $ ${usdM(c.usdEquiv)} M earned ` +
-        `· <b>${Math.round((c.usdEquiv / evTotal) * 1000) / 10}%</b> of total ` +
+      const el = document.getElementById('f-evdetail');
+      const head = `<b style="color:${catColor(c.category)}">${c.category}</b> — $ ${usdM(c.usdEquiv)} M earned ` +
+        `· <b>${pct1(c.usdEquiv, evTotal)}%</b> of total ` +
         `<span class="muted">($ ${usdM(c.usd)} M + NPR ${nprM(c.npr)} M)</span>`;
+      const items = c.items || [];
+      const active = items.filter((it) => it.usdEquiv > 0);
+      const idle = items.length - active.length;
+      if (!active.length) {
+        el.innerHTML = head + `<div class="muted" style="font-size:11px;margin-top:8px">`
+          + `No activity in this category has earned value yet.</div>`;
+        return;
+      }
+      const rows = active.map((it) => `<tr>
+          <td><b>${esc(it.code)}</b><div class="muted" style="font-size:11px" title="${esc(it.name)}">${esc(trunc(it.name, 52))}</div></td>
+          <td style="white-space:nowrap">$ ${usdM(it.usdEquiv)} M</td>
+          <td>${pct1(it.usdEquiv, c.usdEquiv)}%</td>
+          <td>${pct1(it.usdEquiv, it.contractUsdEq)}%</td>
+        </tr>`).join('');
+      el.innerHTML = head
+        + `<div class="ipc-sub" style="text-align:left;margin-top:10px">Activity-wise earned value</div>`
+        + `<table class="tbl"><thead><tr><th>Activity</th><th>Earned (USD-eq)</th>`
+        + `<th title="Share of this category's earned value">Share</th>`
+        + `<th title="Earned against this activity's own contract amount">Done</th></tr></thead>`
+        + `<tbody>${rows}</tbody></table>`
+        + (idle ? `<div class="muted" style="font-size:11px;margin-top:6px">`
+          + `+ ${idle} further ${idle === 1 ? 'activity' : 'activities'} not started (nil earned value).</div>` : '');
     });
 
     const donut = makeChart('f-donut');
