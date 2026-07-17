@@ -392,14 +392,13 @@
   }
 
   // Map the sheet's casual status text to professional payment-cycle terms.
+  // Binary IPC status: a completed/paid certificate is "Settled"; anything else
+  // (submitted, remaining, certified-but-unpaid, blank) is "Under Review".
   function ipcStatusLabel(s) {
     const t = (s || '').toLowerCase();
-    if (/partial/.test(t)) return 'Partially Paid';
     if (/reject/.test(t)) return 'Rejected';
     if (/settl|complete|paid/.test(t)) return 'Settled';
-    if (/certif/.test(t)) return 'Certified';
-    if (/remain|pending|review|outstand|process|progress/.test(t)) return 'Under Review';
-    return s || '—';
+    return 'Under Review';
   }
 
   function renderIpc() {
@@ -770,7 +769,7 @@
             <td>${x.amountNPR ? nprM(x.amountNPR) + ' M' : '–'}</td></tr>`).join('')}
         </tbody>
       </table>`;
-    const done = (s) => /complete/i.test(s);
+    const statusBadge = (s) => { const l = ipcStatusLabel(s); return `<span class="badge ${l === 'Settled' ? 'ok' : l === 'Rejected' ? 'bad' : 'warn'}">${l}</span>`; };
     // Reverse chronological — newest IPC first (Advance Payment, the oldest, last).
     const ipcsDesc = ipcs.slice().sort((a, b) => (b.certifiedDate || '').localeCompare(a.certifiedDate || ''));
     document.getElementById('f-ipclist').innerHTML = ipcsDesc.map((i, idx) => `
@@ -780,7 +779,7 @@
           <span class="ipc-date">${i.certifiedDate || ''}</span>
           <span class="ipc-amt">Net <b>$${usdM(i.netUSD)}M</b> / <b>NPR ${nprM(i.netNPR)}M</b></span>
           <span class="ipc-amt">Recv <b>NPR ${nprM(i.receivedNPR)}M</b></span>
-          <span class="badge ${done(i.status) ? 'ok' : 'warn'}">${i.status}</span>
+          ${statusBadge(i.status)}
           <span class="ipc-caret">▸</span>
         </div>
         <div class="ipc-body">
