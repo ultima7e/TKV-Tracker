@@ -666,7 +666,13 @@
     // Wire the toggle once: icon opens/closes the popover; click-away closes it.
     const advToggle = document.getElementById('adv-toggle');
     if (advToggle) {
-      advToggle.onclick = (e) => { e.stopPropagation(); advPop.hidden = !advPop.hidden; };
+      advToggle.onclick = (e) => {
+        // The popover now lives inside the card, so ignore clicks that came
+        // from within it — only the card itself toggles.
+        if (advPop.contains(e.target)) return;
+        e.stopPropagation();
+        advPop.hidden = !advPop.hidden;
+      };
       if (!advDocWired) {
         advDocWired = true;
         document.addEventListener('click', (e) => {
