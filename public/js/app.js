@@ -391,6 +391,31 @@
     }
   }
 
+  // Expandable chart-detail panels. Each collapses back to its hint via the ✕.
+  const DETAIL_HINTS = {
+    'f-evdetail': 'Click a slice to see its contribution.',
+    'f-donut-detail': 'Click “Certified” to see the breakdown.',
+    'f-bardetail': 'NPR millions received per certificate.',
+  };
+  function expandDetail(id, html) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.position = 'relative'; // anchors the ✕ to the panel's top-right
+    el.innerHTML = `<button class="detail-x" data-close="${id}" title="Collapse details"`
+      + ` aria-label="Collapse details">✕</button>` + html;
+  }
+  function collapseDetail(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.position = '';
+    el.innerHTML = DETAIL_HINTS[id] || '';
+  }
+  // One delegated listener — panels are re-rendered on every refresh.
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('[data-close]');
+    if (b) collapseDetail(b.getAttribute('data-close'));
+  });
+
   // Map the sheet's casual status text to professional payment-cycle terms.
   // Binary IPC status: a completed/paid certificate is "Settled"; anything else
   // (submitted, remaining, certified-but-unpaid, blank) is "Under Review".
@@ -678,7 +703,6 @@
     evChart.off('click');
     evChart.on('click', (p) => {
       const c = cats[p.dataIndex];
-      const el = document.getElementById('f-evdetail');
       const head = `<b style="color:${catColor(c.category)}">${c.category}</b> — $ ${usdM(c.usdEquiv)} M earned ` +
         `· <b>${pct1(c.usdEquiv, evTotal)}%</b> of total ` +
         `<span class="muted">($ ${usdM(c.usd)} M + NPR ${nprM(c.npr)} M)</span>`;
@@ -686,8 +710,8 @@
       const active = items.filter((it) => it.usdEquiv > 0);
       const idle = items.length - active.length;
       if (!active.length) {
-        el.innerHTML = head + `<div class="muted" style="font-size:11px;margin-top:8px">`
-          + `No activity in this category has earned value yet.</div>`;
+        expandDetail('f-evdetail', head + `<div class="muted" style="font-size:11px;margin-top:8px">`
+          + `No activity in this category has earned value yet.</div>`);
         return;
       }
       const rows = active.map((it) => `<tr>
@@ -696,14 +720,14 @@
           <td>${pct1(it.usdEquiv, c.usdEquiv)}%</td>
           <td>${pct1(it.usdEquiv, it.contractUsdEq)}%</td>
         </tr>`).join('');
-      el.innerHTML = head
+      expandDetail('f-evdetail', head
         + `<div class="ipc-sub" style="text-align:left;margin-top:10px">Activity-wise earned value</div>`
         + `<table class="tbl"><thead><tr><th>Activity</th><th>Earned (USD-eq)</th>`
         + `<th title="Share of this category's earned value">Share</th>`
         + `<th title="Earned against this activity's own contract amount">Done</th></tr></thead>`
         + `<tbody>${rows}</tbody></table>`
         + (idle ? `<div class="muted" style="font-size:11px;margin-top:6px">`
-          + `+ ${idle} further ${idle === 1 ? 'activity' : 'activities'} not started (nil earned value).</div>` : '');
+          + `+ ${idle} further ${idle === 1 ? 'activity' : 'activities'} not started (nil earned value).</div>` : ''));
     });
 
     // donut: certified vs outstanding work value (USD-equivalent)
@@ -725,23 +749,23 @@
     // Click "Certified" -> show the earned-value breakdown by work category.
     donut.off('click');
     donut.on('click', (p) => {
-      const el = document.getElementById('f-donut-detail');
       if (p.name === 'Certified') {
         const body = cats.map((c) =>
           `<tr><td>${c.category}</td><td>$ ${usdM(c.usdEquiv)} M</td>
             <td>${Math.round((c.usdEquiv / evTotal) * 1000) / 10}%</td></tr>`).join('');
-        el.innerHTML = `<div class="ipc-sub" style="text-align:left">Earned value — work done by category</div>
+        expandDetail('f-donut-detail', `<div class="ipc-sub" style="text-align:left">Earned value — work done by category</div>
           <table class="tbl"><thead><tr><th>Category</th><th>Earned (USD-eq)</th><th>Weightage</th></tr></thead>
-          <tbody>${body}</tbody></table>`;
+          <tbody>${body}</tbody></table>`);
       } else {
-        el.innerHTML = `<span>Outstanding work value: <b>$ ${usdM(fb.outstandingEq)} M</b> ` +
-          `(${Math.round((fb.outstandingEq / b.workUSDEq) * 1000) / 10}% of contract still to certify)</span>`;
+        expandDetail('f-donut-detail', `<span>Outstanding work value: <b>$ ${usdM(fb.outstandingEq)} M</b> ` +
+          `(${Math.round((fb.outstandingEq / b.workUSDEq) * 1000) / 10}% of contract still to certify)</span>`);
       }
     });
 
     // bar: cash received per IPC (NPR, millions)
     const ipcs = fd.ipcs || [];
-    makeChart('f-bar').setOption({
+    const bar = makeChart('f-bar');
+    bar.setOption({
       grid: { left: 44, right: 12, top: 16, bottom: 56 },
       tooltip: { trigger: 'axis',
         formatter: (ps) => {
@@ -762,6 +786,23 @@
             ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#f5a623' }, { offset: 1, color: '#f2c879' }])
             : new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: COL.accent }, { offset: 1, color: COL.accent2 }]) },
         })) }],
+    });
+    // Clicking a bar breaks that certificate open into the activities it paid for.
+    bar.off('click');
+    bar.on('click', (p) => {
+      const i = ipcs[p.dataIndex];
+      if (!i) return;
+      const lbl = ipcStatusLabel(i.status);
+      const badge = `<span class="badge ${lbl === 'Settled' ? 'ok' : lbl === 'Rejected' ? 'bad' : 'warn'}">${lbl}</span>`;
+      const head = `<div style="text-align:left"><b>${i.ipc}</b>`
+        + (i.certifiedDate ? ` <span class="muted">· certified ${i.certifiedDate}</span>` : '') + ` ${badge}`
+        + `<br/><span class="muted">Received</span> <b>NPR ${nprM(i.receivedNPR)} M</b>`
+        + (i.receivedUSD ? ` + <b>$ ${usdM(i.receivedUSD)} M</b>` : '') + `</div>`;
+      const paid = (i.items || []).filter((it) => it.netUSD || it.netNPR);
+      expandDetail('f-bardetail', head + (paid.length
+        ? `<div class="ipc-sub" style="text-align:left;margin-top:10px">Activity-wise payment</div>` + itemsTable(i.items)
+        : `<div class="muted" style="font-size:11px;margin-top:8px">`
+          + `No sub-activity breakdown recorded for this certificate.</div>`));
     });
 
     // IPC register accordion
