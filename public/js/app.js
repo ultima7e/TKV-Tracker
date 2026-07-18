@@ -1476,10 +1476,24 @@
     const cls = /reject|not\s*approv/i.test(s) ? 'bad' : /approv|submit|receiv|settl/i.test(s) ? 'ok' : 'neu';
     return `<span class="badge ${cls}">${s}</span>`;
   };
+  // Map the live parsed claims payload onto the render shape (falls back to the
+  // built-in CLAIMS snapshot when the workbook isn't available).
+  function normClaims(src) {
+    return {
+      totalUSD: src.totalUSD, totalNPR: src.totalNPR, socCount: src.socCount,
+      approvedNPR: src.approvedNPR, eotDays: src.eotDays, surgeNPR: src.surgeNPR,
+      claims: (src.claims || []).map((x) => ({ no: x.no, desc: x.subject, basis: x.basis, usd: x.usd, npr: x.npr, status: x.status })),
+      variations: (src.variations || []).map((x) => ({ desc: x.desc, basis: x.basis, npr: x.npr, status: x.status })),
+      eot: (src.eot || []).map((x) => ({
+        desc: x.no + ((x.usd || x.npr) ? ' — cost ' + (x.usd ? '$ ' + x.usd.toFixed(2) + 'M' : 'NPR ' + x.npr.toFixed(1) + 'M') : ''),
+        period: x.remarks || '', days: x.eotDays, status: x.status,
+      })),
+    };
+  }
   function renderClaims() {
     const el = document.getElementById('claims-body');
     if (!el) return;
-    const c = CLAIMS;
+    const c = (data && data.claims && !data.claims.missing) ? normClaims(data.claims) : CLAIMS;
     const amt = (u, n) => {
       const p = [];
       if (u) p.push('$ ' + u.toFixed(u < 0.1 ? 3 : 2) + 'M');
@@ -1508,7 +1522,7 @@
           <div class="valm">$ <span>${c.totalUSD.toFixed(2)}</span> M</div>
           <div class="valm">NPR <span>${c.totalNPR.toFixed(1)}</span> M</div>
           <div class="sub">incl. surge-tunnel variation</div></div>
-        <div class="card kpi"><h3>Statements of Claim</h3><div class="val">${c.socCount}</div><div class="sub">SoC #1–#8 submitted</div></div>
+        <div class="card kpi"><h3>Statements of Claim</h3><div class="val">${c.socCount}</div><div class="sub">SoC #1–#${c.socCount} submitted</div></div>
         <div class="card kpi"><h3>Approved &amp; Received</h3><div class="valm">NPR ${c.approvedNPR.toFixed(2)} M</div><div class="sub">Provisional Sum — landslide cost</div></div>
         <div class="card kpi"><h3>EoT Sought</h3><div class="val">${c.eotDays} <span style="font-size:15px">days</span></div><div class="sub">baseline (TIA) pending</div></div>
       </div>
@@ -1516,7 +1530,7 @@
         <h3>Statements of Claim <span class="muted" style="font-weight:600">· amount claimed &amp; engineer's position</span></h3>
         <table class="tbl"><thead><tr><th>Claim</th><th style="text-align:left">Description</th><th style="text-align:left">Contractual basis</th><th>Amount</th><th>Status</th></tr></thead>
         <tbody>${claimRows}</tbody></table>
-        <div class="muted" style="font-size:11.5px;margin-top:8px">Total contractor's claim <b>$ ${c.totalUSD.toFixed(2)}M + NPR ${c.totalNPR.toFixed(1)}M</b> — of which NPR ${c.variations[0].npr.toFixed(1)}M is the Additional Surge Tunnel variation. Most claims remain pending or rejected by the Engineer.</div>
+        <div class="muted" style="font-size:11.5px;margin-top:8px">Total contractor's claim <b>$ ${c.totalUSD.toFixed(2)}M + NPR ${c.totalNPR.toFixed(1)}M</b>${(c.surgeNPR || (c.variations[0] && c.variations[0].npr)) ? ` — of which NPR ${(c.surgeNPR || c.variations[0].npr).toFixed(1)}M is the Additional Surge Tunnel variation` : ''}. Most claims remain pending or rejected by the Engineer.</div>
       </div>
       <div class="grid row-2">
         <div class="card"><h3>Variations &amp; Value Engineering</h3>

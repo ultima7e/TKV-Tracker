@@ -8,7 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const { workbookToBoth } = require('../lib/workbook');
-const { parseTunnel, parseKpis, parseSCurve, parseFinance, parseManpower, parseIpc, parseFinanceDetail } = require('../lib/parsers');
+const { parseTunnel, parseKpis, parseSCurve, parseFinance, parseManpower, parseIpc, parseFinanceDetail, parseClaims } = require('../lib/parsers');
 const { parseXer } = require('../lib/xer');
 const { currentUser } = require('../lib/auth');
 const { kvGet } = require('../lib/store');
@@ -33,6 +33,10 @@ const DAV_BASE = 'https://dav.jianguoyun.com/dav/';
 // Disruption tab shows the TIA (Time Impact Analysis) schedule with delay events.
 const DEFAULT_XER_PATH = 'Shared Folder/Schedule/Baseline Schedule/accepted baseline-Final/TKV-BL-A.xer';
 const DELAY_XER_PATH = 'Shared Folder/Schedule/TKV-BL-A-2 (TIA-Bishan).xer';
+// Claims & Variations register — a separate Nutstore workbook (its sheets are
+// parsed in isolation so 'Summary'/'Variation'/'Sheet1' can't collide with the
+// finance workbooks). Editing this file live-updates the Claims panel.
+const CLAIMS_XLSX_PATH = 'Shared Folder/Claims & Variation/Summary and other details/Claim & Variation Log.xlsx';
 const encPath = (p) => p.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
 
 // Module-level caches survive across requests on a warm serverless instance.
@@ -120,8 +124,20 @@ async function getXer(p, mtime, headers) {
   return text;
 }
 
+// Parse the Claims workbook in isolation (its own matrices) so its sheet names
+// never merge into the finance bag. Returns null if unreadable, letting the
+// frontend fall back to its built-in snapshot.
+function claimsFromBuffer(buffer) {
+  if (!buffer) return null;
+  try {
+    const { matrices } = workbookToBoth(buffer);
+    const c = parseClaims(matrices);
+    return c && !c.missing ? c : null;
+  } catch (e) { return null; }
+}
+
 // Parse buffers + XER into the API payload (no generatedAt — added fresh each send).
-function assemble(buffers, xerText, delayXerText, source) {
+function assemble(buffers, xerText, delayXerText, source, claimsBuffer) {
   const sheets = {}, matrices = {};
   const skipWarnings = [];
   for (const buffer of buffers) {
@@ -162,6 +178,7 @@ function assemble(buffers, xerText, delayXerText, source) {
     },
     ipc: { rows: ipc.rows, total: ipc.total },
     financeDetail,
+    claims: claimsFromBuffer(claimsBuffer),
     schedule: { activities: schedule.activities, relationships: schedule.relationships, wbs: schedule.wbs },
     delaySchedule: { activities: delaySchedule.activities, relationships: delaySchedule.relationships, wbs: delaySchedule.wbs },
   };
@@ -181,15 +198,17 @@ async function buildPayload() {
     const xerPath = process.env.NUTSTORE_XER_PATH || DEFAULT_XER_PATH;
     const delayXerPath = process.env.NUTSTORE_DELAY_XER_PATH || DELAY_XER_PATH;
 
-    // Nutstore folder PROPFIND + both XER PROPFINDs + Dropbox fetches + the small
-    // schedule-override version marker, all parallel.
-    const [listing, xerInfo, delayXerInfo, dbx, schedVer] = await Promise.all([
+    // Nutstore folder PROPFIND + both XER PROPFINDs + claims PROPFIND + Dropbox
+    // fetches + the small schedule-override version marker, all parallel.
+    const [listing, xerInfo, delayXerInfo, claimsInfo, dbx, schedVer] = await Promise.all([
       propfind(DAV_BASE + encPath(dir) + '/', headers, 1),
       propfind(DAV_BASE + encPath(xerPath), headers, 0),
       propfind(DAV_BASE + encPath(delayXerPath), headers, 0),
+      propfind(DAV_BASE + encPath(CLAIMS_XLSX_PATH), headers, 0).catch(() => []),
       fetchDropbox(),
       kvGet('tkv:schedule_ver').catch(() => null),
     ]);
+    const claimsMtime = (claimsInfo[0] && claimsInfo[0].mtime) || '';
     let entries = listing.filter((e) => /\.xlsx$/i.test(e.path) && !/\/~\$/.test(e.path));
     if (!entries.length) entries = process.env.NUTSTORE_FILE_PATH.split(';').map((p) => ({ path: p.trim(), mtime: '' })).filter((e) => e.path);
     // Drop any Nutstore file that Dropbox now supplies (Dropbox is the source of truth).
@@ -202,6 +221,7 @@ async function buildPayload() {
       wb: entries.map((e) => e.path + '|' + e.mtime),
       xer: xerPath + '|' + xerMtime,
       dxer: delayXerPath + '|' + delayXerMtime,
+      claims: CLAIMS_XLSX_PATH + '|' + claimsMtime,
       sched: schedVer || '',
       dbx: dbx.map((d) => d.name + '|' + d.etag),
     });
@@ -210,13 +230,14 @@ async function buildPayload() {
       return stamp(payloadCache.payload);
     }
 
-    const [nutBuffers, xerText, delayXerText] = await Promise.all([
+    const [nutBuffers, xerText, delayXerText, claimsBuffer] = await Promise.all([
       Promise.all(entries.map((e) => getBuffer(e.path, e.mtime, headers))),
       getXer(xerPath, xerMtime, headers),
       getXer(delayXerPath, delayXerMtime, headers),
+      claimsMtime ? getBuffer(CLAIMS_XLSX_PATH, claimsMtime, headers).catch(() => null) : Promise.resolve(null),
     ]);
     const buffers = [...nutBuffers, ...dbx.filter((d) => d.buffer).map((d) => d.buffer)];
-    const payload = assemble(buffers, xerText, delayXerText, 'nutstore');
+    const payload = assemble(buffers, xerText, delayXerText, 'nutstore', claimsBuffer);
     payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
     if (schedVer) await applyScheduleOverride(payload);
     payloadCache = { sig, payload, ts: Date.now() };
@@ -234,14 +255,18 @@ async function buildPayload() {
     dbx: dbx.map((d) => d.name + '|' + d.etag),
   });
   if (payloadCache && payloadCache.sig === sig) return stamp(payloadCache.payload);
-  const localBuffers = files.filter((f) => f.endsWith('.xlsx') && !DBX_NAMEKEYS.has(normName(f)))
+  const localBuffers = files.filter((f) => f.endsWith('.xlsx') && !DBX_NAMEKEYS.has(normName(f))
+      && !/claim.*variation.*log\.xlsx$/i.test(f)) // claims workbook is parsed in isolation below
     .map((f) => fs.readFileSync(path.join(dir, f)));
   const buffers = [...localBuffers, ...dbx.filter((d) => d.buffer).map((d) => d.buffer)];
   const xerFiles = files.filter((f) => f.endsWith('.xer'));
   const baselineXf = xerFiles.find((f) => /baseline|TKV-BL-A\.xer/i.test(f)) || xerFiles[0];
   const delayXf = xerFiles.find((f) => /tia|delay|BL-A-2/i.test(f)) || baselineXf;
   const readXer = (f) => (f ? fs.readFileSync(path.join(dir, f), 'latin1') : null);
-  const payload = assemble(buffers, readXer(baselineXf), readXer(delayXf), 'local-file');
+  // Optional local claims workbook (e.g. data/Claim & Variation Log.xlsx).
+  const claimsFile = files.find((f) => /claim.*variation.*log\.xlsx$/i.test(f));
+  const claimsBuffer = claimsFile ? fs.readFileSync(path.join(dir, claimsFile)) : null;
+  const payload = assemble(buffers, readXer(baselineXf), readXer(delayXf), 'local-file', claimsBuffer);
   payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
   if (schedVer) await applyScheduleOverride(payload);
   payloadCache = { sig, payload, ts: Date.now() };
