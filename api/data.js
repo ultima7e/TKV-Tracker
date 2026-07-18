@@ -36,7 +36,10 @@ const DELAY_XER_PATH = 'Shared Folder/Schedule/TKV-BL-A-2 (TIA-Bishan).xer';
 // Claims & Variations register — a separate Nutstore workbook (its sheets are
 // parsed in isolation so 'Summary'/'Variation'/'Sheet1' can't collide with the
 // finance workbooks). Editing this file live-updates the Claims panel.
-const CLAIMS_XLSX_PATH = 'Shared Folder/Claims & Variation/Summary and other details/Claim & Variation Log.xlsx';
+// NB: two copies of this filename exist in the account; this — the maintained
+// one under "Contractor's Claims" — is the current register (the "Summary and
+// other details" copy is stale and stops at Claim 9).
+const CLAIMS_XLSX_PATH = "Shared Folder/Claims & Variation/Contractor's Claims/Claim & Variation Log.xlsx";
 const encPath = (p) => p.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
 
 // Module-level caches survive across requests on a warm serverless instance.
