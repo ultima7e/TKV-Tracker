@@ -1481,7 +1481,7 @@
   function normClaims(src) {
     return {
       totalUSD: src.totalUSD, totalNPR: src.totalNPR, socCount: src.socCount,
-      approvedNPR: src.approvedNPR, eotDays: src.eotDays, surgeNPR: src.surgeNPR,
+      approvedNPR: src.approvedNPR, eotDays: src.eotDays, eotGranted: src.eotGranted, surgeNPR: src.surgeNPR,
       claims: (src.claims || []).map((x) => ({ no: x.no, desc: x.subject, basis: x.basis, usd: x.usd, npr: x.npr, status: x.status })),
       variations: (src.variations || []).map((x) => ({ desc: x.desc, basis: x.basis, npr: x.npr, status: x.status })),
       eot: (src.eot || []).map((x) => ({
@@ -1524,7 +1524,7 @@
           <div class="sub">incl. surge-tunnel variation</div></div>
         <div class="card kpi"><h3>Statements of Claim</h3><div class="val">${c.socCount}</div><div class="sub">SoC #1–#${c.socCount} submitted</div></div>
         <div class="card kpi"><h3>Approved &amp; Received</h3><div class="valm">NPR ${c.approvedNPR.toFixed(2)} M</div><div class="sub">Provisional Sum — landslide cost</div></div>
-        <div class="card kpi"><h3>EoT Sought</h3><div class="val">${c.eotDays} <span style="font-size:15px">days</span></div><div class="sub">baseline (TIA) pending</div></div>
+        <div class="card kpi"><h3>EoT Sought</h3><div class="val">${c.eotDays} <span style="font-size:15px">days</span></div><div class="sub">${c.eotGranted ? c.eotGranted + ' days granted so far' : 'baseline (TIA) pending'}</div></div>
       </div>
       <div class="card" style="margin-bottom:16px">
         <h3>Statements of Claim <span class="muted" style="font-weight:600">· amount claimed &amp; engineer's position</span></h3>
