@@ -12,6 +12,7 @@ const { parseTunnel, parseKpis, parseSCurve, parseFinance, parseManpower, parseI
 const { parseXer } = require('../lib/xer');
 const { currentUser } = require('../lib/auth');
 const { kvGet } = require('../lib/store');
+const { computeRow } = require('../lib/finance-formulas');
 
 const FIN_RATE = 133.02; // USD-eq bridge rate, matches lib/parsers EV_RATE
 const fnum = (v) => (typeof v === 'number' ? v : (parseFloat(v) || 0));
@@ -50,7 +51,13 @@ async function applyFinanceOverride(payload) {
       fd.ipcs = f.ipcs.map((i) => ({ ...i, netUSD: fnum(i.netUSD), netNPR: fnum(i.netNPR),
         receivedUSD: i.receivedUSD != null ? fnum(i.receivedUSD) : fnum(i.netUSD),
         receivedNPR: i.receivedNPR != null ? fnum(i.receivedNPR) : fnum(i.netNPR),
-        items: Array.isArray(i.items) ? i.items : [], installments: Array.isArray(i.installments) ? i.installments : [] }));
+        // Where an item carries taxable amounts, derive its full breakdown (and
+        // net) from the source formulas so the Details panel and work-items agree.
+        items: (Array.isArray(i.items) ? i.items : []).map((it) => {
+          if (it && (it.taxableUSD || it.taxableNPR)) { const c = computeRow(it); return { ...it, netUSD: c.netUSD, netNPR: c.netNPR, detail: c }; }
+          return it;
+        }),
+        installments: Array.isArray(i.installments) ? i.installments : [] }));
     }
 
     const b = fd.budget || {}, rc = fd.received || {};

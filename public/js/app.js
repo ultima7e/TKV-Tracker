@@ -852,6 +852,35 @@
         </tbody>
       </table>`;
     const statusBadge = (s) => { const l = ipcStatusLabel(s); return `<span class="badge ${l === 'Settled' ? 'ok' : l === 'Rejected' ? 'bad' : 'warn'}">${l}</span>`; };
+    // Full accounting breakdown (taxable → net) shown when "Details" is toggled.
+    const fUSD = (v) => (v ? '$ ' + (+v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '–');
+    const fNPR = (v) => (v ? (+v).toLocaleString('en-US', { maximumFractionDigits: 0 }) : '–');
+    const detailPanel = (i) => {
+      const rows = (i.items || []).map((it) => { const x = it.detail || {}; return `<tr>
+        <td style="white-space:nowrap"><b>${it.code || ''}</b></td>
+        <td>${it.paymentPct != null ? it.paymentPct + '%' : '–'}</td>
+        <td>${fUSD(x.taxableUSD)}</td><td>${fNPR(x.taxableNPR)}</td>
+        <td>${fUSD(x.vatUSD)}</td><td>${fNPR(x.vatNPR)}</td>
+        <td>${fUSD(x.totalUSD)}</td><td>${fNPR(x.totalNPR)}</td>
+        <td>${fUSD(x.tdsUSD)}</td><td>${fUSD(x.retUSD)}</td><td>${fUSD(x.vat30USD)}</td>
+        <td><b>${fUSD(x.netUSD || it.netUSD)}</b></td><td><b>${fNPR(x.netNPR || it.netNPR)}</b></td></tr>`; }).join('');
+      const dt = i.detail || {};
+      const info = [
+        ['Certified letter', i.certifiedLetter || dt.certLetter],
+        ['IPS submission', dt.ipsDate], ['Certified date', i.certifiedDate || dt.certDate],
+        ['Due date', i.dueDate || dt.dueDate], ['Exchange rate', i.exchangeRate || dt.exchangeRate],
+        ['Received (NPR)', dt.receivedNPR ? fNPR(dt.receivedNPR) : (i.receivedNPR ? fNPR(i.receivedNPR) : null)],
+        ['Remaining (NPR)', dt.remainingNPR ? fNPR(dt.remainingNPR) : null],
+      ].filter(([, v]) => v != null && v !== '').map(([k, v]) => `<div class="ipc-di"><span>${k}</span><b>${v}</b></div>`).join('');
+      return `<div class="ipc-details" hidden>
+        <div class="ipc-diwrap">${info}</div>
+        ${rows ? `<div class="ipc-dscroll"><table class="tbl ipc-dtable"><thead><tr>
+          <th>Item</th><th>Pay&nbsp;%</th><th>Taxable USD</th><th>Taxable NPR</th><th>VAT USD</th><th>VAT NPR</th>
+          <th>Total USD</th><th>Total NPR</th><th>TDS USD</th><th>Retn USD</th><th>VAT30 USD</th><th>Net USD</th><th>Net NPR</th>
+        </tr></thead><tbody>${rows}</tbody></table></div>`
+        : '<div class="muted" style="font-size:11px">No per-activity breakdown recorded for this certificate.</div>'}
+      </div>`;
+    };
     // Reverse chronological — newest IPC first (Advance Payment, the oldest, last).
     const ipcsDesc = ipcs.slice().sort((a, b) => (b.certifiedDate || '').localeCompare(a.certifiedDate || ''));
     document.getElementById('f-ipclist').innerHTML = ipcsDesc.map((i, idx) => `
@@ -865,11 +894,19 @@
           <span class="ipc-caret">▸</span>
         </div>
         <div class="ipc-body">
+          <button class="ipc-details-btn" type="button">⊞ Details</button>
           ${i.items.length ? '<div class="ipc-sub">Work Items (' + i.items.length + ')</div>' + itemsTable(i.items) : ''}
+          ${detailPanel(i)}
         </div>
       </div>`).join('');
     document.querySelectorAll('#f-ipclist .ipc-head').forEach((h) =>
       h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
+    document.querySelectorAll('#f-ipclist .ipc-details-btn').forEach((b) =>
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const panel = b.parentElement.querySelector('.ipc-details');
+        if (panel) { panel.hidden = !panel.hidden; b.classList.toggle('on', !panel.hidden); }
+      }));
   }
 
   let schedBuiltFor = null;
@@ -1562,10 +1599,13 @@
       earnedByCategory: (fd.earnedByCategory || []).map((c) => ({ group: c.group || '', category: c.category, usd: c.usd ?? null, npr: c.npr ?? null })),
       ipcs: (fd.ipcs || []).map((i) => ({
         ipc: i.ipc, certifiedDate: i.certifiedDate || '', certifiedLetter: i.certifiedLetter || '',
+        dueDate: i.dueDate || '', exchangeRate: i.exchangeRate ?? null,
         netUSD: i.netUSD ?? null, netNPR: i.netNPR ?? null, receivedUSD: i.receivedUSD ?? null, receivedNPR: i.receivedNPR ?? null,
         status: i.status || '', isAdvance: !!i.isAdvance,
         items: (i.items || []).map((it) => ({ code: it.code || '', activityName: it.activityName || '', paymentPct: it.paymentPct ?? null,
-          netUSD: it.netUSD ?? null, netNPR: it.netNPR ?? null, taxableUSD: it.taxableUSD ?? null, taxableNPR: it.taxableNPR ?? null })),
+          netUSD: it.netUSD ?? null, netNPR: it.netNPR ?? null,
+          taxableUSD: (it.detail && it.detail.taxableUSD) ?? it.taxableUSD ?? null,
+          taxableNPR: (it.detail && it.detail.taxableNPR) ?? it.taxableNPR ?? null })),
       })),
     };
   }
@@ -1630,6 +1670,19 @@
   }
   function feMsg(text, cls) { const el = document.getElementById('fe-msg'); if (el) { el.textContent = text; el.className = 'fe-msg ' + (cls || ''); } }
   function feSet(path, val) { const t = path.split('.'); let o = feModel; for (let k = 0; k < t.length - 1; k++) { o = o[t[k]]; if (o == null) return; } o[t[t.length - 1]] = val; }
+  // Live-derive Net from Taxable using the source formula (Net = Taxable × 1.026
+  // for USD; NPR applies the same VAT/TDS/retention/VAT-30% chain), so typing the
+  // taxable amount fills the net columns. The server recomputes exactly on save.
+  function feComputeItemNet(i, j) {
+    const it = feModel.ipcs[i] && feModel.ipcs[i].items[j]; if (!it) return;
+    const F = +it.taxableUSD || 0, G = +it.taxableNPR || 0;
+    const vatN = Math.round(G * 0.13 * 100) / 100;
+    if (F) it.netUSD = Math.round(F * 1.026 * 100) / 100;
+    if (G) it.netNPR = Math.round(((G + vatN) - G * 0.015 - G * 0.05 - vatN * 0.30) * 100) / 100;
+    const host = document.getElementById('fin-entry');
+    const nu = host.querySelector('[data-fe="ipcs.' + i + '.items.' + j + '.netUSD"]'); if (nu && F) nu.value = it.netUSD;
+    const nn = host.querySelector('[data-fe="ipcs.' + i + '.items.' + j + '.netNPR"]'); if (nn && G) nn.value = it.netNPR;
+  }
   function feDel(spec) {
     const [kind, i, j] = spec.split('.');
     if (kind === 'cat') feModel.earnedByCategory.splice(+i, 1);
@@ -1690,7 +1743,12 @@
     }));
     const host = document.getElementById('fin-entry');
     if (host) {
-      host.addEventListener('input', (e) => { const p = e.target.dataset.fe; if (!p) return; feSet(p, e.target.dataset.feNum ? feN(e.target.value) : e.target.value); });
+      host.addEventListener('input', (e) => {
+        const p = e.target.dataset.fe; if (!p) return;
+        feSet(p, e.target.dataset.feNum ? feN(e.target.value) : e.target.value);
+        const m = p.match(/^ipcs\.(\d+)\.items\.(\d+)\.taxable(?:USD|NPR)$/);
+        if (m) feComputeItemNet(+m[1], +m[2]);
+      });
       host.addEventListener('click', (e) => {
         const t = e.target.closest('[data-fe-act],[data-fe-add],[data-fe-del]'); if (!t) return;
         if (t.dataset.feAct === 'save') feSave();
