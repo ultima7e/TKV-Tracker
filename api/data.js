@@ -41,7 +41,12 @@ async function applyFinanceOverride(payload) {
     if (f.received) fd.received = { usd: fnum(f.received.usd), npr: fnum(f.received.npr),
       nprEq: fnum(f.received.npr) + fnum(f.received.usd) * FIN_RATE };
     if (f.retention) fd.retention = { usd: fnum(f.retention.usd), npr: fnum(f.retention.npr) };
-    if (f.advance !== undefined) fd.advance = f.advance;
+    if (f.advance !== undefined) fd.advance = f.advance && {
+      amortisedPct: fnum(f.advance.amortisedPct), disbursedUSD: fnum(f.advance.disbursedUSD), disbursedNPR: fnum(f.advance.disbursedNPR),
+      recoveredUSD: fnum(f.advance.recoveredUSD), recoveredNPR: fnum(f.advance.recoveredNPR),
+      outstandingUSD: fnum(f.advance.outstandingUSD), outstandingNPR: fnum(f.advance.outstandingNPR),
+      monsoonDisbursedNPR: fnum(f.advance.monsoonDisbursedNPR), monsoonRecoveredNPR: fnum(f.advance.monsoonRecoveredNPR),
+    };
     if (Array.isArray(f.earnedByCategory)) {
       fd.earnedByCategory = f.earnedByCategory
         .map((c) => ({ ...c, usd: fnum(c.usd), npr: fnum(c.npr), usdEquiv: fnum(c.usd) + fnum(c.npr) / FIN_RATE }))

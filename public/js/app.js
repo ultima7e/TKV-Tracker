@@ -645,11 +645,12 @@
     ] });
     // Headline amortised % for the KPI card (combined, NPR-equivalent).
     const arate = (b.workUSDEq > b.workUSD && b.workNPR) ? b.workNPR / (b.workUSDEq - b.workUSD) : 133;
-    const advNpr = (a) => a.lines.reduce((s, l) => s + (l.cur === 'USD' ? l.disbursed * arate : l.disbursed), 0);
-    const recNpr = (a) => a.lines.reduce((s, l) => s + (l.cur === 'USD' ? l.recovered * arate : l.recovered), 0);
+    const nz = (v) => (Number.isFinite(+v) ? +v : 0); // guard null/undefined -> 0
+    const advNpr = (a) => a.lines.reduce((s, l) => s + (l.cur === 'USD' ? nz(l.disbursed) * arate : nz(l.disbursed)), 0);
+    const recNpr = (a) => a.lines.reduce((s, l) => s + (l.cur === 'USD' ? nz(l.recovered) * arate : nz(l.recovered)), 0);
     const totDisb = advances.reduce((s, a) => s + advNpr(a), 0);
     const totRec = advances.reduce((s, a) => s + recNpr(a), 0);
-    setKpi('adv-pct', totDisb ? Math.round((totRec / totDisb) * 1000) / 10 : 0, 1);
+    setKpi('adv-pct', totDisb > 0 ? Math.round((totRec / totDisb) * 1000) / 10 : 0, 1);
     const fmtAmt = (cur, v) => (cur === 'USD' ? `$ ${usdM(v)} M` : `NPR ${nprM(v)} M`);
     const advPop = document.getElementById('f-advance');
     advPop.innerHTML = `<div class="adv-pop-head">Advance Payment — Amortisation</div>` +
@@ -1600,7 +1601,9 @@
       received: { usd: rc.usd ?? null, npr: rc.npr ?? null },
       retention: { usd: ret.usd ?? null, npr: ret.npr ?? null },
       advance: adv ? { amortisedPct: adv.amortisedPct ?? 0, disbursedUSD: adv.disbursedUSD ?? null, disbursedNPR: adv.disbursedNPR ?? null,
-        outstandingUSD: adv.outstandingUSD ?? null, outstandingNPR: adv.outstandingNPR ?? null } : null,
+        recoveredUSD: adv.recoveredUSD ?? 0, recoveredNPR: adv.recoveredNPR ?? 0,
+        outstandingUSD: adv.outstandingUSD ?? null, outstandingNPR: adv.outstandingNPR ?? null,
+        monsoonDisbursedNPR: adv.monsoonDisbursedNPR ?? 0, monsoonRecoveredNPR: adv.monsoonRecoveredNPR ?? 0 } : null,
       earnedByCategory: (fd.earnedByCategory || []).map((c) => ({ group: c.group || '', category: c.category, usd: c.usd ?? null, npr: c.npr ?? null })),
       ipcs: (fd.ipcs || []).map((i) => ({
         ipc: i.ipc, certifiedDate: i.certifiedDate || '', certifiedLetter: i.certifiedLetter || '',
