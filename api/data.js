@@ -13,6 +13,62 @@ const { parseXer } = require('../lib/xer');
 const { currentUser } = require('../lib/auth');
 const { kvGet } = require('../lib/store');
 
+const FIN_RATE = 133.02; // USD-eq bridge rate, matches lib/parsers EV_RATE
+const fnum = (v) => (typeof v === 'number' ? v : (parseFloat(v) || 0));
+
+// If an admin has entered/edited financials in the app (stored in KV as
+// tkv:finance), they REPLACE the figures parsed from the Earned Value workbook
+// so the dashboard is driven by the app. Derived fields (USD-eq, certified/
+// outstanding split, headline KPIs, the exec IPC table) are recomputed here so
+// everything stays internally consistent regardless of what was entered.
+async function applyFinanceOverride(payload) {
+  try {
+    const raw = await kvGet('tkv:finance');
+    if (!raw) return payload;
+    const f = JSON.parse(raw);
+    if (!f || typeof f !== 'object') return payload;
+    const fd = payload.financeDetail = payload.financeDetail || {};
+
+    if (f.budget) {
+      const workUSD = fnum(f.budget.workUSD), workNPR = fnum(f.budget.workNPR);
+      const workUSDEq = workUSD + workNPR / FIN_RATE;
+      const pf = f.budget.progressPct != null ? fnum(f.budget.progressPct) : (fd.budget && fd.budget.progressPct);
+      fd.budget = { ...fd.budget, workUSD, workNPR, workUSDEq, progressPct: pf,
+        certifiedUsdEq: pf != null ? (pf / 100) * workUSDEq : (fd.budget && fd.budget.certifiedUsdEq),
+        outstandingUsdEq: pf != null ? (1 - pf / 100) * workUSDEq : (fd.budget && fd.budget.outstandingUsdEq) };
+    }
+    if (f.received) fd.received = { usd: fnum(f.received.usd), npr: fnum(f.received.npr),
+      nprEq: fnum(f.received.npr) + fnum(f.received.usd) * FIN_RATE };
+    if (f.retention) fd.retention = { usd: fnum(f.retention.usd), npr: fnum(f.retention.npr) };
+    if (f.advance !== undefined) fd.advance = f.advance;
+    if (Array.isArray(f.earnedByCategory)) {
+      fd.earnedByCategory = f.earnedByCategory
+        .map((c) => ({ ...c, usd: fnum(c.usd), npr: fnum(c.npr), usdEquiv: fnum(c.usd) + fnum(c.npr) / FIN_RATE }))
+        .filter((c) => c.usdEquiv > 0).sort((a, b) => b.usdEquiv - a.usdEquiv);
+    }
+    if (Array.isArray(f.ipcs)) {
+      fd.ipcs = f.ipcs.map((i) => ({ ...i, netUSD: fnum(i.netUSD), netNPR: fnum(i.netNPR),
+        receivedUSD: i.receivedUSD != null ? fnum(i.receivedUSD) : fnum(i.netUSD),
+        receivedNPR: i.receivedNPR != null ? fnum(i.receivedNPR) : fnum(i.netNPR),
+        items: Array.isArray(i.items) ? i.items : [], installments: Array.isArray(i.installments) ? i.installments : [] }));
+    }
+
+    const b = fd.budget || {}, rc = fd.received || {};
+    payload.finance = { ...payload.finance,
+      budgetUSD: b.workUSD, budgetNPR: b.workNPR, budgetUSDEquiv: b.workUSDEq,
+      financialProgressPct: b.progressPct, receivedUSD: rc.usd, receivedNPR: rc.npr, receivedNPREquiv: rc.nprEq };
+
+    if (Array.isArray(fd.ipcs)) {
+      const rows = fd.ipcs.filter((i) => !i.isAdvance).map((i) => ({
+        ipc: i.ipc, certifiedDate: i.certifiedDate, netUSD: fnum(i.netUSD), netNPR: fnum(i.netNPR), status: i.status }));
+      const total = rows.reduce((a, r) => ({ netUSD: a.netUSD + r.netUSD, netNPR: a.netNPR + r.netNPR, count: a.count + 1 }),
+        { netUSD: 0, netNPR: 0, count: 0 });
+      payload.ipc = { rows, total };
+    }
+  } catch (e) { /* keep workbook-derived figures on any store/parse error */ }
+  return payload;
+}
+
 // If an admin uploaded a schedule (stored in KV), it permanently replaces the
 // Schedule tab's baseline. Only read the (larger) blob when rebuilding.
 async function applyScheduleOverride(payload) {
@@ -203,13 +259,14 @@ async function buildPayload() {
 
     // Nutstore folder PROPFIND + both XER PROPFINDs + claims PROPFIND + Dropbox
     // fetches + the small schedule-override version marker, all parallel.
-    const [listing, xerInfo, delayXerInfo, claimsInfo, dbx, schedVer] = await Promise.all([
+    const [listing, xerInfo, delayXerInfo, claimsInfo, dbx, schedVer, finVer] = await Promise.all([
       propfind(DAV_BASE + encPath(dir) + '/', headers, 1),
       propfind(DAV_BASE + encPath(xerPath), headers, 0),
       propfind(DAV_BASE + encPath(delayXerPath), headers, 0),
       propfind(DAV_BASE + encPath(CLAIMS_XLSX_PATH), headers, 0).catch(() => []),
       fetchDropbox(),
       kvGet('tkv:schedule_ver').catch(() => null),
+      kvGet('tkv:finance_ver').catch(() => null),
     ]);
     const claimsMtime = (claimsInfo[0] && claimsInfo[0].mtime) || '';
     let entries = listing.filter((e) => /\.xlsx$/i.test(e.path) && !/\/~\$/.test(e.path));
@@ -226,6 +283,7 @@ async function buildPayload() {
       dxer: delayXerPath + '|' + delayXerMtime,
       claims: CLAIMS_XLSX_PATH + '|' + claimsMtime,
       sched: schedVer || '',
+      fin: finVer || '',
       dbx: dbx.map((d) => d.name + '|' + d.etag),
     });
     if (payloadCache && payloadCache.sig === sig) { // nothing changed — reuse parsed payload
@@ -242,6 +300,7 @@ async function buildPayload() {
     const buffers = [...nutBuffers, ...dbx.filter((d) => d.buffer).map((d) => d.buffer)];
     const payload = assemble(buffers, xerText, delayXerText, 'nutstore', claimsBuffer);
     payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
+    if (finVer) await applyFinanceOverride(payload);
     if (schedVer) await applyScheduleOverride(payload);
     payloadCache = { sig, payload, ts: Date.now() };
     return stamp(payload);
@@ -252,9 +311,11 @@ async function buildPayload() {
   const files = fs.readdirSync(dir).filter((f) => (f.endsWith('.xlsx') || f.endsWith('.xer')) && !f.startsWith('~$')).sort();
   const dbx = await fetchDropbox();
   const schedVer = await kvGet('tkv:schedule_ver').catch(() => null);
+  const finVer = await kvGet('tkv:finance_ver').catch(() => null);
   const sig = JSON.stringify({
     local: files.map((f) => f + '|' + fs.statSync(path.join(dir, f)).mtimeMs),
     sched: schedVer || '',
+    fin: finVer || '',
     dbx: dbx.map((d) => d.name + '|' + d.etag),
   });
   if (payloadCache && payloadCache.sig === sig) return stamp(payloadCache.payload);
@@ -271,6 +332,7 @@ async function buildPayload() {
   const claimsBuffer = claimsFile ? fs.readFileSync(path.join(dir, claimsFile)) : null;
   const payload = assemble(buffers, readXer(baselineXf), readXer(delayXf), 'local-file', claimsBuffer);
   payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
+  if (finVer) await applyFinanceOverride(payload);
   if (schedVer) await applyScheduleOverride(payload);
   payloadCache = { sig, payload, ts: Date.now() };
   return stamp(payload);

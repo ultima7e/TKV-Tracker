@@ -122,6 +122,11 @@
       </section>
 
       <section class="view" id="fin">
+        <div class="fin-subtabs" id="fin-subtabs" hidden>
+          <button class="fin-subtab active" data-fintab="dash">Dashboard</button>
+          <button class="fin-subtab" data-fintab="entry">✎ Data Entry</button>
+        </div>
+        <div id="fin-entry" class="fin-entry" hidden></div>
         <div class="grid kpis" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px">
           <div class="card kpi"><h3>Contract Amount</h3>
             <div class="valm">$ <span id="f-cusd">—</span> M</div>

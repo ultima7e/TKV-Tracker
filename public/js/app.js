@@ -60,6 +60,8 @@
     const na = document.getElementById('nav-admin'); if (na) na.style.display = me.isAdmin ? '' : 'none';
     const schTools = document.getElementById('sch-admin-tools'); if (schTools) schTools.style.display = me.isAdmin ? '' : 'none';
     const calBtn = document.getElementById('t3d-cal-btn'); if (calBtn) calBtn.style.display = me.isAdmin ? '' : 'none';
+    const finTabs = document.getElementById('fin-subtabs'); if (finTabs) finTabs.hidden = !me.isAdmin;
+    wireFinanceEntry();
     // Land on the first section this account may see.
     const first = me.isAdmin ? 'exec' : (me.sections || [])[0];
     document.querySelectorAll('.nav-item').forEach((n) => n.classList.remove('active'));
@@ -1540,6 +1542,165 @@
           <table class="tbl"><thead><tr><th style="text-align:left">Item</th><th>Period</th><th>EoT</th><th>Status</th></tr></thead>
           <tbody>${eotRows}</tbody></table></div>
       </div>`;
+  }
+
+  // ---- Financial Data Entry (admin) ----------------------------------------
+  // An editable working copy of the financials that, once saved, drives the whole
+  // dashboard (via /api/finance -> tkv:finance override) and can be exported to
+  // the Milestone Payment Summary Excel format.
+  let feModel = null, feWired = false;
+  const feN = (v) => (v === '' || v == null || isNaN(+v) ? null : +v);
+  function feSeed() {
+    const fd = (data && data.financeDetail) || {};
+    const b = fd.budget || {}, rc = fd.received || {}, ret = fd.retention || {}, adv = fd.advance || null;
+    feModel = {
+      budget: { workUSD: b.workUSD ?? null, workNPR: b.workNPR ?? null, progressPct: b.progressPct ?? null },
+      received: { usd: rc.usd ?? null, npr: rc.npr ?? null },
+      retention: { usd: ret.usd ?? null, npr: ret.npr ?? null },
+      advance: adv ? { amortisedPct: adv.amortisedPct ?? 0, disbursedUSD: adv.disbursedUSD ?? null, disbursedNPR: adv.disbursedNPR ?? null,
+        outstandingUSD: adv.outstandingUSD ?? null, outstandingNPR: adv.outstandingNPR ?? null } : null,
+      earnedByCategory: (fd.earnedByCategory || []).map((c) => ({ group: c.group || '', category: c.category, usd: c.usd ?? null, npr: c.npr ?? null })),
+      ipcs: (fd.ipcs || []).map((i) => ({
+        ipc: i.ipc, certifiedDate: i.certifiedDate || '', certifiedLetter: i.certifiedLetter || '',
+        netUSD: i.netUSD ?? null, netNPR: i.netNPR ?? null, receivedUSD: i.receivedUSD ?? null, receivedNPR: i.receivedNPR ?? null,
+        status: i.status || '', isAdvance: !!i.isAdvance,
+        items: (i.items || []).map((it) => ({ code: it.code || '', activityName: it.activityName || '', paymentPct: it.paymentPct ?? null,
+          netUSD: it.netUSD ?? null, netNPR: it.netNPR ?? null, taxableUSD: it.taxableUSD ?? null, taxableNPR: it.taxableNPR ?? null })),
+      })),
+    };
+  }
+  const feEsc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  const feInp = (path, val, numeric, ph) => `<input class="fe-input" data-fe="${path}"${numeric ? ' data-fe-num="1" type="number" step="any"' : ''} value="${feEsc(val)}"${ph ? ` placeholder="${ph}"` : ''}>`;
+  const feFld = (label, path, val, numeric) => `<div class="fe-field"><label>${label}</label>${feInp(path, val, numeric)}</div>`;
+  function renderFinanceEntry() {
+    const host = document.getElementById('fin-entry');
+    if (!host) return;
+    if (!feModel) feSeed();
+    const m = feModel;
+    const kpi = `<div class="fe-sec">Headline figures</div><div class="fe-grid">
+      ${feFld('Contract USD', 'budget.workUSD', m.budget.workUSD, true)}
+      ${feFld('Contract NPR', 'budget.workNPR', m.budget.workNPR, true)}
+      ${feFld('Financial progress %', 'budget.progressPct', m.budget.progressPct, true)}
+      ${feFld('Total received USD', 'received.usd', m.received.usd, true)}
+      ${feFld('Total received NPR', 'received.npr', m.received.npr, true)}
+      ${feFld('Retention USD', 'retention.usd', m.retention.usd, true)}
+      ${feFld('Retention NPR', 'retention.npr', m.retention.npr, true)}
+      ${m.advance ? feFld('Advance amortised %', 'advance.amortisedPct', m.advance.amortisedPct, true) : ''}
+    </div>`;
+    const cats = `<div class="fe-sec">Earned value by category</div>
+      <table class="fe-table"><thead><tr><th style="width:44%">Category</th><th>USD</th><th>NPR</th><th></th></tr></thead><tbody>
+      ${m.earnedByCategory.map((c, i) => `<tr>
+        <td>${feInp('earnedByCategory.' + i + '.category', c.category)}</td>
+        <td>${feInp('earnedByCategory.' + i + '.usd', c.usd, true)}</td>
+        <td>${feInp('earnedByCategory.' + i + '.npr', c.npr, true)}</td>
+        <td><button class="fe-x" data-fe-del="cat.${i}" title="Remove">✕</button></td></tr>`).join('')}
+      </tbody></table><button class="fe-btn" data-fe-add="cat" style="margin-top:8px">+ Add category</button>`;
+    const ipcs = `<div class="fe-sec">IPC register &amp; per-activity payments</div>
+      ${m.ipcs.map((ip, i) => `<div class="fe-ipc">
+        <div class="fe-ipc-head">
+          ${feFld('IPC', 'ipcs.' + i + '.ipc', ip.ipc)}
+          ${feFld('Certified date', 'ipcs.' + i + '.certifiedDate', ip.certifiedDate)}
+          ${feFld('Certified letter', 'ipcs.' + i + '.certifiedLetter', ip.certifiedLetter)}
+          ${feFld('Net USD', 'ipcs.' + i + '.netUSD', ip.netUSD, true)}
+          ${feFld('Net NPR', 'ipcs.' + i + '.netNPR', ip.netNPR, true)}
+          ${feFld('Recv USD', 'ipcs.' + i + '.receivedUSD', ip.receivedUSD, true)}
+          ${feFld('Recv NPR', 'ipcs.' + i + '.receivedNPR', ip.receivedNPR, true)}
+          ${feFld('Status', 'ipcs.' + i + '.status', ip.status)}
+          <button class="fe-x" data-fe-del="ipc.${i}" title="Remove IPC" style="margin-bottom:2px">✕</button>
+        </div>
+        <table class="fe-table" style="margin-top:10px"><thead><tr><th>Activity</th><th>Pay %</th><th>Taxable USD</th><th>Taxable NPR</th><th>Net USD</th><th>Net NPR</th><th></th></tr></thead><tbody>
+        ${ip.items.map((it, j) => `<tr>
+          <td>${feInp('ipcs.' + i + '.items.' + j + '.code', it.code)}</td>
+          <td style="width:64px">${feInp('ipcs.' + i + '.items.' + j + '.paymentPct', it.paymentPct, true)}</td>
+          <td>${feInp('ipcs.' + i + '.items.' + j + '.taxableUSD', it.taxableUSD, true)}</td>
+          <td>${feInp('ipcs.' + i + '.items.' + j + '.taxableNPR', it.taxableNPR, true)}</td>
+          <td>${feInp('ipcs.' + i + '.items.' + j + '.netUSD', it.netUSD, true)}</td>
+          <td>${feInp('ipcs.' + i + '.items.' + j + '.netNPR', it.netNPR, true)}</td>
+          <td><button class="fe-x" data-fe-del="item.${i}.${j}" title="Remove">✕</button></td></tr>`).join('')}
+        </tbody></table><button class="fe-btn" data-fe-add="item.${i}" style="margin-top:8px">+ Add activity</button>
+      </div>`).join('')}
+      <button class="fe-btn" data-fe-add="ipc">+ Add IPC</button>`;
+    host.innerHTML = `<div class="fe-actions">
+        <button class="fe-btn primary" data-fe-act="save">Save &amp; apply</button>
+        <button class="fe-btn" data-fe-act="export">⬇ Export Excel</button>
+        <button class="fe-btn" data-fe-act="undo">Undo edits</button>
+        <button class="fe-btn danger" data-fe-act="reset">Reset to Excel source</button>
+        <span class="fe-msg" id="fe-msg"></span>
+      </div>${kpi}${cats}${ipcs}`;
+  }
+  function feMsg(text, cls) { const el = document.getElementById('fe-msg'); if (el) { el.textContent = text; el.className = 'fe-msg ' + (cls || ''); } }
+  function feSet(path, val) { const t = path.split('.'); let o = feModel; for (let k = 0; k < t.length - 1; k++) { o = o[t[k]]; if (o == null) return; } o[t[t.length - 1]] = val; }
+  function feDel(spec) {
+    const [kind, i, j] = spec.split('.');
+    if (kind === 'cat') feModel.earnedByCategory.splice(+i, 1);
+    else if (kind === 'ipc') feModel.ipcs.splice(+i, 1);
+    else if (kind === 'item') feModel.ipcs[+i].items.splice(+j, 1);
+    renderFinanceEntry();
+  }
+  function feAdd(spec) {
+    const [kind, i] = spec.split('.');
+    if (kind === 'cat') feModel.earnedByCategory.push({ group: '', category: 'New category', usd: null, npr: null });
+    else if (kind === 'ipc') feModel.ipcs.push({ ipc: 'IPC-', certifiedDate: '', certifiedLetter: '', netUSD: null, netNPR: null, receivedUSD: null, receivedNPR: null, status: 'Under review', isAdvance: false, items: [] });
+    else if (kind === 'item') feModel.ipcs[+i].items.push({ code: '', activityName: '', paymentPct: null, netUSD: null, netNPR: null, taxableUSD: null, taxableNPR: null });
+    renderFinanceEntry();
+  }
+  async function feSave() {
+    feMsg('Saving…', '');
+    try {
+      const r = await authFetch('/api/finance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: feModel }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { feMsg(j.error || ('Save failed (' + r.status + ')'), 'err'); return; }
+      feMsg('Saved — refreshing dashboard…', 'ok');
+      await load();          // pull the now-overridden payload
+      feSeed(); renderFinanceEntry();
+      feMsg('Saved & applied ✓', 'ok');
+    } catch (e) { feMsg('Save failed: ' + e.message, 'err'); }
+  }
+  async function feReset() {
+    if (!confirm('Discard the app data and revert the dashboard to the live Excel source?')) return;
+    feMsg('Reverting…', '');
+    try {
+      const r = await authFetch('/api/finance', { method: 'DELETE' });
+      if (!r.ok) { const j = await r.json().catch(() => ({})); feMsg(j.error || 'Reset failed', 'err'); return; }
+      await load(); feSeed(); renderFinanceEntry();
+      feMsg('Reverted to Excel source ✓', 'ok');
+    } catch (e) { feMsg('Reset failed: ' + e.message, 'err'); }
+  }
+  async function feExport() {
+    feMsg('Building Excel…', '');
+    try {
+      const r = await authFetch('/api/finance?export=1');
+      if (!r.ok) { const j = await r.json().catch(() => ({})); feMsg(j.error || 'Export failed — save first', 'err'); return; }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'Milestone Payment Summary.xlsx';
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      feMsg('Exported ✓', 'ok');
+    } catch (e) { feMsg('Export failed: ' + e.message, 'err'); }
+  }
+  function wireFinanceEntry() {
+    if (feWired) return; feWired = true;
+    document.querySelectorAll('#fin-subtabs .fin-subtab').forEach((b) => b.addEventListener('click', () => {
+      document.querySelectorAll('#fin-subtabs .fin-subtab').forEach((x) => x.classList.remove('active'));
+      b.classList.add('active');
+      const entry = b.dataset.fintab === 'entry';
+      document.getElementById('fin').classList.toggle('entry-mode', entry);
+      const host = document.getElementById('fin-entry'); if (host) host.hidden = !entry;
+      if (entry) { feSeed(); renderFinanceEntry(); }
+    }));
+    const host = document.getElementById('fin-entry');
+    if (host) {
+      host.addEventListener('input', (e) => { const p = e.target.dataset.fe; if (!p) return; feSet(p, e.target.dataset.feNum ? feN(e.target.value) : e.target.value); });
+      host.addEventListener('click', (e) => {
+        const t = e.target.closest('[data-fe-act],[data-fe-add],[data-fe-del]'); if (!t) return;
+        if (t.dataset.feAct === 'save') feSave();
+        else if (t.dataset.feAct === 'reset') feReset();
+        else if (t.dataset.feAct === 'export') feExport();
+        else if (t.dataset.feAct === 'undo') { feSeed(); renderFinanceEntry(); feMsg('Edits discarded', ''); }
+        else if (t.dataset.feAdd) feAdd(t.dataset.feAdd);
+        else if (t.dataset.feDel) feDel(t.dataset.feDel);
+      });
+    }
   }
 
   function renderAll() {

@@ -9,6 +9,8 @@ node_modules/
 # Only the synthetic dev sample is tracked.
 *.xlsx
 !data/sample.xlsx
+# Data-free Excel export template (headers/styles only, no financial figures).
+!assets/templates/*.xlsx
 
 # Large CAD source files + conversion temp artifacts (the compact
 # public/assets/tunnels.bin built from them IS tracked).
