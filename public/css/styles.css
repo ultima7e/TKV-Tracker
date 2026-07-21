@@ -227,7 +227,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .ipc-di span{font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700}
 .ipc-di b{color:var(--navy)}
 .ipc-dscroll{overflow-x:auto}
-.ipc-dtable{min-width:1050px;font-size:11.5px}
+.ipc-dtable{min-width:1400px;font-size:11.5px}
 .ipc-dtable th,.ipc-dtable td{white-space:nowrap;text-align:right;padding:5px 8px}
 .ipc-dtable th:first-child,.ipc-dtable td:first-child{text-align:left}
 /* Financial: Dashboard / Data-Entry sub-tabs + the entry form. */

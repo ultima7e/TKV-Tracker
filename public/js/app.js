@@ -862,7 +862,10 @@
         <td>${fUSD(x.taxableUSD)}</td><td>${fNPR(x.taxableNPR)}</td>
         <td>${fUSD(x.vatUSD)}</td><td>${fNPR(x.vatNPR)}</td>
         <td>${fUSD(x.totalUSD)}</td><td>${fNPR(x.totalNPR)}</td>
-        <td>${fUSD(x.tdsUSD)}</td><td>${fUSD(x.retUSD)}</td><td>${fUSD(x.vat30USD)}</td>
+        <td>${fUSD(x.tdsUSD)}</td>
+        <td>${fUSD(x.advanceUSD)}</td><td>${fNPR(x.advanceNPR)}</td>
+        <td>${fUSD(x.ded15USD)}</td><td>${fNPR(x.ded15NPR)}</td>
+        <td>${fUSD(x.retUSD)}</td><td>${fUSD(x.vat30USD)}</td>
         <td><b>${fUSD(x.netUSD || it.netUSD)}</b></td><td><b>${fNPR(x.netNPR || it.netNPR)}</b></td></tr>`; }).join('');
       const dt = i.detail || {};
       const info = [
@@ -876,7 +879,8 @@
         <div class="ipc-diwrap">${info}</div>
         ${rows ? `<div class="ipc-dscroll"><table class="tbl ipc-dtable"><thead><tr>
           <th>Item</th><th>Pay&nbsp;%</th><th>Taxable USD</th><th>Taxable NPR</th><th>VAT USD</th><th>VAT NPR</th>
-          <th>Total USD</th><th>Total NPR</th><th>TDS USD</th><th>Retn USD</th><th>VAT30 USD</th><th>Net USD</th><th>Net NPR</th>
+          <th>Total USD</th><th>Total NPR</th><th>TDS USD</th><th>Adv USD</th><th>Adv NPR</th><th>15%-AP USD</th><th>15%-AP NPR</th>
+          <th>Retn USD</th><th>VAT30 USD</th><th>Net USD</th><th>Net NPR</th>
         </tr></thead><tbody>${rows}</tbody></table></div>`
         : '<div class="muted" style="font-size:11px">No per-activity breakdown recorded for this certificate.</div>'}
       </div>`;
@@ -1602,10 +1606,11 @@
         dueDate: i.dueDate || '', exchangeRate: i.exchangeRate ?? null,
         netUSD: i.netUSD ?? null, netNPR: i.netNPR ?? null, receivedUSD: i.receivedUSD ?? null, receivedNPR: i.receivedNPR ?? null,
         status: i.status || '', isAdvance: !!i.isAdvance,
-        items: (i.items || []).map((it) => ({ code: it.code || '', activityName: it.activityName || '', paymentPct: it.paymentPct ?? null,
+        items: (i.items || []).map((it) => { const d = it.detail || {}; return { code: it.code || '', activityName: it.activityName || '', paymentPct: it.paymentPct ?? null,
           netUSD: it.netUSD ?? null, netNPR: it.netNPR ?? null,
-          taxableUSD: (it.detail && it.detail.taxableUSD) ?? it.taxableUSD ?? null,
-          taxableNPR: (it.detail && it.detail.taxableNPR) ?? it.taxableNPR ?? null })),
+          taxableUSD: d.taxableUSD ?? it.taxableUSD ?? null, taxableNPR: d.taxableNPR ?? it.taxableNPR ?? null,
+          advanceUSD: d.advanceUSD ?? it.advanceUSD ?? null, advanceNPR: d.advanceNPR ?? it.advanceNPR ?? null,
+          ded15USD: d.ded15USD ?? it.ded15USD ?? null, ded15NPR: d.ded15NPR ?? it.ded15NPR ?? null }; }),
       })),
     };
   }
@@ -1648,16 +1653,18 @@
           ${feFld('Status', 'ipcs.' + i + '.status', ip.status)}
           <button class="fe-x" data-fe-del="ipc.${i}" title="Remove IPC" style="margin-bottom:2px">✕</button>
         </div>
-        <table class="fe-table" style="margin-top:10px"><thead><tr><th>Activity</th><th>Pay %</th><th>Taxable USD</th><th>Taxable NPR</th><th>Net USD</th><th>Net NPR</th><th></th></tr></thead><tbody>
+        <div style="overflow-x:auto"><table class="fe-table" style="margin-top:10px;min-width:820px"><thead><tr><th>Activity</th><th>Pay %</th><th>Taxable USD</th><th>Taxable NPR</th><th>Adv NPR</th><th>Less 15%-AP NPR</th><th>Net USD</th><th>Net NPR</th><th></th></tr></thead><tbody>
         ${ip.items.map((it, j) => `<tr>
           <td>${feInp('ipcs.' + i + '.items.' + j + '.code', it.code)}</td>
           <td style="width:64px">${feInp('ipcs.' + i + '.items.' + j + '.paymentPct', it.paymentPct, true)}</td>
           <td>${feInp('ipcs.' + i + '.items.' + j + '.taxableUSD', it.taxableUSD, true)}</td>
           <td>${feInp('ipcs.' + i + '.items.' + j + '.taxableNPR', it.taxableNPR, true)}</td>
+          <td>${feInp('ipcs.' + i + '.items.' + j + '.advanceNPR', it.advanceNPR, true)}</td>
+          <td>${feInp('ipcs.' + i + '.items.' + j + '.ded15NPR', it.ded15NPR, true)}</td>
           <td>${feInp('ipcs.' + i + '.items.' + j + '.netUSD', it.netUSD, true)}</td>
           <td>${feInp('ipcs.' + i + '.items.' + j + '.netNPR', it.netNPR, true)}</td>
           <td><button class="fe-x" data-fe-del="item.${i}.${j}" title="Remove">✕</button></td></tr>`).join('')}
-        </tbody></table><button class="fe-btn" data-fe-add="item.${i}" style="margin-top:8px">+ Add activity</button>
+        </tbody></table></div><button class="fe-btn" data-fe-add="item.${i}" style="margin-top:8px">+ Add activity</button>
       </div>`).join('')}
       <button class="fe-btn" data-fe-add="ipc">+ Add IPC</button>`;
     host.innerHTML = `<div class="fe-actions">
@@ -1676,9 +1683,11 @@
   function feComputeItemNet(i, j) {
     const it = feModel.ipcs[i] && feModel.ipcs[i].items[j]; if (!it) return;
     const F = +it.taxableUSD || 0, G = +it.taxableNPR || 0;
+    const advN = +it.advanceNPR || 0, dedN = +it.ded15NPR || 0;
     const vatN = Math.round(G * 0.13 * 100) / 100;
     if (F) it.netUSD = Math.round(F * 1.026 * 100) / 100;
-    if (G) it.netNPR = Math.round(((G + vatN) - G * 0.015 - G * 0.05 - vatN * 0.30) * 100) / 100;
+    // Net NPR = Total + TDS + Advance + 15%-AP deduction + Retention + VAT-30% (source formula W).
+    if (G) it.netNPR = Math.round(((G + vatN) - G * 0.015 + advN + dedN - G * 0.05 - vatN * 0.30) * 100) / 100;
     const host = document.getElementById('fin-entry');
     const nu = host.querySelector('[data-fe="ipcs.' + i + '.items.' + j + '.netUSD"]'); if (nu && F) nu.value = it.netUSD;
     const nn = host.querySelector('[data-fe="ipcs.' + i + '.items.' + j + '.netNPR"]'); if (nn && G) nn.value = it.netNPR;
@@ -1694,7 +1703,7 @@
     const [kind, i] = spec.split('.');
     if (kind === 'cat') feModel.earnedByCategory.push({ group: '', category: 'New category', usd: null, npr: null });
     else if (kind === 'ipc') feModel.ipcs.push({ ipc: 'IPC-', certifiedDate: '', certifiedLetter: '', netUSD: null, netNPR: null, receivedUSD: null, receivedNPR: null, status: 'Under review', isAdvance: false, items: [] });
-    else if (kind === 'item') feModel.ipcs[+i].items.push({ code: '', activityName: '', paymentPct: null, netUSD: null, netNPR: null, taxableUSD: null, taxableNPR: null });
+    else if (kind === 'item') feModel.ipcs[+i].items.push({ code: '', activityName: '', paymentPct: null, netUSD: null, netNPR: null, taxableUSD: null, taxableNPR: null, advanceUSD: null, advanceNPR: null, ded15USD: null, ded15NPR: null });
     renderFinanceEntry();
   }
   async function feSave() {
@@ -1746,7 +1755,7 @@
       host.addEventListener('input', (e) => {
         const p = e.target.dataset.fe; if (!p) return;
         feSet(p, e.target.dataset.feNum ? feN(e.target.value) : e.target.value);
-        const m = p.match(/^ipcs\.(\d+)\.items\.(\d+)\.taxable(?:USD|NPR)$/);
+        const m = p.match(/^ipcs\.(\d+)\.items\.(\d+)\.(?:taxable(?:USD|NPR)|advanceNPR|ded15NPR)$/);
         if (m) feComputeItemNet(+m[1], +m[2]);
       });
       host.addEventListener('click', (e) => {
