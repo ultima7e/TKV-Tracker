@@ -862,10 +862,11 @@
         <td>${fUSD(x.taxableUSD)}</td><td>${fNPR(x.taxableNPR)}</td>
         <td>${fUSD(x.vatUSD)}</td><td>${fNPR(x.vatNPR)}</td>
         <td>${fUSD(x.totalUSD)}</td><td>${fNPR(x.totalNPR)}</td>
-        <td>${fUSD(x.tdsUSD)}</td>
+        <td>${fUSD(x.tdsUSD)}</td><td>${fNPR(x.tdsNPR)}</td>
         <td>${fUSD(x.advanceUSD)}</td><td>${fNPR(x.advanceNPR)}</td>
         <td>${fUSD(x.ded15USD)}</td><td>${fNPR(x.ded15NPR)}</td>
-        <td>${fUSD(x.retUSD)}</td><td>${fUSD(x.vat30USD)}</td>
+        <td>${fUSD(x.retUSD)}</td><td>${fNPR(x.retNPR)}</td>
+        <td>${fUSD(x.vat30USD)}</td><td>${fNPR(x.vat30NPR)}</td>
         <td><b>${fUSD(x.netUSD || it.netUSD)}</b></td><td><b>${fNPR(x.netNPR || it.netNPR)}</b></td></tr>`; }).join('');
       const dt = i.detail || {};
       const info = [
@@ -879,8 +880,8 @@
         <div class="ipc-diwrap">${info}</div>
         ${rows ? `<div class="ipc-dscroll"><table class="tbl ipc-dtable"><thead><tr>
           <th>Item</th><th>Pay&nbsp;%</th><th>Taxable USD</th><th>Taxable NPR</th><th>VAT USD</th><th>VAT NPR</th>
-          <th>Total USD</th><th>Total NPR</th><th>TDS USD</th><th>Adv USD</th><th>Adv NPR</th><th>15%-AP USD</th><th>15%-AP NPR</th>
-          <th>Retn USD</th><th>VAT30 USD</th><th>Net USD</th><th>Net NPR</th>
+          <th>Total USD</th><th>Total NPR</th><th>TDS USD</th><th>TDS NPR</th><th>Adv USD</th><th>Adv NPR</th><th>15%-AP USD</th><th>15%-AP NPR</th>
+          <th>Retn USD</th><th>Retn NPR</th><th>VAT30 USD</th><th>VAT30 NPR</th><th>Net USD</th><th>Net NPR</th>
         </tr></thead><tbody>${rows}</tbody></table></div>`
         : '<div class="muted" style="font-size:11px">No per-activity breakdown recorded for this certificate.</div>'}
       </div>`;
