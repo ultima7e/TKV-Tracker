@@ -18,11 +18,15 @@ module.exports = async (req, res) => {
     const me = await currentUser(req);
     if (!me) return res.status(401).json({ error: 'Not authenticated' });
 
-    // Export is available to anyone who can see the finance section; edits are admin-only.
-    if (req.method === 'GET' && (req.query && (req.query.export || req.query.export === ''))) {
-      const raw = await kvGet('tkv:finance');
-      const data = raw ? JSON.parse(raw) : (req.body && req.body.data) || null;
-      if (!data) return res.status(404).json({ error: 'No saved financial data to export yet.' });
+    // Export is available to anyone who can see the finance section; edits are
+    // admin-only. Accepts the current form data in the POST body (so exporting
+    // reflects unsaved edits); otherwise falls back to the saved override.
+    const wantsExport = req.query && (req.query.export || req.query.export === '');
+    if (wantsExport && (req.method === 'GET' || req.method === 'POST')) {
+      const posted = req.body && req.body.data;
+      const raw = posted ? null : await kvGet('tkv:finance');
+      const data = posted || (raw ? JSON.parse(raw) : null);
+      if (!data) return res.status(404).json({ error: 'No financial data to export yet.' });
       const buf = await buildFinanceWorkbook(data);
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename="Milestone Payment Summary.xlsx"');

@@ -1731,8 +1731,9 @@
   async function feExport() {
     feMsg('Building Excel…', '');
     try {
-      const r = await authFetch('/api/finance?export=1');
-      if (!r.ok) { const j = await r.json().catch(() => ({})); feMsg(j.error || 'Export failed — save first', 'err'); return; }
+      // POST the current form so the export reflects unsaved edits too.
+      const r = await authFetch('/api/finance?export=1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: feModel }) });
+      if (!r.ok) { const j = await r.json().catch(() => ({})); feMsg(j.error || 'Export failed', 'err'); return; }
       const blob = await r.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = 'Milestone Payment Summary.xlsx';
