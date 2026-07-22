@@ -48,8 +48,14 @@ async function applyFinanceOverride(payload) {
       monsoonDisbursedNPR: fnum(f.advance.monsoonDisbursedNPR), monsoonRecoveredNPR: fnum(f.advance.monsoonRecoveredNPR),
     };
     if (Array.isArray(f.earnedByCategory)) {
+      // The per-activity (ACS) breakdown isn't user-editable, so keep the live
+      // items when the override only carries category totals (older snapshots
+      // dropped them, which blanked the pie's click-through detail).
+      const liveItems = {};
+      for (const c of (fd.earnedByCategory || [])) if (c.group) liveItems[c.group] = c.items || [];
       fd.earnedByCategory = f.earnedByCategory
-        .map((c) => ({ ...c, usd: fnum(c.usd), npr: fnum(c.npr), usdEquiv: fnum(c.usd) + fnum(c.npr) / FIN_RATE }))
+        .map((c) => ({ ...c, usd: fnum(c.usd), npr: fnum(c.npr), usdEquiv: fnum(c.usd) + fnum(c.npr) / FIN_RATE,
+          items: (c.items && c.items.length) ? c.items : (liveItems[c.group] || []) }))
         .filter((c) => c.usdEquiv > 0).sort((a, b) => b.usdEquiv - a.usdEquiv);
     }
     if (Array.isArray(f.ipcs)) {

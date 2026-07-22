@@ -1604,7 +1604,7 @@
         recoveredUSD: adv.recoveredUSD ?? 0, recoveredNPR: adv.recoveredNPR ?? 0,
         outstandingUSD: adv.outstandingUSD ?? null, outstandingNPR: adv.outstandingNPR ?? null,
         monsoonDisbursedNPR: adv.monsoonDisbursedNPR ?? 0, monsoonRecoveredNPR: adv.monsoonRecoveredNPR ?? 0 } : null,
-      earnedByCategory: (fd.earnedByCategory || []).map((c) => ({ group: c.group || '', category: c.category, usd: c.usd ?? null, npr: c.npr ?? null })),
+      earnedByCategory: (fd.earnedByCategory || []).map((c) => ({ group: c.group || '', category: c.category, usd: c.usd ?? null, npr: c.npr ?? null, items: c.items || [] })),
       ipcs: (fd.ipcs || []).map((i) => ({
         ipc: i.ipc, certifiedDate: i.certifiedDate || '', certifiedLetter: i.certifiedLetter || '',
         dueDate: i.dueDate || '', exchangeRate: i.exchangeRate ?? null,
