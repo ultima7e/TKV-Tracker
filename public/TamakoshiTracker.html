@@ -203,6 +203,15 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .expl-chip .k{font-weight:800;color:var(--muted);font-size:10.5px}
 .expl-chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .expl-chip.on .k{color:#eaf2ff}
+.ins-filter{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:12px}
+.ins-fbtn{border:1px solid var(--line);background:#fff;color:var(--muted);font-weight:700;font-size:11.5px;padding:5px 12px;border-radius:8px;cursor:pointer}
+.ins-fbtn.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.ins-days{font-weight:800;white-space:nowrap}
+.ins-days.exp{color:#b3261e} .ins-days.soon{color:#c77700} .ins-days.ok{color:#1c7a52}
+.ins-claim{border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:12px 15px;margin-bottom:10px;background:#fff}
+.ins-claim h4{font-size:13.5px;font-weight:800;color:var(--navy);margin-bottom:3px}
+.ins-claim .meta{font-size:11.5px;color:var(--muted)}
+.ins-claim .desc{font-size:12px;color:#41506a;margin-top:5px}
 .ipc-details-btn{border:1px solid var(--line);background:#fff;color:var(--muted);font-weight:700;font-size:11px;padding:4px 10px;border-radius:7px;cursor:pointer;margin-bottom:10px}
 .ipc-details-btn:hover{border-color:var(--accent);color:var(--accent)}
 .ipc-details-btn.on{background:var(--navy);color:#fff;border-color:var(--navy)}
@@ -437,6 +446,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       <div class="nav-item" data-v="tunnel"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V11a9 9 0 0 1 18 0v10"/><path d="M9 21v-8a3 3 0 0 1 6 0v8"/></svg></span>Tunnel</div>
       <div class="nav-item" data-v="claims"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg></span>Claims &amp; Variations</div>
       <div class="nav-item" data-v="inv"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8.5 12 3 3 8.5v7L12 21l9-5.5z"/><path d="M3 8.5 12 14l9-5.5"/><line x1="12" y1="14" x2="12" y2="21"/></svg></span>Inventory &amp; Explosives</div>
+      <div class="nav-item" data-v="ins"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5 20 6v5.5c0 5-3.4 8.4-8 9.5-4.6-1.1-8-4.5-8-9.5V6z"/><path d="M9.2 11.8l2 2 3.6-3.8"/></svg></span>Insurance &amp; Claims</div>
       <div class="nav-item" data-v="man"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0"/><path d="M16 5.2a3 3 0 0 1 0 5.6"/><path d="M18.5 19.5a5.5 5.5 0 0 0-2.8-4.8"/></svg></span>Manpower</div>
       <div class="nav-item" data-v="equip"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2.1 2.1M16.9 16.9 19 19M19 5l-2.1 2.1M7.1 16.9 5 19"/></svg></span>Equipment</div>
       <div class="nav-item" data-v="safety"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 20 6v6c0 5-3.5 7.8-8 9-4.5-1.2-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></span>Safety</div>
@@ -645,6 +655,32 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
           <div id="inv-exp"></div>
         </div>
       </section>
+      <section class="view" id="ins">
+        <div class="sched-tabs">
+          <button class="sched-tab on" data-itab="summary">Insurance Summary</button>
+          <button class="sched-tab" data-itab="claims">Insurance Claims</button>
+        </div>
+        <div class="stab-pane" id="itab-summary">
+          <div id="ins-tiles" class="expl-summary"></div>
+          <div class="card">
+            <h3>Insurance Policies <span class="muted" style="font-weight:600">· days-to-expiry recalculated live · click a column note</span></h3>
+            <div class="ins-filter">
+              <button class="ins-fbtn on" data-ifilter="all" type="button">All</button>
+              <button class="ins-fbtn" data-ifilter="expired" type="button">Expired</button>
+              <button class="ins-fbtn" data-ifilter="expiring" type="button">Expiring ≤30d</button>
+              <button class="ins-fbtn" data-ifilter="soon" type="button">Due ≤90d</button>
+              <button class="ins-fbtn" data-ifilter="valid" type="button">Valid</button>
+              <input id="ins-search" class="fe-input" placeholder="Search description / policy no…" style="max-width:260px;margin-left:auto">
+            </div>
+            <div id="ins-table"></div>
+          </div>
+        </div>
+        <div class="stab-pane" id="itab-claims" hidden>
+          <div class="card"><h3>Insurance Claims <span class="muted" style="font-weight:600">· active &amp; recent claims</span></h3>
+            <div id="ins-claims"></div>
+          </div>
+        </div>
+      </section>
       <section class="view" id="man">
         <div class="grid row-2">
           <div class="card"><h3>Mobilized Manpower — <span id="mp-date">—</span></h3><div id="mp-mobilized"><p class="muted">Awaiting manpower data.</p></div></div>
@@ -692,8 +728,8 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   let me = null; // { username, isAdmin, sections }
   const TOKEN_KEY = 'tkv_token';
   const SECTION_LABELS = { exec: 'Executive Summary', fin: 'Financial', sched: 'Schedule & Progress',
-    tunnel: 'Tunnel', claims: 'Claims & Variations', inv: 'Inventory & Explosives', man: 'Manpower',
-    equip: 'Equipment', safety: 'Safety' };
+    tunnel: 'Tunnel', claims: 'Claims & Variations', inv: 'Inventory & Explosives', ins: 'Insurance & Claims',
+    man: 'Manpower', equip: 'Equipment', safety: 'Safety' };
   const ALL_SECTIONS = Object.keys(SECTION_LABELS);
   // Cross-origin from a local file: use a Bearer token (cookies won't apply).
   function authFetch(url, opts = {}) {
@@ -989,6 +1025,87 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       wireExplControls();
     }
     drawExplChart(); renderExplSummary(); renderExplProc();
+  }
+
+  // ---- Insurance & Claims. Days-to-expiry is computed live from validTill so
+  // the register always reflects today; policies sort with the most urgent first.
+  let insPols = [];
+  const insState = { filter: 'all', search: '', wired: false };
+  const INS_CLAIMS = [
+    { title: 'CAR Insurance Claim — Landslide-induced Debris Flow', type: 'CAR Policy', date: '29 Jun 2026', desc: "Damage from a landslide-induced debris flow; claim lodged under the Contractor's All Risks (CAR) policy." },
+    { title: 'CPM Claim — Boomer Damage', type: 'Construction Plant & Machinery', date: '—', desc: 'Damage to a drilling boomer (jumbo); claim under the CPM / equipment insurance.' },
+    { title: 'Marine Insurance Claim — Transformer Damage', type: 'Marine Insurance', date: '—', desc: 'Transformer damaged in transit; claim under the marine (transit) insurance.' },
+    { title: 'Monsoon Flood Damage 2024 — Adit-1 & PHC', type: 'CAR Policy', date: '2024 Monsoon', desc: 'Flood damage at Adit-1 and the Powerhouse Cavern during the 2024 monsoon.' },
+  ];
+  const insDaysLeft = (till) => (till ? Math.ceil((new Date(till + 'T00:00:00') - new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00')) / 86400000) : null);
+  const insStatus = (d) => (d == null ? { dcls: '', badge: 'neu', lab: 'No date' }
+    : d < 0 ? { dcls: 'exp', badge: 'bad', lab: 'Expired' }
+      : d <= 30 ? { dcls: 'soon', badge: 'warn', lab: 'Expiring' }
+        : d <= 90 ? { dcls: 'soon', badge: 'warn', lab: 'Due soon' }
+          : { dcls: 'ok', badge: 'ok', lab: 'Valid' });
+  const insN = (v) => (v ? Math.round(v).toLocaleString('en-US') : '–');
+  function renderInsTable() {
+    const host = document.getElementById('ins-table'); if (!host) return;
+    const f = insState.filter, q = insState.search.toLowerCase();
+    let rows = insPols.filter((p) => {
+      if (q && !((p.desc || '').toLowerCase().includes(q) || (p.policyNo || '').toLowerCase().includes(q))) return false;
+      const d = p.daysLeft;
+      if (f === 'expired') return d != null && d < 0;
+      if (f === 'expiring') return d != null && d >= 0 && d <= 30;
+      if (f === 'soon') return d != null && d >= 0 && d <= 90;
+      if (f === 'valid') return d != null && d > 90;
+      return true;
+    }).sort((a, b) => (a.daysLeft == null ? 1e9 : a.daysLeft) - (b.daysLeft == null ? 1e9 : b.daysLeft));
+    const body = rows.map((p) => {
+      const s = insStatus(p.daysLeft);
+      const dtxt = p.daysLeft == null ? '–' : (p.daysLeft < 0 ? Math.abs(p.daysLeft) + ' d ago' : p.daysLeft + ' d left');
+      return `<tr>
+        <td style="text-align:left">${p.sn ? `<span class="muted">${p.sn}</span> ` : ''}${p.desc}</td>
+        <td style="text-align:left" class="muted">${p.policyNo || '–'}</td>
+        <td>${p.validFrom || '–'}</td><td>${p.validTill || '–'}</td>
+        <td><span class="ins-days ${s.dcls}">${dtxt}</span></td>
+        <td>${insN(p.paidNPR)}</td>
+        <td><span class="badge ${s.badge}">${p.remarks || s.lab}</span></td></tr>`;
+    }).join('');
+    host.innerHTML = `<div style="overflow-x:auto"><table class="tbl" style="min-width:840px"><thead><tr>
+      <th style="text-align:left">Insurance / Description</th><th style="text-align:left">Policy No.</th><th>Valid From</th><th>Valid Till</th><th>Days to Expiry</th><th>Paid (NPR)</th><th>Status</th>
+    </tr></thead><tbody>${body || '<tr><td colspan="7" class="muted" style="padding:14px">No policies match this filter.</td></tr>'}</tbody></table></div>`;
+  }
+  function renderInsClaims() {
+    const host = document.getElementById('ins-claims'); if (!host) return;
+    host.innerHTML = INS_CLAIMS.map((c) => `<div class="ins-claim"><h4>${c.title}</h4><div class="meta">${c.type} · ${c.date}</div><div class="desc">${c.desc}</div></div>`).join('')
+      + `<div class="muted" style="font-size:11px;margin-top:6px">From the project's Insurance Claims records. Claim amounts &amp; settlement status can be shown here once a claims-tracker sheet is linked.</div>`;
+  }
+  function wireInsurance() {
+    if (insState.wired) return; insState.wired = true;
+    document.querySelectorAll('#ins .sched-tab').forEach((btn) => btn.addEventListener('click', () => {
+      const w = btn.dataset.itab;
+      document.querySelectorAll('#ins .sched-tab').forEach((b) => b.classList.toggle('on', b === btn));
+      document.getElementById('itab-summary').hidden = w !== 'summary';
+      document.getElementById('itab-claims').hidden = w !== 'claims';
+    }));
+    const filt = document.querySelector('#ins .ins-filter');
+    if (filt) filt.addEventListener('click', (e) => { const b = e.target.closest('.ins-fbtn'); if (!b) return;
+      insState.filter = b.dataset.ifilter; filt.querySelectorAll('.ins-fbtn').forEach((x) => x.classList.toggle('on', x === b)); renderInsTable(); });
+    const search = document.getElementById('ins-search');
+    if (search) search.addEventListener('input', () => { insState.search = search.value; renderInsTable(); });
+  }
+  function renderInsurance() {
+    const tiles = document.getElementById('ins-tiles'); if (!tiles) return;
+    wireInsurance(); renderInsClaims();
+    const ins = data && data.insurance;
+    if (!ins || !ins.policies || !ins.policies.length) { tiles.innerHTML = '<div class="muted" style="font-size:12px">No insurance data available yet.</div>'; insPols = []; renderInsTable(); return; }
+    insPols = ins.policies.map((p) => ({ ...p, daysLeft: insDaysLeft(p.validTill) }));
+    const dated = insPols.filter((p) => p.daysLeft != null);
+    const expired = dated.filter((p) => p.daysLeft < 0).length;
+    const expiring = dated.filter((p) => p.daysLeft >= 0 && p.daysLeft <= 30).length;
+    const tile = (lab, val, sub, accent) => `<div class="expl-tile"><div class="lab">${lab}</div><div class="val"${accent ? ` style="color:${accent}"` : ''}>${val}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+    tiles.innerHTML =
+      tile('Policies', insPols.length, 'in the register') +
+      tile('Expired', expired, 'need renewal', expired ? '#b3261e' : '') +
+      tile('Expiring ≤ 30 days', expiring, 'renew soon', expiring ? '#c77700' : '') +
+      tile('Total paid', 'NPR ' + insN(ins.totalPaidNPR), 'premiums to date');
+    renderInsTable();
   }
 
   const INV_MATERIALS = ['Cement (bags)', 'Reinforcement Steel (MT)', 'Aggregate (m³)', 'Sand (m³)', 'Shotcrete (m³)', 'Structural Steel / Liner (MT)', 'Diesel (L)', 'Cement Grout (bags)'];
@@ -2532,6 +2649,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     renderFinancial();
     renderInventory();
     renderExplosives();
+    renderInsurance();
     renderWeekly();
     renderClaims();
     renderSchedule();

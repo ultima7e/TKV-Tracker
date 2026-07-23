@@ -8,8 +8,8 @@
   let me = null; // { username, isAdmin, sections }
   const TOKEN_KEY = 'tkv_token';
   const SECTION_LABELS = { exec: 'Executive Summary', fin: 'Financial', sched: 'Schedule & Progress',
-    tunnel: 'Tunnel', claims: 'Claims & Variations', inv: 'Inventory & Explosives', man: 'Manpower',
-    equip: 'Equipment', safety: 'Safety' };
+    tunnel: 'Tunnel', claims: 'Claims & Variations', inv: 'Inventory & Explosives', ins: 'Insurance & Claims',
+    man: 'Manpower', equip: 'Equipment', safety: 'Safety' };
   const ALL_SECTIONS = Object.keys(SECTION_LABELS);
   // Same-origin (hosted) uses the session cookie; the standalone file adds a Bearer token.
   function authFetch(url, opts = {}) {
@@ -1503,6 +1503,87 @@
     drawExplChart(); renderExplSummary(); renderExplProc();
   }
 
+  // ---- Insurance & Claims. Days-to-expiry is computed live from validTill so
+  // the register always reflects today; policies sort with the most urgent first.
+  let insPols = [];
+  const insState = { filter: 'all', search: '', wired: false };
+  const INS_CLAIMS = [
+    { title: 'CAR Insurance Claim — Landslide-induced Debris Flow', type: 'CAR Policy', date: '29 Jun 2026', desc: "Damage from a landslide-induced debris flow; claim lodged under the Contractor's All Risks (CAR) policy." },
+    { title: 'CPM Claim — Boomer Damage', type: 'Construction Plant & Machinery', date: '—', desc: 'Damage to a drilling boomer (jumbo); claim under the CPM / equipment insurance.' },
+    { title: 'Marine Insurance Claim — Transformer Damage', type: 'Marine Insurance', date: '—', desc: 'Transformer damaged in transit; claim under the marine (transit) insurance.' },
+    { title: 'Monsoon Flood Damage 2024 — Adit-1 & PHC', type: 'CAR Policy', date: '2024 Monsoon', desc: 'Flood damage at Adit-1 and the Powerhouse Cavern during the 2024 monsoon.' },
+  ];
+  const insDaysLeft = (till) => (till ? Math.ceil((new Date(till + 'T00:00:00') - new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00')) / 86400000) : null);
+  const insStatus = (d) => (d == null ? { dcls: '', badge: 'neu', lab: 'No date' }
+    : d < 0 ? { dcls: 'exp', badge: 'bad', lab: 'Expired' }
+      : d <= 30 ? { dcls: 'soon', badge: 'warn', lab: 'Expiring' }
+        : d <= 90 ? { dcls: 'soon', badge: 'warn', lab: 'Due soon' }
+          : { dcls: 'ok', badge: 'ok', lab: 'Valid' });
+  const insN = (v) => (v ? Math.round(v).toLocaleString('en-US') : '–');
+  function renderInsTable() {
+    const host = document.getElementById('ins-table'); if (!host) return;
+    const f = insState.filter, q = insState.search.toLowerCase();
+    let rows = insPols.filter((p) => {
+      if (q && !((p.desc || '').toLowerCase().includes(q) || (p.policyNo || '').toLowerCase().includes(q))) return false;
+      const d = p.daysLeft;
+      if (f === 'expired') return d != null && d < 0;
+      if (f === 'expiring') return d != null && d >= 0 && d <= 30;
+      if (f === 'soon') return d != null && d >= 0 && d <= 90;
+      if (f === 'valid') return d != null && d > 90;
+      return true;
+    }).sort((a, b) => (a.daysLeft == null ? 1e9 : a.daysLeft) - (b.daysLeft == null ? 1e9 : b.daysLeft));
+    const body = rows.map((p) => {
+      const s = insStatus(p.daysLeft);
+      const dtxt = p.daysLeft == null ? '–' : (p.daysLeft < 0 ? Math.abs(p.daysLeft) + ' d ago' : p.daysLeft + ' d left');
+      return `<tr>
+        <td style="text-align:left">${p.sn ? `<span class="muted">${p.sn}</span> ` : ''}${p.desc}</td>
+        <td style="text-align:left" class="muted">${p.policyNo || '–'}</td>
+        <td>${p.validFrom || '–'}</td><td>${p.validTill || '–'}</td>
+        <td><span class="ins-days ${s.dcls}">${dtxt}</span></td>
+        <td>${insN(p.paidNPR)}</td>
+        <td><span class="badge ${s.badge}">${p.remarks || s.lab}</span></td></tr>`;
+    }).join('');
+    host.innerHTML = `<div style="overflow-x:auto"><table class="tbl" style="min-width:840px"><thead><tr>
+      <th style="text-align:left">Insurance / Description</th><th style="text-align:left">Policy No.</th><th>Valid From</th><th>Valid Till</th><th>Days to Expiry</th><th>Paid (NPR)</th><th>Status</th>
+    </tr></thead><tbody>${body || '<tr><td colspan="7" class="muted" style="padding:14px">No policies match this filter.</td></tr>'}</tbody></table></div>`;
+  }
+  function renderInsClaims() {
+    const host = document.getElementById('ins-claims'); if (!host) return;
+    host.innerHTML = INS_CLAIMS.map((c) => `<div class="ins-claim"><h4>${c.title}</h4><div class="meta">${c.type} · ${c.date}</div><div class="desc">${c.desc}</div></div>`).join('')
+      + `<div class="muted" style="font-size:11px;margin-top:6px">From the project's Insurance Claims records. Claim amounts &amp; settlement status can be shown here once a claims-tracker sheet is linked.</div>`;
+  }
+  function wireInsurance() {
+    if (insState.wired) return; insState.wired = true;
+    document.querySelectorAll('#ins .sched-tab').forEach((btn) => btn.addEventListener('click', () => {
+      const w = btn.dataset.itab;
+      document.querySelectorAll('#ins .sched-tab').forEach((b) => b.classList.toggle('on', b === btn));
+      document.getElementById('itab-summary').hidden = w !== 'summary';
+      document.getElementById('itab-claims').hidden = w !== 'claims';
+    }));
+    const filt = document.querySelector('#ins .ins-filter');
+    if (filt) filt.addEventListener('click', (e) => { const b = e.target.closest('.ins-fbtn'); if (!b) return;
+      insState.filter = b.dataset.ifilter; filt.querySelectorAll('.ins-fbtn').forEach((x) => x.classList.toggle('on', x === b)); renderInsTable(); });
+    const search = document.getElementById('ins-search');
+    if (search) search.addEventListener('input', () => { insState.search = search.value; renderInsTable(); });
+  }
+  function renderInsurance() {
+    const tiles = document.getElementById('ins-tiles'); if (!tiles) return;
+    wireInsurance(); renderInsClaims();
+    const ins = data && data.insurance;
+    if (!ins || !ins.policies || !ins.policies.length) { tiles.innerHTML = '<div class="muted" style="font-size:12px">No insurance data available yet.</div>'; insPols = []; renderInsTable(); return; }
+    insPols = ins.policies.map((p) => ({ ...p, daysLeft: insDaysLeft(p.validTill) }));
+    const dated = insPols.filter((p) => p.daysLeft != null);
+    const expired = dated.filter((p) => p.daysLeft < 0).length;
+    const expiring = dated.filter((p) => p.daysLeft >= 0 && p.daysLeft <= 30).length;
+    const tile = (lab, val, sub, accent) => `<div class="expl-tile"><div class="lab">${lab}</div><div class="val"${accent ? ` style="color:${accent}"` : ''}>${val}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+    tiles.innerHTML =
+      tile('Policies', insPols.length, 'in the register') +
+      tile('Expired', expired, 'need renewal', expired ? '#b3261e' : '') +
+      tile('Expiring ≤ 30 days', expiring, 'renew soon', expiring ? '#c77700' : '') +
+      tile('Total paid', 'NPR ' + insN(ins.totalPaidNPR), 'premiums to date');
+    renderInsTable();
+  }
+
   // Placeholder Inventory & Explosives tables — structure for seniors now; the
   // cells auto-fill once the inventory sheet is linked.
   const INV_MATERIALS = ['Cement (bags)', 'Reinforcement Steel (MT)', 'Aggregate (m³)', 'Sand (m³)', 'Shotcrete (m³)', 'Structural Steel / Liner (MT)', 'Diesel (L)', 'Cement Grout (bags)'];
@@ -1895,6 +1976,7 @@
     renderFinancial();
     renderInventory();
     renderExplosives();
+    renderInsurance();
     renderWeekly();
     renderClaims();
     renderSchedule();

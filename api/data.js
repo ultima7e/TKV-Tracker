@@ -7,8 +7,8 @@
 //   - fetches everything in parallel and parses each workbook only once.
 const fs = require('fs');
 const path = require('path');
-const { workbookToBoth } = require('../lib/workbook');
-const { parseTunnel, parseKpis, parseSCurve, parseFinance, parseManpower, parseIpc, parseFinanceDetail, parseClaims, parseExplosives } = require('../lib/parsers');
+const { workbookToBoth, workbookSheets } = require('../lib/workbook');
+const { parseTunnel, parseKpis, parseSCurve, parseFinance, parseManpower, parseIpc, parseFinanceDetail, parseClaims, parseExplosives, parseInsurance } = require('../lib/parsers');
 const { parseXer } = require('../lib/xer');
 const { currentUser } = require('../lib/auth');
 const { kvGet } = require('../lib/store');
@@ -116,6 +116,8 @@ const DELAY_XER_PATH = 'Shared Folder/Schedule/TKV-BL-A-2 (TIA-Bishan).xer';
 const CLAIMS_XLSX_PATH = "Shared Folder/Claims & Variation/Contractor's Claims/Claim & Variation Log.xlsx";
 // Explosive consumption workbook — its own Nutstore file, parsed in isolation.
 const EXPLOSIVES_XLSX_PATH = 'Shared Folder/Explosive Record/Daily Explosive Consumption.xlsx';
+// Insurance register — its own Nutstore file (only the 'Summary' sheet is read).
+const INSURANCE_XLSX_PATH = 'Insurance and Bank Gurantee/Insurance/insurance.xlsx';
 const encPath = (p) => p.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
 
 // Module-level caches survive across requests on a warm serverless instance.
@@ -225,8 +227,19 @@ function explosivesFromBuffer(buffer) {
   } catch (e) { return null; }
 }
 
+// Insurance workbook — only the 'Summary' sheet is converted (the file has a
+// 13k-row equipment sheet we don't need).
+function insuranceFromBuffer(buffer) {
+  if (!buffer) return null;
+  try {
+    const { matrices } = workbookSheets(buffer, ['Summary']);
+    const i = parseInsurance(matrices);
+    return i && !i.missing ? i : null;
+  } catch (e) { return null; }
+}
+
 // Parse buffers + XER into the API payload (no generatedAt — added fresh each send).
-function assemble(buffers, xerText, delayXerText, source, claimsBuffer, explosivesBuffer) {
+function assemble(buffers, xerText, delayXerText, source, claimsBuffer, explosivesBuffer, insuranceBuffer) {
   const sheets = {}, matrices = {};
   const skipWarnings = [];
   for (const buffer of buffers) {
@@ -269,6 +282,7 @@ function assemble(buffers, xerText, delayXerText, source, claimsBuffer, explosiv
     financeDetail,
     claims: claimsFromBuffer(claimsBuffer),
     explosives: explosivesFromBuffer(explosivesBuffer),
+    insurance: insuranceFromBuffer(insuranceBuffer),
     schedule: { activities: schedule.activities, relationships: schedule.relationships, wbs: schedule.wbs },
     delaySchedule: { activities: delaySchedule.activities, relationships: delaySchedule.relationships, wbs: delaySchedule.wbs },
   };
@@ -290,18 +304,20 @@ async function buildPayload() {
 
     // Nutstore folder PROPFIND + both XER PROPFINDs + claims PROPFIND + Dropbox
     // fetches + the small schedule-override version marker, all parallel.
-    const [listing, xerInfo, delayXerInfo, claimsInfo, explInfo, dbx, schedVer, finVer] = await Promise.all([
+    const [listing, xerInfo, delayXerInfo, claimsInfo, explInfo, insInfo, dbx, schedVer, finVer] = await Promise.all([
       propfind(DAV_BASE + encPath(dir) + '/', headers, 1),
       propfind(DAV_BASE + encPath(xerPath), headers, 0),
       propfind(DAV_BASE + encPath(delayXerPath), headers, 0),
       propfind(DAV_BASE + encPath(CLAIMS_XLSX_PATH), headers, 0).catch(() => []),
       propfind(DAV_BASE + encPath(EXPLOSIVES_XLSX_PATH), headers, 0).catch(() => []),
+      propfind(DAV_BASE + encPath(INSURANCE_XLSX_PATH), headers, 0).catch(() => []),
       fetchDropbox(),
       kvGet('tkv:schedule_ver').catch(() => null),
       kvGet('tkv:finance_ver').catch(() => null),
     ]);
     const claimsMtime = (claimsInfo[0] && claimsInfo[0].mtime) || '';
     const explMtime = (explInfo[0] && explInfo[0].mtime) || '';
+    const insMtime = (insInfo[0] && insInfo[0].mtime) || '';
     let entries = listing.filter((e) => /\.xlsx$/i.test(e.path) && !/\/~\$/.test(e.path));
     if (!entries.length) entries = process.env.NUTSTORE_FILE_PATH.split(';').map((p) => ({ path: p.trim(), mtime: '' })).filter((e) => e.path);
     // Drop any Nutstore file that Dropbox now supplies (Dropbox is the source of truth).
@@ -316,6 +332,7 @@ async function buildPayload() {
       dxer: delayXerPath + '|' + delayXerMtime,
       claims: CLAIMS_XLSX_PATH + '|' + claimsMtime,
       expl: EXPLOSIVES_XLSX_PATH + '|' + explMtime,
+      ins: INSURANCE_XLSX_PATH + '|' + insMtime,
       sched: schedVer || '',
       fin: finVer || '',
       dbx: dbx.map((d) => d.name + '|' + d.etag),
@@ -325,15 +342,16 @@ async function buildPayload() {
       return stamp(payloadCache.payload);
     }
 
-    const [nutBuffers, xerText, delayXerText, claimsBuffer, explosivesBuffer] = await Promise.all([
+    const [nutBuffers, xerText, delayXerText, claimsBuffer, explosivesBuffer, insuranceBuffer] = await Promise.all([
       Promise.all(entries.map((e) => getBuffer(e.path, e.mtime, headers))),
       getXer(xerPath, xerMtime, headers),
       getXer(delayXerPath, delayXerMtime, headers),
       claimsMtime ? getBuffer(CLAIMS_XLSX_PATH, claimsMtime, headers).catch(() => null) : Promise.resolve(null),
       explMtime ? getBuffer(EXPLOSIVES_XLSX_PATH, explMtime, headers).catch(() => null) : Promise.resolve(null),
+      insMtime ? getBuffer(INSURANCE_XLSX_PATH, insMtime, headers).catch(() => null) : Promise.resolve(null),
     ]);
     const buffers = [...nutBuffers, ...dbx.filter((d) => d.buffer).map((d) => d.buffer)];
-    const payload = assemble(buffers, xerText, delayXerText, 'nutstore', claimsBuffer, explosivesBuffer);
+    const payload = assemble(buffers, xerText, delayXerText, 'nutstore', claimsBuffer, explosivesBuffer, insuranceBuffer);
     payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
     if (finVer) await applyFinanceOverride(payload);
     if (schedVer) await applyScheduleOverride(payload);
@@ -356,7 +374,8 @@ async function buildPayload() {
   if (payloadCache && payloadCache.sig === sig) return stamp(payloadCache.payload);
   const localBuffers = files.filter((f) => f.endsWith('.xlsx') && !DBX_NAMEKEYS.has(normName(f))
       && !/claim.*variation.*log\.xlsx$/i.test(f)   // claims workbook is parsed in isolation below
-      && !/explosive.*consumption\.xlsx$/i.test(f)) // explosives workbook likewise
+      && !/explosive.*consumption\.xlsx$/i.test(f)  // explosives workbook likewise
+      && !/^insurance\.xlsx$/i.test(f))             // insurance workbook likewise
     .map((f) => fs.readFileSync(path.join(dir, f)));
   const buffers = [...localBuffers, ...dbx.filter((d) => d.buffer).map((d) => d.buffer)];
   const xerFiles = files.filter((f) => f.endsWith('.xer'));
@@ -368,7 +387,9 @@ async function buildPayload() {
   const claimsBuffer = claimsFile ? fs.readFileSync(path.join(dir, claimsFile)) : null;
   const explFile = files.find((f) => /explosive.*consumption\.xlsx$/i.test(f));
   const explosivesBuffer = explFile ? fs.readFileSync(path.join(dir, explFile)) : null;
-  const payload = assemble(buffers, readXer(baselineXf), readXer(delayXf), 'local-file', claimsBuffer, explosivesBuffer);
+  const insFile = files.find((f) => /^insurance\.xlsx$/i.test(f));
+  const insuranceBuffer = insFile ? fs.readFileSync(path.join(dir, insFile)) : null;
+  const payload = assemble(buffers, readXer(baselineXf), readXer(delayXf), 'local-file', claimsBuffer, explosivesBuffer, insuranceBuffer);
   payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
   if (finVer) await applyFinanceOverride(payload);
   if (schedVer) await applyScheduleOverride(payload);
