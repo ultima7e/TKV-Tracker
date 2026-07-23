@@ -1416,6 +1416,13 @@
       : ex.months.filter((m) => m >= st.from && m <= st.to);
     const labels = st.groupby === 'loc' ? ks : ks.map(MONL);
     const stacked = st.source === 'both';
+    // For the Month view, break each month down by site so the tooltip can show
+    // which locations drove that month's consumption.
+    const srcVal = (r) => (st.source === 'china' ? r.china : st.source === 'nepal' ? r.nepal : r.china + r.nepal);
+    const monthLoc = {};
+    if (st.groupby === 'month') {
+      for (const r of recs) { (monthLoc[r.month] = monthLoc[r.month] || {}); monthLoc[r.month][r.loc] = (monthLoc[r.month][r.loc] || 0) + srcVal(r); }
+    }
     const series = stacked ? [
       { name: 'China', type: 'bar', stack: 's', data: ks.map((k) => Math.round(china[k] || 0)), itemStyle: { color: '#2f6fd0' } },
       { name: 'Nepal Army', type: 'bar', stack: 's', data: ks.map((k) => Math.round(nepal[k] || 0)), itemStyle: { color: '#e0a52e' } },
@@ -1425,8 +1432,21 @@
     ];
     makeChart('expl-chart').setOption({
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' },
-        formatter: (ps) => ps[0].axisValue + '<br/>' + ps.map((p) => `${p.marker}${p.seriesName}: <b>${explFmt(p.value)}</b> kg`).join('<br/>')
-          + (stacked && ps.length > 1 ? `<br/>Total: <b>${explFmt(ps.reduce((s, p) => s + p.value, 0))}</b> kg` : '') },
+        formatter: (ps) => {
+          let out = ps[0].axisValue + '<br/>' + ps.map((p) => `${p.marker}${p.seriesName}: <b>${explFmt(p.value)}</b> kg`).join('<br/>')
+            + (stacked && ps.length > 1 ? `<br/>Total: <b>${explFmt(ps.reduce((s, p) => s + p.value, 0))}</b> kg` : '');
+          if (st.groupby === 'month') {
+            const by = monthLoc[ks[ps[0].dataIndex]] || {};
+            const list = Object.entries(by).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+            if (list.length) {
+              out += '<hr style="border:0;border-top:1px solid #e3e9f2;margin:5px 0">'
+                + '<div style="font-size:11px;color:#5b6b82;font-weight:700">By site</div>'
+                + list.slice(0, 8).map(([l, v]) => `${l}: <b>${explFmt(v)}</b> kg`).join('<br/>')
+                + (list.length > 8 ? `<br/><span style="color:#8a97a8">+ ${list.length - 8} more site${list.length - 8 === 1 ? '' : 's'}</span>` : '');
+            }
+          }
+          return out;
+        } },
       legend: stacked ? { top: 0, textStyle: { fontSize: 11, color: COL.muted } } : { show: false },
       grid: { left: 56, right: 16, top: stacked ? 30 : 12, bottom: st.groupby === 'loc' ? 96 : 44 },
       xAxis: { type: 'category', data: labels, axisLabel: { fontSize: 10, color: COL.muted, rotate: st.groupby === 'loc' ? 40 : 0, interval: 0 }, axisLine: { lineStyle: { color: '#cfd8e6' } } },
@@ -1541,7 +1561,7 @@
         <td>${p.validFrom || '–'}</td><td>${p.validTill || '–'}</td>
         <td><span class="ins-days ${s.dcls}">${dtxt}</span></td>
         <td>${insN(p.paidNPR)}</td>
-        <td><span class="badge ${s.badge}">${p.remarks || s.lab}</span></td></tr>`;
+        <td><span class="badge ${s.badge}">${/expired/i.test(p.remarks || '') ? 'Expired' : (p.remarks || s.lab)}</span></td></tr>`;
     }).join('');
     host.innerHTML = `<div style="overflow-x:auto"><table class="tbl" style="min-width:840px"><thead><tr>
       <th style="text-align:left">Insurance / Description</th><th style="text-align:left">Policy No.</th><th>Valid From</th><th>Valid Till</th><th>Days to Expiry</th><th>Paid (NPR)</th><th>Status</th>
