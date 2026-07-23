@@ -1388,6 +1388,121 @@
     chart.resize();
   }
 
+  // ---- Explosive consumption (filterable bar chart from the Daily Explosive
+  // Consumption workbook). Filters: group-by, source, month range, site chips.
+  let explState = null, explWired = false;
+  const MONL = (m) => { const p = String(m).split('-'); return MON[(+p[1] || 1) - 1] + ' ' + (p[0] || '').slice(2); };
+  const explFmt = (v) => Math.round(v).toLocaleString('en-US');
+  function explFiltered() {
+    const st = explState, ex = data.explosives;
+    return ex.records.filter((r) => st.locs.has(r.loc) && r.month >= st.from && r.month <= st.to);
+  }
+  function renderExplChips() {
+    const ex = data.explosives, st = explState;
+    const host = document.getElementById('expl-locs'); if (!host) return;
+    // total per location (all months) for the little count on each chip
+    const byLoc = {}; ex.records.forEach((r) => { byLoc[r.loc] = (byLoc[r.loc] || 0) + r.china + r.nepal; });
+    host.innerHTML = ex.locations.map((l) => `<span class="expl-chip ${st.locs.has(l) ? 'on' : ''}" data-loc="${l.replace(/"/g, '&quot;')}">${l} <span class="k">${explFmt(byLoc[l] || 0)}</span></span>`).join('');
+  }
+  function drawExplChart() {
+    const st = explState, ex = data.explosives;
+    const recs = explFiltered();
+    const gk = (r) => (st.groupby === 'loc' ? r.loc : r.month);
+    const china = {}, nepal = {}, tot = {};
+    for (const r of recs) { const k = gk(r); china[k] = (china[k] || 0) + r.china; nepal[k] = (nepal[k] || 0) + r.nepal;
+      tot[k] = (tot[k] || 0) + (st.source === 'china' ? r.china : st.source === 'nepal' ? r.nepal : r.china + r.nepal); }
+    let ks = st.groupby === 'loc'
+      ? Object.keys(tot).sort((a, b) => tot[b] - tot[a])
+      : ex.months.filter((m) => m >= st.from && m <= st.to);
+    const labels = st.groupby === 'loc' ? ks : ks.map(MONL);
+    const stacked = st.source === 'both';
+    const series = stacked ? [
+      { name: 'China', type: 'bar', stack: 's', data: ks.map((k) => Math.round(china[k] || 0)), itemStyle: { color: '#2f6fd0' } },
+      { name: 'Nepal Army', type: 'bar', stack: 's', data: ks.map((k) => Math.round(nepal[k] || 0)), itemStyle: { color: '#e0a52e' } },
+    ] : [
+      { name: st.source === 'china' ? 'China' : 'Nepal Army', type: 'bar', barMaxWidth: 46,
+        data: ks.map((k) => Math.round(tot[k] || 0)), itemStyle: { color: st.source === 'china' ? '#2f6fd0' : '#e0a52e', borderRadius: [3, 3, 0, 0] } },
+    ];
+    makeChart('expl-chart').setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' },
+        formatter: (ps) => ps[0].axisValue + '<br/>' + ps.map((p) => `${p.marker}${p.seriesName}: <b>${explFmt(p.value)}</b> kg`).join('<br/>')
+          + (stacked && ps.length > 1 ? `<br/>Total: <b>${explFmt(ps.reduce((s, p) => s + p.value, 0))}</b> kg` : '') },
+      legend: stacked ? { top: 0, textStyle: { fontSize: 11, color: COL.muted } } : { show: false },
+      grid: { left: 56, right: 16, top: stacked ? 30 : 12, bottom: st.groupby === 'loc' ? 96 : 44 },
+      xAxis: { type: 'category', data: labels, axisLabel: { fontSize: 10, color: COL.muted, rotate: st.groupby === 'loc' ? 40 : 0, interval: 0 }, axisLine: { lineStyle: { color: '#cfd8e6' } } },
+      yAxis: { type: 'value', name: 'kg', nameTextStyle: { fontSize: 10, color: COL.muted }, splitLine: { lineStyle: { color: COL.grid } }, axisLabel: { fontSize: 10, color: COL.muted } },
+      series,
+    }, true);
+  }
+  function renderExplSummary() {
+    const ex = data.explosives, st = explState;
+    const sel = explFiltered().reduce((s, r) => s + (st.source === 'china' ? r.china : st.source === 'nepal' ? r.nepal : r.china + r.nepal), 0);
+    const totCons = ex.totalChina + ex.totalNepal;
+    const proc = ex.procurement ? ex.procurement.grandTotal : 0;
+    const tile = (lab, val, sub) => `<div class="expl-tile"><div class="lab">${lab}</div><div class="val">${val}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+    const host = document.getElementById('expl-summary'); if (!host) return;
+    host.innerHTML =
+      tile('Consumed · selection', explFmt(sel) + ' kg', st.locs.size + ' of ' + ex.locations.length + ' sites · ' + MONL(st.from) + '–' + MONL(st.to)) +
+      tile('Consumed · all', explFmt(totCons) + ' kg', 'China ' + explFmt(ex.totalChina) + ' + Nepal ' + explFmt(ex.totalNepal)) +
+      tile('Procured · all', explFmt(proc) + ' kg', 'from Procurement Summary') +
+      tile('Stock balance', explFmt(proc - totCons) + ' kg', 'procured − consumed');
+  }
+  function renderExplProc() {
+    const ex = data.explosives, host = document.getElementById('expl-proc'); if (!host) return;
+    const p = ex.procurement;
+    if (!p || !p.rows.length) { host.innerHTML = '<div class="muted" style="font-size:12px">No procurement data.</div>'; return; }
+    const head = '<th style="text-align:left">Source</th>' + p.months.map((m) => `<th>${MONL(m)}</th>`).join('') + '<th>Total</th>';
+    const body = p.rows.map((r) => `<tr><td style="text-align:left"><b>${r.source}</b></td>`
+      + p.months.map((m) => `<td>${r.byMonth[m] ? explFmt(r.byMonth[m]) : '–'}</td>`).join('')
+      + `<td><b>${explFmt(r.total)}</b></td></tr>`).join('');
+    const totRow = `<tr class="ipc-grp"><td style="text-align:left">Grand Total</td>`
+      + p.months.map((m) => `<td>${explFmt(p.rows.reduce((s, r) => s + (r.byMonth[m] || 0), 0))}</td>`).join('')
+      + `<td>${explFmt(p.grandTotal)}</td></tr>`;
+    host.innerHTML = `<div style="overflow-x:auto"><table class="tbl" style="min-width:640px"><thead><tr>${head}</tr></thead><tbody>${body}${totRow}</tbody></table></div>`;
+  }
+  function wireExplControls() {
+    if (explWired) return; explWired = true;
+    const upd = () => { drawExplChart(); renderExplSummary(); };
+    const gb = document.getElementById('expl-groupby'), sc = document.getElementById('expl-source'),
+      fr = document.getElementById('expl-from'), to = document.getElementById('expl-to');
+    if (gb) gb.addEventListener('change', () => { explState.groupby = gb.value; upd(); });
+    if (sc) sc.addEventListener('change', () => { explState.source = sc.value; upd(); });
+    if (fr) fr.addEventListener('change', () => { explState.from = fr.value; if (explState.from > explState.to) { explState.to = explState.from; to.value = explState.to; } upd(); });
+    if (to) to.addEventListener('change', () => { explState.to = to.value; if (explState.to < explState.from) { explState.from = explState.to; fr.value = explState.from; } upd(); });
+    const locHost = document.getElementById('expl-locs');
+    if (locHost) locHost.addEventListener('click', (e) => {
+      const chip = e.target.closest('.expl-chip'); if (!chip) return;
+      const l = chip.dataset.loc;
+      if (explState.locs.has(l)) explState.locs.delete(l); else explState.locs.add(l);
+      chip.classList.toggle('on'); upd();
+    });
+    const all = document.getElementById('expl-loc-all'), none = document.getElementById('expl-loc-none');
+    if (all) all.addEventListener('click', () => { explState.locs = new Set(data.explosives.locations); renderExplChips(); upd(); });
+    if (none) none.addEventListener('click', () => { explState.locs = new Set(); renderExplChips(); upd(); });
+  }
+  function renderExplosives() {
+    const host = document.getElementById('expl-chart'); if (!host) return;
+    const ex = data && data.explosives;
+    const sumHost = document.getElementById('expl-summary');
+    if (!ex || !ex.records || !ex.records.length) {
+      if (sumHost) sumHost.innerHTML = '<div class="muted" style="font-size:12px">No explosive consumption data available yet.</div>';
+      return;
+    }
+    const sig = ex.locations.join('|') + '##' + ex.months.join('|');
+    if (!explState || explState._sig !== sig) {
+      explState = { _sig: sig, groupby: 'loc', source: 'both', from: ex.months[0], to: ex.months[ex.months.length - 1], locs: new Set(ex.locations) };
+      const opts = ex.months.map((m) => `<option value="${m}">${MONL(m)}</option>`).join('');
+      const fr = document.getElementById('expl-from'), to = document.getElementById('expl-to'),
+        gb = document.getElementById('expl-groupby'), sc = document.getElementById('expl-source');
+      if (fr) { fr.innerHTML = opts; fr.value = explState.from; }
+      if (to) { to.innerHTML = opts; to.value = explState.to; }
+      if (gb) gb.value = 'loc'; if (sc) sc.value = 'both';
+      renderExplChips();
+      wireExplControls();
+    }
+    drawExplChart(); renderExplSummary(); renderExplProc();
+  }
+
   // Placeholder Inventory & Explosives tables — structure for seniors now; the
   // cells auto-fill once the inventory sheet is linked.
   const INV_MATERIALS = ['Cement (bags)', 'Reinforcement Steel (MT)', 'Aggregate (m³)', 'Sand (m³)', 'Shotcrete (m³)', 'Structural Steel / Liner (MT)', 'Diesel (L)', 'Cement Grout (bags)'];
@@ -1779,6 +1894,7 @@
     renderKpis();
     renderFinancial();
     renderInventory();
+    renderExplosives();
     renderWeekly();
     renderClaims();
     renderSchedule();

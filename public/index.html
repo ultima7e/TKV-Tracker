@@ -211,6 +211,26 @@
       <section class="view" id="claims"><div id="claims-body"></div></section>
       <section class="view" id="inv">
         <div class="card" style="margin-bottom:16px">
+          <h3>Explosive Consumption <span class="muted" style="font-weight:600">· emulsion (kg) · pick filters to update the chart</span></h3>
+          <div id="expl-summary" class="expl-summary"></div>
+          <div class="expl-controls">
+            <div class="fe-field"><label>Group bars by</label><select id="expl-groupby" class="fe-input"><option value="loc">Location / Site</option><option value="month">Month</option></select></div>
+            <div class="fe-field"><label>Source</label><select id="expl-source" class="fe-input"><option value="both">Both sources</option><option value="china">China</option><option value="nepal">Nepal Army</option></select></div>
+            <div class="fe-field"><label>From month</label><select id="expl-from" class="fe-input"></select></div>
+            <div class="fe-field"><label>To month</label><select id="expl-to" class="fe-input"></select></div>
+          </div>
+          <div class="expl-loc-wrap">
+            <div class="expl-loc-head"><span>Sites <span class="muted">· click to include / exclude</span></span>
+              <span><button id="expl-loc-all" class="fe-btn" type="button">All</button> <button id="expl-loc-none" class="fe-btn" type="button">None</button></span></div>
+            <div id="expl-locs" class="expl-locs"></div>
+          </div>
+          <div id="expl-chart" class="chart" style="height:360px"></div>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <h3>Procurement Summary <span class="muted" style="font-weight:600">· kg received by source</span></h3>
+          <div id="expl-proc"></div>
+        </div>
+        <div class="card" style="margin-bottom:16px">
           <h3>Material Inventory Summary <span class="muted" style="font-weight:600">· data to be populated</span></h3>
           <div id="inv-mat"></div>
         </div>

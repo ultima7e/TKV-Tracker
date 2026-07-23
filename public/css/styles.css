@@ -216,6 +216,22 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .badge{font-size:10px;font-weight:800;padding:3px 9px;border-radius:20px;white-space:nowrap}
 .badge.ok{background:#e4f5ee;color:#1c7a52} .badge.warn{background:#fdf0d8;color:#9a6b00}
 .badge.bad{background:#fdeaea;color:#b3261e} .badge.neu{background:#eef2f7;color:#5b6b82}
+/* Explosive consumption — filter controls, site chips, summary tiles. */
+.expl-summary{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.expl-tile{flex:1;min-width:150px;background:#f4f7fb;border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.expl-tile .lab{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700}
+.expl-tile .val{font-size:19px;font-weight:800;color:var(--navy);margin-top:2px}
+.expl-tile .sub{font-size:11px;color:var(--muted);margin-top:1px}
+.expl-controls{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:14px}
+.expl-loc-wrap{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:14px;background:#fbfdff}
+.expl-loc-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px}
+.expl-loc-head .fe-btn{padding:3px 10px;font-size:11px}
+.expl-locs{display:flex;flex-wrap:wrap;gap:6px;max-height:132px;overflow-y:auto}
+.expl-chip{border:1px solid var(--line);background:#fff;color:#51637e;font-size:11.5px;font-weight:600;
+  padding:4px 11px;border-radius:20px;cursor:pointer;user-select:none;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.expl-chip .k{font-weight:800;color:var(--muted);font-size:10.5px}
+.expl-chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.expl-chip.on .k{color:#eaf2ff}
 /* IPC register — "Details" toggle + full accounting breakdown panel. */
 .ipc-details-btn{border:1px solid var(--line);background:#fff;color:var(--muted);font-weight:700;font-size:11px;
   padding:4px 10px;border-radius:7px;cursor:pointer;margin-bottom:10px}

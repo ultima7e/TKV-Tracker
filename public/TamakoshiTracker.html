@@ -189,6 +189,20 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .badge{font-size:10px;font-weight:800;padding:3px 9px;border-radius:20px;white-space:nowrap}
 .badge.ok{background:#e4f5ee;color:#1c7a52} .badge.warn{background:#fdf0d8;color:#9a6b00}
 .badge.bad{background:#fdeaea;color:#b3261e} .badge.neu{background:#eef2f7;color:#5b6b82}
+.expl-summary{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.expl-tile{flex:1;min-width:150px;background:#f4f7fb;border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.expl-tile .lab{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700}
+.expl-tile .val{font-size:19px;font-weight:800;color:var(--navy);margin-top:2px}
+.expl-tile .sub{font-size:11px;color:var(--muted);margin-top:1px}
+.expl-controls{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:14px}
+.expl-loc-wrap{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:14px;background:#fbfdff}
+.expl-loc-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px}
+.expl-loc-head .fe-btn{padding:3px 10px;font-size:11px}
+.expl-locs{display:flex;flex-wrap:wrap;gap:6px;max-height:132px;overflow-y:auto}
+.expl-chip{border:1px solid var(--line);background:#fff;color:#51637e;font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:20px;cursor:pointer;user-select:none;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.expl-chip .k{font-weight:800;color:var(--muted);font-size:10.5px}
+.expl-chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.expl-chip.on .k{color:#eaf2ff}
 .ipc-details-btn{border:1px solid var(--line);background:#fff;color:var(--muted);font-weight:700;font-size:11px;padding:4px 10px;border-radius:7px;cursor:pointer;margin-bottom:10px}
 .ipc-details-btn:hover{border-color:var(--accent);color:var(--accent)}
 .ipc-details-btn.on{background:var(--navy);color:#fff;border-color:var(--navy)}
@@ -603,6 +617,26 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       <section class="view" id="claims"><div id="claims-body"></div></section>
       <section class="view" id="inv">
         <div class="card" style="margin-bottom:16px">
+          <h3>Explosive Consumption <span class="muted" style="font-weight:600">· emulsion (kg) · pick filters to update the chart</span></h3>
+          <div id="expl-summary" class="expl-summary"></div>
+          <div class="expl-controls">
+            <div class="fe-field"><label>Group bars by</label><select id="expl-groupby" class="fe-input"><option value="loc">Location / Site</option><option value="month">Month</option></select></div>
+            <div class="fe-field"><label>Source</label><select id="expl-source" class="fe-input"><option value="both">Both sources</option><option value="china">China</option><option value="nepal">Nepal Army</option></select></div>
+            <div class="fe-field"><label>From month</label><select id="expl-from" class="fe-input"></select></div>
+            <div class="fe-field"><label>To month</label><select id="expl-to" class="fe-input"></select></div>
+          </div>
+          <div class="expl-loc-wrap">
+            <div class="expl-loc-head"><span>Sites <span class="muted">· click to include / exclude</span></span>
+              <span><button id="expl-loc-all" class="fe-btn" type="button">All</button> <button id="expl-loc-none" class="fe-btn" type="button">None</button></span></div>
+            <div id="expl-locs" class="expl-locs"></div>
+          </div>
+          <div id="expl-chart" class="chart" style="height:360px"></div>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <h3>Procurement Summary <span class="muted" style="font-weight:600">· kg received by source</span></h3>
+          <div id="expl-proc"></div>
+        </div>
+        <div class="card" style="margin-bottom:16px">
           <h3>Material Inventory Summary <span class="muted" style="font-weight:600">· data to be populated</span></h3>
           <div id="inv-mat"></div>
         </div>
@@ -843,6 +877,120 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     if (/settl|complete|paid/.test(t)) return 'Settled';
     return 'Under Review';
   }
+  // ---- Explosive consumption (filterable bar chart from the Daily Explosive
+  // Consumption workbook). Filters: group-by, source, month range, site chips.
+  let explState = null, explWired = false;
+  const MONL = (m) => { const p = String(m).split('-'); return MON[(+p[1] || 1) - 1] + ' ' + (p[0] || '').slice(2); };
+  const explFmt = (v) => Math.round(v).toLocaleString('en-US');
+  function explFiltered() {
+    const st = explState, ex = data.explosives;
+    return ex.records.filter((r) => st.locs.has(r.loc) && r.month >= st.from && r.month <= st.to);
+  }
+  function renderExplChips() {
+    const ex = data.explosives, st = explState;
+    const host = document.getElementById('expl-locs'); if (!host) return;
+    const byLoc = {}; ex.records.forEach((r) => { byLoc[r.loc] = (byLoc[r.loc] || 0) + r.china + r.nepal; });
+    host.innerHTML = ex.locations.map((l) => `<span class="expl-chip ${st.locs.has(l) ? 'on' : ''}" data-loc="${l.replace(/"/g, '&quot;')}">${l} <span class="k">${explFmt(byLoc[l] || 0)}</span></span>`).join('');
+  }
+  function drawExplChart() {
+    const st = explState, ex = data.explosives;
+    const recs = explFiltered();
+    const gk = (r) => (st.groupby === 'loc' ? r.loc : r.month);
+    const china = {}, nepal = {}, tot = {};
+    for (const r of recs) { const k = gk(r); china[k] = (china[k] || 0) + r.china; nepal[k] = (nepal[k] || 0) + r.nepal;
+      tot[k] = (tot[k] || 0) + (st.source === 'china' ? r.china : st.source === 'nepal' ? r.nepal : r.china + r.nepal); }
+    let ks = st.groupby === 'loc'
+      ? Object.keys(tot).sort((a, b) => tot[b] - tot[a])
+      : ex.months.filter((m) => m >= st.from && m <= st.to);
+    const labels = st.groupby === 'loc' ? ks : ks.map(MONL);
+    const stacked = st.source === 'both';
+    const series = stacked ? [
+      { name: 'China', type: 'bar', stack: 's', data: ks.map((k) => Math.round(china[k] || 0)), itemStyle: { color: '#2f6fd0' } },
+      { name: 'Nepal Army', type: 'bar', stack: 's', data: ks.map((k) => Math.round(nepal[k] || 0)), itemStyle: { color: '#e0a52e' } },
+    ] : [
+      { name: st.source === 'china' ? 'China' : 'Nepal Army', type: 'bar', barMaxWidth: 46,
+        data: ks.map((k) => Math.round(tot[k] || 0)), itemStyle: { color: st.source === 'china' ? '#2f6fd0' : '#e0a52e', borderRadius: [3, 3, 0, 0] } },
+    ];
+    makeChart('expl-chart').setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' },
+        formatter: (ps) => ps[0].axisValue + '<br/>' + ps.map((p) => `${p.marker}${p.seriesName}: <b>${explFmt(p.value)}</b> kg`).join('<br/>')
+          + (stacked && ps.length > 1 ? `<br/>Total: <b>${explFmt(ps.reduce((s, p) => s + p.value, 0))}</b> kg` : '') },
+      legend: stacked ? { top: 0, textStyle: { fontSize: 11, color: COL.muted } } : { show: false },
+      grid: { left: 56, right: 16, top: stacked ? 30 : 12, bottom: st.groupby === 'loc' ? 96 : 44 },
+      xAxis: { type: 'category', data: labels, axisLabel: { fontSize: 10, color: COL.muted, rotate: st.groupby === 'loc' ? 40 : 0, interval: 0 }, axisLine: { lineStyle: { color: '#cfd8e6' } } },
+      yAxis: { type: 'value', name: 'kg', nameTextStyle: { fontSize: 10, color: COL.muted }, splitLine: { lineStyle: { color: COL.grid } }, axisLabel: { fontSize: 10, color: COL.muted } },
+      series,
+    }, true);
+  }
+  function renderExplSummary() {
+    const ex = data.explosives, st = explState;
+    const sel = explFiltered().reduce((s, r) => s + (st.source === 'china' ? r.china : st.source === 'nepal' ? r.nepal : r.china + r.nepal), 0);
+    const totCons = ex.totalChina + ex.totalNepal;
+    const proc = ex.procurement ? ex.procurement.grandTotal : 0;
+    const tile = (lab, val, sub) => `<div class="expl-tile"><div class="lab">${lab}</div><div class="val">${val}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+    const host = document.getElementById('expl-summary'); if (!host) return;
+    host.innerHTML =
+      tile('Consumed · selection', explFmt(sel) + ' kg', st.locs.size + ' of ' + ex.locations.length + ' sites · ' + MONL(st.from) + '–' + MONL(st.to)) +
+      tile('Consumed · all', explFmt(totCons) + ' kg', 'China ' + explFmt(ex.totalChina) + ' + Nepal ' + explFmt(ex.totalNepal)) +
+      tile('Procured · all', explFmt(proc) + ' kg', 'from Procurement Summary') +
+      tile('Stock balance', explFmt(proc - totCons) + ' kg', 'procured − consumed');
+  }
+  function renderExplProc() {
+    const ex = data.explosives, host = document.getElementById('expl-proc'); if (!host) return;
+    const p = ex.procurement;
+    if (!p || !p.rows.length) { host.innerHTML = '<div class="muted" style="font-size:12px">No procurement data.</div>'; return; }
+    const head = '<th style="text-align:left">Source</th>' + p.months.map((m) => `<th>${MONL(m)}</th>`).join('') + '<th>Total</th>';
+    const body = p.rows.map((r) => `<tr><td style="text-align:left"><b>${r.source}</b></td>`
+      + p.months.map((m) => `<td>${r.byMonth[m] ? explFmt(r.byMonth[m]) : '–'}</td>`).join('')
+      + `<td><b>${explFmt(r.total)}</b></td></tr>`).join('');
+    const totRow = `<tr class="ipc-grp"><td style="text-align:left">Grand Total</td>`
+      + p.months.map((m) => `<td>${explFmt(p.rows.reduce((s, r) => s + (r.byMonth[m] || 0), 0))}</td>`).join('')
+      + `<td>${explFmt(p.grandTotal)}</td></tr>`;
+    host.innerHTML = `<div style="overflow-x:auto"><table class="tbl" style="min-width:640px"><thead><tr>${head}</tr></thead><tbody>${body}${totRow}</tbody></table></div>`;
+  }
+  function wireExplControls() {
+    if (explWired) return; explWired = true;
+    const upd = () => { drawExplChart(); renderExplSummary(); };
+    const gb = document.getElementById('expl-groupby'), sc = document.getElementById('expl-source'),
+      fr = document.getElementById('expl-from'), to = document.getElementById('expl-to');
+    if (gb) gb.addEventListener('change', () => { explState.groupby = gb.value; upd(); });
+    if (sc) sc.addEventListener('change', () => { explState.source = sc.value; upd(); });
+    if (fr) fr.addEventListener('change', () => { explState.from = fr.value; if (explState.from > explState.to) { explState.to = explState.from; to.value = explState.to; } upd(); });
+    if (to) to.addEventListener('change', () => { explState.to = to.value; if (explState.to < explState.from) { explState.from = explState.to; fr.value = explState.from; } upd(); });
+    const locHost = document.getElementById('expl-locs');
+    if (locHost) locHost.addEventListener('click', (e) => {
+      const chip = e.target.closest('.expl-chip'); if (!chip) return;
+      const l = chip.dataset.loc;
+      if (explState.locs.has(l)) explState.locs.delete(l); else explState.locs.add(l);
+      chip.classList.toggle('on'); upd();
+    });
+    const all = document.getElementById('expl-loc-all'), none = document.getElementById('expl-loc-none');
+    if (all) all.addEventListener('click', () => { explState.locs = new Set(data.explosives.locations); renderExplChips(); upd(); });
+    if (none) none.addEventListener('click', () => { explState.locs = new Set(); renderExplChips(); upd(); });
+  }
+  function renderExplosives() {
+    const host = document.getElementById('expl-chart'); if (!host) return;
+    const ex = data && data.explosives;
+    const sumHost = document.getElementById('expl-summary');
+    if (!ex || !ex.records || !ex.records.length) {
+      if (sumHost) sumHost.innerHTML = '<div class="muted" style="font-size:12px">No explosive consumption data available yet.</div>';
+      return;
+    }
+    const sig = ex.locations.join('|') + '##' + ex.months.join('|');
+    if (!explState || explState._sig !== sig) {
+      explState = { _sig: sig, groupby: 'loc', source: 'both', from: ex.months[0], to: ex.months[ex.months.length - 1], locs: new Set(ex.locations) };
+      const opts = ex.months.map((m) => `<option value="${m}">${MONL(m)}</option>`).join('');
+      const fr = document.getElementById('expl-from'), to = document.getElementById('expl-to'),
+        gb = document.getElementById('expl-groupby'), sc = document.getElementById('expl-source');
+      if (fr) { fr.innerHTML = opts; fr.value = explState.from; }
+      if (to) { to.innerHTML = opts; to.value = explState.to; }
+      if (gb) gb.value = 'loc'; if (sc) sc.value = 'both';
+      renderExplChips();
+      wireExplControls();
+    }
+    drawExplChart(); renderExplSummary(); renderExplProc();
+  }
+
   const INV_MATERIALS = ['Cement (bags)', 'Reinforcement Steel (MT)', 'Aggregate (m³)', 'Sand (m³)', 'Shotcrete (m³)', 'Structural Steel / Liner (MT)', 'Diesel (L)', 'Cement Grout (bags)'];
   const INV_EXPLOSIVES = ['Emulsion Explosive (kg)', 'Detonators — Electric (pcs)', 'Detonators — Non-electric (pcs)', 'Detonating Cord (m)', 'Safety Fuse (m)', 'ANFO (kg)'];
   function renderInventory() {
@@ -2383,6 +2531,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     renderKpis();
     renderFinancial();
     renderInventory();
+    renderExplosives();
     renderWeekly();
     renderClaims();
     renderSchedule();
