@@ -955,7 +955,8 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
         data: ks.map((k) => Math.round(tot[k] || 0)), itemStyle: { color: st.source === 'china' ? '#2f6fd0' : '#e0a52e', borderRadius: [3, 3, 0, 0] } },
     ];
     makeChart('expl-chart').setOption({
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, confine: true, enterable: true,
+        extraCssText: 'max-height:330px;overflow-y:auto',
         formatter: (ps) => {
           let out = ps[0].axisValue + '<br/>' + ps.map((p) => `${p.marker}${p.seriesName}: <b>${explFmt(p.value)}</b> kg`).join('<br/>')
             + (stacked && ps.length > 1 ? `<br/>Total: <b>${explFmt(ps.reduce((s, p) => s + p.value, 0))}</b> kg` : '');
@@ -964,9 +965,8 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
             const list = Object.entries(by).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
             if (list.length) {
               out += '<hr style="border:0;border-top:1px solid #e3e9f2;margin:5px 0">'
-                + '<div style="font-size:11px;color:#5b6b82;font-weight:700">By site</div>'
-                + list.slice(0, 8).map(([l, v]) => `${l}: <b>${explFmt(v)}</b> kg`).join('<br/>')
-                + (list.length > 8 ? `<br/><span style="color:#8a97a8">+ ${list.length - 8} more site${list.length - 8 === 1 ? '' : 's'}</span>` : '');
+                + `<div style="font-size:11px;color:#5b6b82;font-weight:700">By site (${list.length})</div>`
+                + list.map(([l, v]) => `${l}: <b>${explFmt(v)}</b> kg`).join('<br/>');
             }
           }
           return out;
