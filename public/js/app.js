@@ -254,13 +254,17 @@
     const eq = nprEquivalents(b, rc);
     $('#v-budget-eq').textContent = eq.contract;
     $('#v-received-eq').textContent = eq.received;
-    // Earned Value = work done to date (USD-equivalent), from the EV workbook.
+    // Total Earned Value — the EV workbook's own headline figure, shown both
+    // ways: USD-equivalent (big) and NPR-equivalent (sub), at the file's rate.
+    // Falls back to the older USD-eq figure if the summary block is absent.
     const evEl = document.getElementById('v-ev');
     const evSub = document.getElementById('v-ev-sub');
-    if (evEl) evEl.textContent = b.completeUSDEq ? '$ ' + (b.completeUSDEq / 1e6).toFixed(2) + 'M' : '—';
-    if (evSub) evSub.textContent = b.completeUSD != null
-      ? `$${(b.completeUSD / 1e6).toFixed(2)}M + NPR ${(b.completeNPR / 1e6).toFixed(0)}M work done`
-      : 'awaiting EV data sheet';
+    if (evEl) evEl.textContent = b.totalEarnedUSDeq != null ? '$ ' + (b.totalEarnedUSDeq / 1e6).toFixed(2) + 'M'
+      : (b.completeUSDEq ? '$ ' + (b.completeUSDEq / 1e6).toFixed(2) + 'M' : '—');
+    if (evSub) evSub.textContent = b.totalEarnedNPReq != null
+      ? `≈ NPR ${(b.totalEarnedNPReq / 1e9).toFixed(2)} B  ·  USD-eq / NPR-eq`
+      : (b.completeUSD != null ? `$${(b.completeUSD / 1e6).toFixed(2)}M + NPR ${(b.completeNPR / 1e6).toFixed(0)}M work done`
+        : 'awaiting EV data sheet');
     renderTimeline();
   }
 
@@ -615,6 +619,11 @@
     const nprM = (v) => (v / 1e6).toFixed(1);
     setKpi('f-cusd', b.workUSD / 1e6, 2);
     setKpi('f-cnpr', b.workNPR / 1e6, 0); // NPR in millions — matches Executive Summary
+    // Total Earned Value — the EV workbook's own USD-eq / NPR-eq headline figures.
+    setKpi('f-eusd', b.totalEarnedUSDeq != null ? b.totalEarnedUSDeq / 1e6 : null, 2);
+    setKpi('f-enpr', b.totalEarnedNPReq != null ? b.totalEarnedNPReq / 1e6 : null, 0);
+    const fEeq = document.getElementById('f-e-eq');
+    if (fEeq && b.totalEarnedNPReq != null) fEeq.textContent = `≈ NPR ${nprB(b.totalEarnedNPReq)} B · incl. PS & VAT`;
     setKpi('f-rusd', rc.usd / 1e6, 2);
     setKpi('f-rnpr', rc.npr / 1e6, 0); // NPR in millions — matches Executive Summary
     const fb = finBasis(b);
