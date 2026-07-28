@@ -1524,7 +1524,8 @@
   }
 
   // ---- Insurance & Claims. Days-to-expiry is computed live from validTill so
-  // the register always reflects today; policies sort with the most urgent first.
+  // the register always reflects today; policies are grouped by category in the
+  // source register's order (not scattered by expiry date).
   let insPols = [];
   const insState = { filter: 'all', search: '', wired: false };
   const INS_CLAIMS = [
@@ -1543,6 +1544,8 @@
   function renderInsTable() {
     const host = document.getElementById('ins-table'); if (!host) return;
     const f = insState.filter, q = insState.search.toLowerCase();
+    // Keep the register's own order (idx) so related policies stay together —
+    // grouped by their top-level category, most urgent first within each group.
     let rows = insPols.filter((p) => {
       if (q && !((p.desc || '').toLowerCase().includes(q) || (p.policyNo || '').toLowerCase().includes(q))) return false;
       const d = p.daysLeft;
@@ -1551,8 +1554,9 @@
       if (f === 'soon') return d != null && d >= 0 && d <= 90;
       if (f === 'valid') return d != null && d > 90;
       return true;
-    }).sort((a, b) => (a.daysLeft == null ? 1e9 : a.daysLeft) - (b.daysLeft == null ? 1e9 : b.daysLeft));
-    const body = rows.map((p) => {
+    }).sort((a, b) => (a.idx || 0) - (b.idx || 0));
+    const cats = (data.insurance && data.insurance.categories) || {};
+    const rowHtml = (p) => {
       const s = insStatus(p.daysLeft);
       const dtxt = p.daysLeft == null ? '–' : (p.daysLeft < 0 ? Math.abs(p.daysLeft) + ' d ago' : p.daysLeft + ' d left');
       return `<tr>
@@ -1562,7 +1566,19 @@
         <td><span class="ins-days ${s.dcls}">${dtxt}</span></td>
         <td>${insN(p.paidNPR)}</td>
         <td><span class="badge ${s.badge}">${/expired/i.test(p.remarks || '') ? 'Expired' : (p.remarks || s.lab)}</span></td></tr>`;
-    }).join('');
+    };
+    const groups = [], gmap = {};
+    for (const p of rows) { if (!gmap[p.group]) { gmap[p.group] = { key: p.group, items: [] }; groups.push(gmap[p.group]); } gmap[p.group].items.push(p); }
+    let body = '';
+    for (const g of groups) {
+      const cat = cats[g.key];
+      if (cat || g.items.length > 1) { // header for real categories & multi-policy groups
+        const parent = g.items.find((p) => !/\./.test(String(p.sn)));
+        const lab = cat || (parent && parent.desc) || g.items[0].desc;
+        body += `<tr class="tbl-grp"><td colspan="7" style="text-align:left">${lab} <span style="opacity:.65;font-weight:600">(${g.items.length})</span></td></tr>`;
+      }
+      for (const p of g.items) body += rowHtml(p);
+    }
     host.innerHTML = `<div style="overflow-x:auto"><table class="tbl" style="min-width:840px"><thead><tr>
       <th style="text-align:left">Insurance / Description</th><th style="text-align:left">Policy No.</th><th>Valid From</th><th>Valid Till</th><th>Days to Expiry</th><th>Paid (NPR)</th><th>Status</th>
     </tr></thead><tbody>${body || '<tr><td colspan="7" class="muted" style="padding:14px">No policies match this filter.</td></tr>'}</tbody></table></div>`;
