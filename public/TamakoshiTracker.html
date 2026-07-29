@@ -1730,33 +1730,34 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       }
     });
 
+    // The mobilisation advance is excluded from this chart — it isn't an IPC.
     const ipcs = fd.ipcs || [];
+    const barIpcs = ipcs.filter((i) => !i.isAdvance);
     const bar = makeChart('f-bar');
     bar.setOption({
       grid: { left: 44, right: 12, top: 16, bottom: 56 },
       tooltip: { trigger: 'axis',
         formatter: (ps) => {
-          const i = ipcs[ps[0].dataIndex];
+          const i = barIpcs[ps[0].dataIndex];
           return `<b>${i.ipc}</b>${i.certifiedDate ? ' · ' + i.certifiedDate : ''}<br/>` +
             `Received: NPR ${nprM(i.receivedNPR)} M` + (i.receivedUSD ? ` + $ ${usdM(i.receivedUSD)} M` : '') +
             `<br/>Status: ${i.status}`;
         } },
-      xAxis: { type: 'category', data: ipcs.map((i) => i.ipc.replace('Advance Payment', 'Adv')),
+      xAxis: { type: 'category', data: barIpcs.map((i) => i.ipc),
         axisLabel: { fontSize: 9, color: COL.muted, rotate: 38 }, axisLine: { lineStyle: { color: '#cfd8e6' } } },
       yAxis: { type: 'value', name: 'NPR M', nameTextStyle: { fontSize: 10, color: COL.muted },
         splitLine: { lineStyle: { color: COL.grid } }, axisLabel: { fontSize: 10, color: COL.muted } },
       series: [{ type: 'bar', barWidth: '58%',
-        data: ipcs.map((i) => ({
+        data: barIpcs.map((i) => ({
           value: Math.round(i.receivedNPR / 1e6),
-          itemStyle: { borderRadius: [4, 4, 0, 0], color: i.isAdvance
-            ? new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#f5a623' }, { offset: 1, color: '#f2c879' }])
-            : new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: COL.accent }, { offset: 1, color: COL.accent2 }]) },
+          itemStyle: { borderRadius: [4, 4, 0, 0],
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: COL.accent }, { offset: 1, color: COL.accent2 }]) },
         })) }],
     });
     // Clicking a bar breaks that certificate open into the activities it paid for.
     bar.off('click');
     bar.on('click', (p) => {
-      const i = ipcs[p.dataIndex];
+      const i = barIpcs[p.dataIndex];
       if (!i) return;
       const lbl = ipcStatusLabel(i.status);
       const badge = `<span class="badge ${lbl === 'Settled' ? 'ok' : lbl === 'Rejected' ? 'bad' : 'warn'}">${lbl}</span>`;
