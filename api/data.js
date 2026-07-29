@@ -403,15 +403,25 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
-  // The dashboard data is private — a valid session is required.
-  const me = await currentUser(req);
-  if (!me) return res.status(401).json({ error: 'Not authenticated' });
   try {
+    // The dashboard data is private — a valid session is required. currentUser()
+    // reads the user store from KV, so keep it INSIDE the try: a KV outage here
+    // must return a readable JSON error, not throw unhandled (which Vercel turns
+    // into an opaque "An error occurred" HTML page the client can't parse).
+    const me = await currentUser(req);
+    if (!me) return res.status(401).json({ error: 'Not authenticated' });
     const payload = await buildPayload();
     res.setHeader('Cache-Control', 'no-store');
     res.status(200).json(payload);
   } catch (err) {
-    res.status(502).json({ error: String(err.message || err) });
+    const msg = String((err && err.message) || err);
+    // A KV/Upstash failure means the session can't be validated — surface it as
+    // 503 with a clear pointer, since it's the data store (often paused on the
+    // free tier or over its request limit), not the dashboard, that's down.
+    const kvDown = /KV (get|set|del) failed|UPSTASH|ECONNRESET|fetch failed/i.test(msg);
+    res.status(kvDown ? 503 : 502).json({ error: kvDown
+      ? `Data store unavailable (${msg}). The KV / Upstash store may be paused or over its limit — check Vercel → Storage.`
+      : msg });
   }
 };
 module.exports.buildPayload = buildPayload;
