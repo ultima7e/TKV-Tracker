@@ -161,6 +161,14 @@
   }
   function finProgPct(b) { return finBasis(b).pct; }
 
+  // Format an absolute amount with a standard magnitude suffix: millions while
+  // the M-figure stays ≤ 3 digits (< 1000 M), rolling over to billions beyond
+  // that. `dpM` = decimals shown in the millions range.
+  function amtMB(cur, v, dpM) {
+    v = v || 0;
+    return Math.abs(v) >= 1e9 ? `${cur} ${(v / 1e9).toFixed(2)} B` : `${cur} ${(v / 1e6).toFixed(dpM)} M`;
+  }
+
   function nprEquivalents(b, rc) {
     const rate = (b && b.workUSDEq > b.workUSD && b.workNPR) ? b.workNPR / (b.workUSDEq - b.workUSD) : 133;
     const bn = (v) => (v / 1e9).toFixed(2);
@@ -255,7 +263,7 @@
     // numbers are the native USD/NPR figures; the small line is the sheet's own
     // all-in equivalent (USD-eq + NPR-eq), computed at its exchange rate.
     const eqSub = (usdEq, nprEq) => (usdEq != null || nprEq != null)
-      ? `≈ $ ${((usdEq || 0) / 1e6).toFixed(2)} M · NPR ${((nprEq || 0) / 1e6).toFixed(0)} M equiv` : '—';
+      ? `≈ ${amtMB('$', usdEq, 2)} · ${amtMB('NPR', nprEq, 0)} equiv` : '—';
     $('#v-received-eq').textContent = eqSub(rc.usdEq, rc.nprEq);
     setKpi('v-ev-usd', b.totalEarnedUSD != null ? b.totalEarnedUSD / 1e6 : null, 2);
     setKpi('v-ev-npr', b.totalEarnedNPR != null ? b.totalEarnedNPR / 1e6 : null, 0);
@@ -619,7 +627,7 @@
     // Total Earned Value / Received / Retention — native USD & NPR from the EV
     // Front sheet (big), with the sheet's all-in equivalent underneath.
     const evEqSub = (usdEq, nprEq) => (usdEq != null || nprEq != null)
-      ? `≈ $ ${((usdEq || 0) / 1e6).toFixed(2)} M · NPR ${((nprEq || 0) / 1e6).toFixed(0)} M equiv` : '—';
+      ? `≈ ${amtMB('$', usdEq, 2)} · ${amtMB('NPR', nprEq, 0)} equiv` : '—';
     setKpi('f-eusd', b.totalEarnedUSD != null ? b.totalEarnedUSD / 1e6 : null, 2);
     setKpi('f-enpr', b.totalEarnedNPR != null ? b.totalEarnedNPR / 1e6 : null, 0);
     const fEeq = document.getElementById('f-e-eq');
