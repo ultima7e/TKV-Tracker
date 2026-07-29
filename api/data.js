@@ -39,7 +39,10 @@ async function applyFinanceOverride(payload) {
         outstandingUsdEq: pf != null ? (1 - pf / 100) * workUSDEq : (fd.budget && fd.budget.outstandingUsdEq) };
     }
     if (f.received) fd.received = { usd: fnum(f.received.usd), npr: fnum(f.received.npr),
-      nprEq: fnum(f.received.npr) + fnum(f.received.usd) * FIN_RATE };
+      // Self-consistent equivalents from the overridden native amounts, so the
+      // "≈ equiv" line never collapses to $0.00M when an older snapshot lacks them.
+      usdEq: f.received.usdEq != null ? fnum(f.received.usdEq) : fnum(f.received.usd) + fnum(f.received.npr) / FIN_RATE,
+      nprEq: f.received.nprEq != null ? fnum(f.received.nprEq) : fnum(f.received.npr) + fnum(f.received.usd) * FIN_RATE };
     if (f.retention) fd.retention = { usd: fnum(f.retention.usd), npr: fnum(f.retention.npr) };
     if (f.advance !== undefined) fd.advance = f.advance && {
       amortisedPct: fnum(f.advance.amortisedPct), disbursedUSD: fnum(f.advance.disbursedUSD), disbursedNPR: fnum(f.advance.disbursedNPR),
