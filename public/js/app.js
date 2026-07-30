@@ -1134,12 +1134,13 @@
       const width = widthOf();
       const bars = rows.map((r, i) => {
         if (r.kind === 'wbs') return ''; // no WBS summary bar in the Gantt
-        const a = r.act, top = HEAD + i * ROW, x = xOf(schDay(a.start));
+        const a = r.act, top = HEAD + i * ROW;
         // Thin grey baseline (planned/target) bar beneath the activity — shows
         // actual-vs-plan slippage at a glance (P6 style).
         const base = (a.baselineStart && a.baselineFinish)
           ? `<div class="g-base" style="left:${xOf(schDay(a.baselineStart))}px;width:${Math.max(2, (schDay(a.baselineFinish) - schDay(a.baselineStart)) * pxd)}px;top:${top + 17}px" title="Baseline: ${schFmt(a.baselineStart)} → ${schFmt(a.baselineFinish)}"></div>` : '';
         if (!a.start || !a.finish) return base; // baseline-only row: baseline bar only, no current bar
+        const x = xOf(schDay(a.start));
         if (a.isMilestone) return `${base}<div class="g-ms ${a.critical ? 'crit' : ''}" data-i="${i}" data-tid="${a.taskId}" style="left:${x - 5}px;top:${top + (ROW - 11) / 2}px"></div>`;
         const w = Math.max(3, (schDay(a.finish) - schDay(a.start)) * pxd);
         // Two-tone progress: solid "done" segment (left, = pct%) over a light
