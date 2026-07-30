@@ -975,7 +975,7 @@
     return { activities, relationships, wbs };
   }
 
-  function handleXerUpload(file) {
+  function handleXerUpload(file, kind) {
     const reader = new FileReader();
     reader.onload = async () => {
       let parsed;
@@ -983,48 +983,55 @@
         parsed = parseXerClient(reader.result);
         if (!parsed.activities.length) { alert('No activities (TASK table) found in this XER file.'); return; }
       } catch (err) { alert('Could not read this XER file: ' + err.message); return; }
-      // Show it immediately…
-      data = data || {};
-      data.schedule = parsed;
-      schedBuiltFor = null;
-      renderSchedule();
       const src = $('#sch-src');
+      if (kind === 'progress') {           // show immediately, then persist
+        data = data || {}; data.schedule = parsed; schedBuiltFor = null; renderSchedule();
+      }
       if (src) src.textContent = '· uploaded: ' + file.name + ' (saving…)';
-      // …then persist so it permanently replaces the baseline (survives refresh).
       try {
-        const r = await authFetch('/api/schedule', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ activities: parsed.activities, relationships: parsed.relationships, wbs: parsed.wbs }) });
+        const body = kind === 'baseline'
+          ? { kind: 'baseline', name: file.name, wbs: parsed.wbs,
+              activities: parsed.activities.map((a) => ({ id: a.id, name: a.name, wbsId: a.wbsId, isMilestone: a.isMilestone, start: a.start, finish: a.finish })) }
+          : { kind: 'progress', activities: parsed.activities, relationships: parsed.relationships, wbs: parsed.wbs };
+        const r = await authFetch('/api/schedule', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
         if (src) src.textContent = '· uploaded: ' + file.name + ' (saved)';
+        await load();                      // re-fetch so the baseline overlay applies
       } catch (err) {
         if (src) src.textContent = '· uploaded: ' + file.name + ' — NOT saved';
-        alert('The schedule is shown but could not be saved permanently: ' + err.message);
+        alert('The schedule was not saved: ' + err.message);
       }
     };
     reader.readAsText(file);
   }
 
-  async function resetSchedule() {
-    if (!confirm('Reset the Schedule tab back to the baseline from the project files?')) return;
+  async function clearBaseline() {
+    if (!confirm('Remove the fixed baseline? Monthly progress uploads are not affected. You can upload a new baseline afterwards.')) return;
     try {
-      const r = await authFetch('/api/schedule', { method: 'DELETE' });
+      const r = await authFetch('/api/schedule?kind=baseline', { method: 'DELETE' });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
-      const src = $('#sch-src'); if (src) src.textContent = '';
-      schedBuiltFor = null;
-      load(); // refetch the baseline
-    } catch (err) { alert('Could not reset the schedule: ' + err.message); }
+      await load();
+    } catch (err) { alert('Could not clear the baseline: ' + err.message); }
   }
 
   function renderSchedule() {
     const sch = data.schedule || {};
     const all = sch.activities || [];
     const wbs = sch.wbs || {};
-    const acts = all.filter((a) => a.start && a.finish);
+    const hasBar = (a) => (a.start && a.finish) || (a.baselineStart && a.baselineFinish);
+    const acts = all.filter(hasBar);
     if (!acts.length || schedBuiltFor === data) return;
     schedBuiltFor = data;
     $('#sch-count').textContent = acts.length;
+    const bl = (data.schedule && data.schedule.baseline) || { set: false };
+    const badge = document.getElementById('sch-baseline-badge');
+    if (badge) badge.textContent = bl.set
+      ? '· baseline set' + (bl.uploadedAt ? ' ' + new Date(bl.uploadedAt).toLocaleDateString() : '') + ' (' + bl.count + ' acts)'
+      : '· no baseline set';
+    const clr = document.getElementById('sch-clear-base');
+    if (clr) clr.style.display = bl.set ? '' : 'none';
 
     const byTask = {};
     all.forEach((a) => { byTask[a.taskId] = a; });
@@ -1042,11 +1049,16 @@
     Object.values(kids).forEach((a) => a.sort((x, y) => (wbs[x].seq || 0) - (wbs[y].seq || 0)));
     const actsByWbs = {};
     acts.forEach((a) => { (actsByWbs[a.wbsId] = actsByWbs[a.wbsId] || []).push(a); });
-    Object.values(actsByWbs).forEach((arr) => arr.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : (a.id < b.id ? -1 : 1))));
+    Object.values(actsByWbs).forEach((arr) => arr.sort((a, b) => {
+      const ka = a.start || a.baselineStart || '', kb = b.start || b.baselineStart || '';
+      return ka < kb ? -1 : ka > kb ? 1 : (a.id < b.id ? -1 : 1);
+    }));
     const roots = Object.keys(wbs).filter((id) => !wbs[wbs[id].parentId]);
 
-    const minDay = Math.min(...acts.map((a) => schDay(a.start)));
-    const maxDay = Math.max(...acts.map((a) => schDay(a.finish)));
+    const dayOf = (a) => [a.start, a.finish, a.baselineStart, a.baselineFinish].filter(Boolean).map(schDay);
+    const allDays = acts.flatMap(dayOf);
+    const minDay = Math.min(...allDays);
+    const maxDay = Math.max(...allDays);
     let pxd = 0.7;                 // px per day — mutable: timescale drag zooms it
     const ROW = 22, HEAD = 28, PAD = 16;
     const xOf = (d) => PAD + (d - minDay) * pxd;
@@ -1127,6 +1139,7 @@
         // actual-vs-plan slippage at a glance (P6 style).
         const base = (a.baselineStart && a.baselineFinish)
           ? `<div class="g-base" style="left:${xOf(schDay(a.baselineStart))}px;width:${Math.max(2, (schDay(a.baselineFinish) - schDay(a.baselineStart)) * pxd)}px;top:${top + 17}px" title="Baseline: ${schFmt(a.baselineStart)} → ${schFmt(a.baselineFinish)}"></div>` : '';
+        if (!a.start || !a.finish) return base; // baseline-only row: baseline bar only, no current bar
         if (a.isMilestone) return `${base}<div class="g-ms ${a.critical ? 'crit' : ''}" data-i="${i}" data-tid="${a.taskId}" style="left:${x - 5}px;top:${top + (ROW - 11) / 2}px"></div>`;
         const w = Math.max(3, (schDay(a.finish) - schDay(a.start)) * pxd);
         // Two-tone progress: solid "done" segment (left, = pct%) over a light
@@ -1924,14 +1937,12 @@
   $('#today').textContent = new Date().toLocaleDateString('en-GB',
     { day: '2-digit', month: 'short', year: 'numeric' });
 
-  const xerInput = document.getElementById('sch-upload');
-  if (xerInput) xerInput.addEventListener('change', (e) => {
-    const f = e.target.files[0];
-    if (f) handleXerUpload(f);
-    e.target.value = ''; // allow re-uploading the same file
-  });
-  const schResetBtn = document.getElementById('sch-reset');
-  if (schResetBtn) schResetBtn.addEventListener('click', resetSchedule);
+  const baseInput = document.getElementById('sch-upload-base');
+  if (baseInput) baseInput.addEventListener('change', (e) => { const f = e.target.files[0]; if (f) handleXerUpload(f, 'baseline'); e.target.value = ''; });
+  const progInput = document.getElementById('sch-upload-prog');
+  if (progInput) progInput.addEventListener('change', (e) => { const f = e.target.files[0]; if (f) handleXerUpload(f, 'progress'); e.target.value = ''; });
+  const clearBaseBtn = document.getElementById('sch-clear-base');
+  if (clearBaseBtn) clearBaseBtn.addEventListener('click', clearBaseline);
 
   // ---------- boot: gate the whole app behind login ----------
   wireAuthUI();
