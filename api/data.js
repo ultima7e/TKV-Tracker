@@ -49,6 +49,8 @@ async function applyBaselineOverlay(payload) {
     for (const a of acts) {
       if (present.has(a.id)) continue;
       sched.activities.push({
+        // taskId is null for baseline-only rows: they carry no P6 relationships,
+        // so they never participate in predecessor/successor lookups.
         taskId: null, id: a.id, name: a.name, wbsId: a.wbsId,
         status: 'Not started', pct: 0, isMilestone: !!a.isMilestone,
         start: null, finish: null, actualStart: null, actualFinish: null,
@@ -56,6 +58,9 @@ async function applyBaselineOverlay(payload) {
         totalFloatDays: 0, critical: false,
       });
     }
+    // Working schedule wins shared WBS keys (it's the live source of truth for
+    // grouping/names); baseline-only WBS nodes are merged in additively so
+    // baseline-only rows still group correctly.
     if (b.wbs) sched.wbs = { ...b.wbs, ...sched.wbs };
     sched.baseline = { set: true, uploadedAt: b.uploadedAt || null, name: b.name || '', count: acts.length };
   } catch (e) { if (payload.schedule) payload.schedule.baseline = { set: false }; }
