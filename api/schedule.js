@@ -1,6 +1,8 @@
-// Admin-only: persist an uploaded P6 schedule so it permanently replaces the
-// baseline shown on the Schedule tab (until reset). The client parses the XER
-// and POSTs { activities, relationships, wbs }; /api/data then serves it.
+// Admin-only: persist an uploaded P6 schedule (progress or baseline).
+// Progress: replaces the baseline shown on the Schedule tab (until reset).
+// Baseline: stored separately for comparison. The client parses the XER
+// and POSTs { activities, relationships?, wbs?, name?, kind? }; /api/data serves it.
+// kind='baseline' -> tkv:baseline, tkv:baseline_ver; otherwise -> tkv:schedule, tkv:schedule_ver.
 const { kvSet, kvDel } = require('../lib/store');
 const { currentUser } = require('../lib/auth');
 
@@ -16,16 +18,32 @@ module.exports = async (req, res) => {
 
     if (req.method === 'POST') {
       const s = req.body || {};
+      const kind = s.kind === 'baseline' ? 'baseline' : 'progress';
       if (!Array.isArray(s.activities) || !s.activities.length) {
         return res.status(400).json({ error: 'No activities in the uploaded schedule.' });
+      }
+      if (kind === 'baseline') {
+        const blob = JSON.stringify({
+          activities: s.activities, wbs: s.wbs || {},
+          name: typeof s.name === 'string' ? s.name : '', uploadedAt: Date.now(),
+        });
+        await kvSet('tkv:baseline', blob);
+        await kvSet('tkv:baseline_ver', String(Date.now()));
+        return res.status(200).json({ ok: true, kind, activities: s.activities.length });
       }
       const blob = JSON.stringify({ activities: s.activities, relationships: s.relationships || [], wbs: s.wbs || {} });
       await kvSet('tkv:schedule', blob);
       await kvSet('tkv:schedule_ver', String(Date.now()));
-      return res.status(200).json({ ok: true, activities: s.activities.length });
+      return res.status(200).json({ ok: true, kind, activities: s.activities.length });
     }
 
     if (req.method === 'DELETE') {
+      const kind = (req.query && req.query.kind) === 'baseline' ? 'baseline' : 'progress';
+      if (kind === 'baseline') {
+        await kvDel('tkv:baseline');
+        await kvDel('tkv:baseline_ver');
+        return res.status(200).json({ ok: true, cleared: 'baseline' });
+      }
       await kvDel('tkv:schedule');
       await kvDel('tkv:schedule_ver');
       return res.status(200).json({ ok: true, reverted: true });
