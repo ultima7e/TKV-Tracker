@@ -28,6 +28,40 @@ async function applyScheduleOverride(payload) {
   return payload;
 }
 
+// Overlay the FIXED baseline (tkv:baseline) onto the working schedule: set each
+// activity's baseline bars from the baseline file (by Activity ID), append
+// baseline-only rows for activities not yet in the monthly progress file, and
+// expose a small status for the UI badge. Progress (%/actual dates) is untouched.
+async function applyBaselineOverlay(payload) {
+  try {
+    const raw = await kvGet('tkv:baseline');
+    const sched = payload.schedule = payload.schedule || { activities: [], relationships: [], wbs: {} };
+    if (!raw) { sched.baseline = { set: false }; return payload; }
+    const b = JSON.parse(raw);
+    const acts = Array.isArray(b.activities) ? b.activities : [];
+    const byId = new Map(acts.map((a) => [a.id, a]));
+    const present = new Set();
+    for (const a of sched.activities) {
+      present.add(a.id);
+      const ba = byId.get(a.id);
+      if (ba) { a.baselineStart = ba.start || null; a.baselineFinish = ba.finish || null; }
+    }
+    for (const a of acts) {
+      if (present.has(a.id)) continue;
+      sched.activities.push({
+        taskId: null, id: a.id, name: a.name, wbsId: a.wbsId,
+        status: 'Not started', pct: 0, isMilestone: !!a.isMilestone,
+        start: null, finish: null, actualStart: null, actualFinish: null,
+        baselineStart: a.start || null, baselineFinish: a.finish || null,
+        totalFloatDays: 0, critical: false,
+      });
+    }
+    if (b.wbs) sched.wbs = { ...b.wbs, ...sched.wbs };
+    sched.baseline = { set: true, uploadedAt: b.uploadedAt || null, name: b.name || '', count: acts.length };
+  } catch (e) { if (payload.schedule) payload.schedule.baseline = { set: false }; }
+  return payload;
+}
+
 const DAV_BASE = 'https://dav.jianguoyun.com/dav/';
 // Two P6 schedules: the Schedule tab shows the accepted BASELINE; the Delay &
 // Disruption tab shows the TIA (Time Impact Analysis) schedule with delay events.
@@ -230,7 +264,7 @@ async function buildPayload() {
 
     // Nutstore folder PROPFIND + both XER PROPFINDs + claims PROPFIND + Dropbox
     // fetches + the small schedule-override version marker, all parallel.
-    const [listing, xerInfo, delayXerInfo, claimsInfo, explInfo, insInfo, dbx, schedVer] = await Promise.all([
+    const [listing, xerInfo, delayXerInfo, claimsInfo, explInfo, insInfo, dbx, schedVer, baseVer] = await Promise.all([
       propfind(DAV_BASE + encPath(dir) + '/', headers, 1),
       propfind(DAV_BASE + encPath(xerPath), headers, 0),
       propfind(DAV_BASE + encPath(delayXerPath), headers, 0),
@@ -239,6 +273,7 @@ async function buildPayload() {
       propfind(DAV_BASE + encPath(INSURANCE_XLSX_PATH), headers, 0).catch(() => []),
       fetchDropbox(),
       kvGet('tkv:schedule_ver').catch(() => null),
+      kvGet('tkv:baseline_ver').catch(() => null),
     ]);
     const claimsMtime = (claimsInfo[0] && claimsInfo[0].mtime) || '';
     const explMtime = (explInfo[0] && explInfo[0].mtime) || '';
@@ -259,6 +294,7 @@ async function buildPayload() {
       expl: EXPLOSIVES_XLSX_PATH + '|' + explMtime,
       ins: INSURANCE_XLSX_PATH + '|' + insMtime,
       sched: schedVer || '',
+      base: baseVer || '',
       dbx: dbx.map((d) => d.name + '|' + d.etag),
     });
     if (payloadCache && payloadCache.sig === sig) { // nothing changed — reuse parsed payload
@@ -278,6 +314,7 @@ async function buildPayload() {
     const payload = assemble(buffers, xerText, delayXerText, 'nutstore', claimsBuffer, explosivesBuffer, insuranceBuffer);
     payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
     if (schedVer) await applyScheduleOverride(payload);
+    await applyBaselineOverlay(payload);
     payloadCache = { sig, payload, ts: Date.now() };
     return stamp(payload);
   }
@@ -287,9 +324,11 @@ async function buildPayload() {
   const files = fs.readdirSync(dir).filter((f) => (f.endsWith('.xlsx') || f.endsWith('.xer')) && !f.startsWith('~$')).sort();
   const dbx = await fetchDropbox();
   const schedVer = await kvGet('tkv:schedule_ver').catch(() => null);
+  const baseVer = await kvGet('tkv:baseline_ver').catch(() => null);
   const sig = JSON.stringify({
     local: files.map((f) => f + '|' + fs.statSync(path.join(dir, f)).mtimeMs),
     sched: schedVer || '',
+    base: baseVer || '',
     dbx: dbx.map((d) => d.name + '|' + d.etag),
   });
   if (payloadCache && payloadCache.sig === sig) return stamp(payloadCache.payload);
@@ -313,6 +352,7 @@ async function buildPayload() {
   const payload = assemble(buffers, readXer(baselineXf), readXer(delayXf), 'local-file', claimsBuffer, explosivesBuffer, insuranceBuffer);
   payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
   if (schedVer) await applyScheduleOverride(payload);
+  await applyBaselineOverlay(payload);
   payloadCache = { sig, payload, ts: Date.now() };
   return stamp(payload);
 }
