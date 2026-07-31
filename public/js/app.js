@@ -1594,7 +1594,7 @@
     const tile = (lab, val, sub) => `<div class="expl-tile"><div class="lab">${lab}</div><div class="val">${val}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
     host.innerHTML =
       tile('Fuel · selection', explFmt(sel) + ' L', st.cats.size + ' of ' + fu.categories.length + ' categories · ' + MONL(st.from) + '–' + MONL(st.to)) +
-      tile('Fuel · all', explFmt(fu.grandTotal) + ' L', months.length + ' months') +
+      tile('Fuel · all', explFmt(fu.grandTotal) + ' L', fu.months.length + ' months') +
       tile('Top category', top ? top.name : '—', top ? explFmt(top.total) + ' L' : '');
   }
   function wireFuelControls() {
