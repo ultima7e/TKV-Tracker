@@ -1943,9 +1943,9 @@
     // Wire the Schedule/Delay sub-tabs once; render the delay view lazily on show.
     if (!schedTabsWired) {
       schedTabsWired = true;
-      document.querySelectorAll('.sched-tab').forEach((btn) => btn.addEventListener('click', () => {
+      document.querySelectorAll('#sched .sched-tab').forEach((btn) => btn.addEventListener('click', () => {
         const which = btn.dataset.stab;
-        document.querySelectorAll('.sched-tab').forEach((b) => b.classList.toggle('on', b === btn));
+        document.querySelectorAll('#sched .sched-tab').forEach((b) => b.classList.toggle('on', b === btn));
         document.getElementById('stab-schedule').hidden = which !== 'schedule';
         document.getElementById('stab-delay').hidden = which !== 'delay';
         if (which === 'delay') renderDelays();
