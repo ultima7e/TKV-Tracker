@@ -215,6 +215,11 @@
       </section>
       <section class="view" id="claims"><div id="claims-body"></div></section>
       <section class="view" id="inv">
+        <div class="sched-tabs">
+          <button class="sched-tab on" data-invtab="expl">Explosives</button>
+          <button class="sched-tab" data-invtab="fuel">Fuel</button>
+        </div>
+        <div class="stab-pane" id="invtab-expl">
         <div class="card" style="margin-bottom:16px">
           <h3>Explosive Consumption <span class="muted" style="font-weight:600">· emulsion (kg) · pick filters to update the chart</span></h3>
           <div id="expl-summary" class="expl-summary"></div>
@@ -242,6 +247,23 @@
         <div class="card">
           <h3>Explosives Summary <span class="muted" style="font-weight:600">· magazine stock · data to be populated</span></h3>
           <div id="inv-exp"></div>
+        </div>
+        </div>
+        <div class="stab-pane" id="invtab-fuel" hidden>
+          <div class="card" style="margin-bottom:16px">
+            <h3>Fuel Consumption <span class="muted" style="font-weight:600">· litres · monthly by equipment category</span></h3>
+            <div id="fuel-summary" class="expl-summary"></div>
+            <div class="expl-controls">
+              <div class="fe-field"><label>From month</label><select id="fuel-from" class="fe-input"></select></div>
+              <div class="fe-field"><label>To month</label><select id="fuel-to" class="fe-input"></select></div>
+            </div>
+            <div class="expl-loc-wrap">
+              <div class="expl-loc-head"><span>Categories <span class="muted">· click to include / exclude</span></span>
+                <span><button id="fuel-cat-all" class="fe-btn" type="button">All</button> <button id="fuel-cat-none" class="fe-btn" type="button">None</button></span></div>
+              <div id="fuel-cats" class="expl-locs"></div>
+            </div>
+            <div id="fuel-chart" class="chart" style="height:360px"></div>
+          </div>
         </div>
       </section>
       <section class="view" id="ins">

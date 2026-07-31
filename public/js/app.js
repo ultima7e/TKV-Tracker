@@ -1554,6 +1554,86 @@
     drawExplChart(); renderExplSummary(); renderExplProc();
   }
 
+  // ---- Fuel consumption (Inventory & Explosives → Fuel tab) ----------------
+  let fuelState = null, fuelWired = false, invTabsWired = false;
+  const FUELCOL = ['#2f6fd0', '#e0a52e', '#1d8a63', '#b9772a', '#c0414b', '#5b46c9', '#2aa7c0', '#c05b8f', '#7a8b3f', '#445876', '#9c6b2e', '#8a8f98', '#d0863a'];
+  function renderFuelChips() {
+    const fu = data.fuel, st = fuelState, host = document.getElementById('fuel-cats'); if (!host) return;
+    host.innerHTML = fu.categories.map((c, i) => `<span class="expl-chip ${st.cats.has(c.name) ? 'on' : ''}" data-cat="${c.name.replace(/"/g, '&quot;')}"><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${FUELCOL[i % FUELCOL.length]};margin-right:5px;vertical-align:-1px"></i>${c.name} <span class="k">${explFmt(c.total)}</span></span>`).join('');
+  }
+  function drawFuelChart() {
+    const fu = data.fuel, st = fuelState;
+    const months = fu.months.filter((m) => m >= st.from && m <= st.to);
+    const colorOf = {}; fu.categories.forEach((c, i) => { colorOf[c.name] = FUELCOL[i % FUELCOL.length]; });
+    const cats = fu.categories.filter((c) => st.cats.has(c.name));
+    const series = cats.map((c) => ({ name: c.name, type: 'bar', stack: 'f',
+      data: months.map((m) => Math.round(((fu.byMonth[m] || {})[c.name]) || 0)),
+      itemStyle: { color: colorOf[c.name] } }));
+    makeChart('fuel-chart').setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, confine: true, enterable: true,
+        extraCssText: 'max-height:330px;overflow-y:auto',
+        formatter: (ps) => {
+          const rows = ps.filter((p) => p.value > 0).sort((a, b) => b.value - a.value);
+          const tot = ps.reduce((s, p) => s + p.value, 0);
+          return ps[0].axisValue + '<br/>' + rows.map((p) => `${p.marker}${p.seriesName}: <b>${explFmt(p.value)}</b> L`).join('<br/>')
+            + '<hr style="border:0;border-top:1px solid #e3e9f2;margin:5px 0"/>' + `Total: <b>${explFmt(tot)}</b> L`;
+        } },
+      legend: { show: false },
+      grid: { left: 56, right: 16, top: 12, bottom: 44 },
+      xAxis: { type: 'category', data: months.map(MONL), axisLabel: { fontSize: 10, color: COL.muted, rotate: months.length > 14 ? 40 : 0, interval: 0 }, axisLine: { lineStyle: { color: '#cfd8e6' } } },
+      yAxis: { type: 'value', name: 'L', nameTextStyle: { fontSize: 10, color: COL.muted }, splitLine: { lineStyle: { color: COL.grid } }, axisLabel: { fontSize: 10, color: COL.muted } },
+      series,
+    }, true);
+  }
+  function renderFuelSummary() {
+    const fu = data.fuel, st = fuelState, host = document.getElementById('fuel-summary'); if (!host) return;
+    const months = fu.months.filter((m) => m >= st.from && m <= st.to);
+    let sel = 0;
+    for (const m of months) { const bm = fu.byMonth[m] || {}; for (const c of fu.categories) if (st.cats.has(c.name)) sel += bm[c.name] || 0; }
+    const top = fu.categories[0];
+    const tile = (lab, val, sub) => `<div class="expl-tile"><div class="lab">${lab}</div><div class="val">${val}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+    host.innerHTML =
+      tile('Fuel · selection', explFmt(sel) + ' L', st.cats.size + ' of ' + fu.categories.length + ' categories · ' + MONL(st.from) + '–' + MONL(st.to)) +
+      tile('Fuel · all', explFmt(fu.grandTotal) + ' L', months.length + ' months') +
+      tile('Top category', top ? top.name : '—', top ? explFmt(top.total) + ' L' : '');
+  }
+  function wireFuelControls() {
+    if (fuelWired) return; fuelWired = true;
+    const upd = () => { drawFuelChart(); renderFuelSummary(); };
+    const fr = document.getElementById('fuel-from'), to = document.getElementById('fuel-to');
+    if (fr) fr.addEventListener('change', () => { fuelState.from = fr.value; if (fuelState.from > fuelState.to) { fuelState.to = fuelState.from; to.value = fuelState.to; } upd(); });
+    if (to) to.addEventListener('change', () => { fuelState.to = to.value; if (fuelState.to < fuelState.from) { fuelState.from = fuelState.to; fr.value = fuelState.from; } upd(); });
+    const catHost = document.getElementById('fuel-cats');
+    if (catHost) catHost.addEventListener('click', (e) => {
+      const chip = e.target.closest('.expl-chip'); if (!chip) return;
+      const c = chip.dataset.cat;
+      if (fuelState.cats.has(c)) fuelState.cats.delete(c); else fuelState.cats.add(c);
+      chip.classList.toggle('on'); upd();
+    });
+    const all = document.getElementById('fuel-cat-all'), none = document.getElementById('fuel-cat-none');
+    if (all) all.addEventListener('click', () => { fuelState.cats = new Set(data.fuel.categories.map((c) => c.name)); renderFuelChips(); upd(); });
+    if (none) none.addEventListener('click', () => { fuelState.cats = new Set(); renderFuelChips(); upd(); });
+  }
+  function renderFuel() {
+    const host = document.getElementById('fuel-chart'); if (!host) return;
+    const fu = data && data.fuel;
+    const sumHost = document.getElementById('fuel-summary');
+    if (!fu || !fu.months || !fu.months.length) {
+      if (sumHost) sumHost.innerHTML = '<div class="muted" style="font-size:12px">No fuel consumption data available yet.</div>';
+      return;
+    }
+    const sig = fu.months.join('|') + '##' + fu.categories.map((c) => c.name).join('|');
+    if (!fuelState || fuelState._sig !== sig) {
+      fuelState = { _sig: sig, from: fu.months[0], to: fu.months[fu.months.length - 1], cats: new Set(fu.categories.map((c) => c.name)) };
+      const opts = fu.months.map((m) => `<option value="${m}">${MONL(m)}</option>`).join('');
+      const fr = document.getElementById('fuel-from'), to = document.getElementById('fuel-to');
+      if (fr) { fr.innerHTML = opts; fr.value = fuelState.from; }
+      if (to) { to.innerHTML = opts; to.value = fuelState.to; }
+      renderFuelChips(); wireFuelControls();
+    }
+    renderFuelSummary(); drawFuelChart();
+  }
+
   // ---- Insurance & Claims. Days-to-expiry is computed live from validTill so
   // the register always reflects today; policies are grouped by category in the
   // source register's order (not scattered by expiry date).
@@ -1855,6 +1935,7 @@
     renderFinancial();
     renderInventory();
     renderExplosives();
+    renderFuel();
     renderInsurance();
     renderWeekly();
     renderClaims();
@@ -1868,6 +1949,17 @@
         document.getElementById('stab-schedule').hidden = which !== 'schedule';
         document.getElementById('stab-delay').hidden = which !== 'delay';
         if (which === 'delay') renderDelays();
+      }));
+    }
+    if (!invTabsWired) {
+      invTabsWired = true;
+      document.querySelectorAll('#inv .sched-tab[data-invtab]').forEach((btn) => btn.addEventListener('click', () => {
+        const which = btn.dataset.invtab;
+        document.querySelectorAll('#inv .sched-tab[data-invtab]').forEach((b) => b.classList.toggle('on', b === btn));
+        const ep = document.getElementById('invtab-expl'), fp = document.getElementById('invtab-fuel');
+        if (ep) ep.hidden = which !== 'expl';
+        if (fp) fp.hidden = which !== 'fuel';
+        if (which === 'fuel') renderFuel(); // (re)draw now that the pane is visible so ECharts sizes correctly
       }));
     }
     renderSCurve('ch-scurve');
