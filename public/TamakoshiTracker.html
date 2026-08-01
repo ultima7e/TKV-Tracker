@@ -2660,7 +2660,13 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
         const ep = document.getElementById('invtab-expl'), fp = document.getElementById('invtab-fuel');
         if (ep) ep.hidden = which !== 'expl';
         if (fp) fp.hidden = which !== 'fuel';
-        if (which === 'fuel') renderFuel(); // (re)draw now that the pane is visible so ECharts sizes correctly
+        // (Re)draw now that the pane is visible, then resize — the chart was
+        // init'd while its pane was hidden (0-width), so it must re-measure the
+        // now-visible container or the bars stay crammed into a narrow strip.
+        if (which === 'fuel') {
+          renderFuel();
+          setTimeout(() => { if (charts['fuel-chart']) charts['fuel-chart'].resize(); }, 80);
+        }
       }));
     }
     renderSCurve('ch-scurve');
