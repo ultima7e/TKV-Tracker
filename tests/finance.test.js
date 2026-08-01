@@ -10,6 +10,9 @@ function makeMatrices() {
     'EV Front': [
       mk([[1, 'Particulars'], [2, 'Total Earned Value']]),
       mk([[1, 'Earned Value (A+C+D)'], [2, 10], [3, 1000]]),      // EV E: USD 10 / NPR 1000
+      // Received is now read from the EV Front 'Net Payable Amount' row, using the
+      // 'Certified Upto Previous Statement' columns (E/F = indices 4/5).
+      mk([[1, 'Net Payable Amount'], [4, 6], [5, 500]]),         // received: USD 6 / NPR 500
       mk([[6, 'Mobilization Advance Paid:'], [7, 5], [8, 500]]),
       mk([[6, 'Mobilization Advance Balance:'], [7, 5], [8, 500]]),
       mk([[12, 0.1], [13, 'Financial Progress']]),               // file's own 10%
@@ -35,7 +38,9 @@ test('parseFinance extracts budget, received and the file-computed progress', ()
   assert.equal(f.budgetUSD, 100);
   assert.equal(f.budgetNPR, 10000);
   assert.ok(Math.abs(f.budgetUSDEquiv - (100 + 10000 / 133.02)) < 1e-6);
-  // Received = advance (3) + IPC-01 (2) + IPC-02 (1) = 6 USD; 300 + 200 + 0 = 500 NPR.
+  // Received = the EV Front 'Net Payable Amount' row (Certified-upto-previous
+  // cols E/F) = USD 6 / NPR 500. (The IPC-Sum rows now drive only the per-IPC
+  // register, not this headline figure.)
   assert.equal(f.receivedUSD, 6);
   assert.equal(f.receivedNPR, 500);
   // Financial Progress is read straight from the workbook cell (0.1 -> 10%).
