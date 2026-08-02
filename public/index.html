@@ -213,7 +213,16 @@
           </div>
         </div>
       </section>
-      <section class="view" id="claims"><div id="claims-body"></div></section>
+      <section class="view" id="claims">
+        <div class="sched-tabs">
+          <button class="sched-tab on" data-cvtab="overview">Overview</button>
+          <button class="sched-tab" data-cvtab="claims">Claims</button>
+          <button class="sched-tab" data-cvtab="variations">Variations</button>
+        </div>
+        <div class="stab-pane" id="cvtab-overview"></div>
+        <div class="stab-pane" id="cvtab-claims" hidden></div>
+        <div class="stab-pane" id="cvtab-variations" hidden></div>
+      </section>
       <section class="view" id="inv">
         <div class="sched-tabs">
           <button class="sched-tab on" data-invtab="expl">Explosives</button>

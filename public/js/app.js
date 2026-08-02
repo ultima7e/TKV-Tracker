@@ -202,6 +202,9 @@
 
   function makeChart(id) {
     const el = document.getElementById(id);
+    // If the container was re-created (e.g. a panel re-rendered its innerHTML),
+    // the cached instance points at a detached node — dispose and re-init.
+    if (charts[id] && charts[id].getDom() !== el) { charts[id].dispose(); delete charts[id]; }
     if (!charts[id]) charts[id] = echarts.init(el);
     return charts[id];
   }
@@ -1835,99 +1838,143 @@
   // Claims & Variations — curated snapshot of the Claim & Variation Log
   // (contractor's Statements of Claim, variations and EoT). Editorial summary
   // for clarity, refreshed from the log; not a live parse.
-  const CLAIMS = {
-    totalUSD: 6.775, totalNPR: 483.334, socCount: 8, approvedNPR: 0.275, eotDays: 350,
-    claims: [
-      { no: 'SoC #1', desc: 'Force Majeure — initial notice & request', basis: 'Force Majeure', usd: 0.028, npr: null, status: 'Rejected' },
-      { no: 'SoC #2', desc: 'Road blockage due to landslide', basis: 'Force Majeure', usd: 0.020, npr: null, status: 'Not Approved' },
-      { no: 'SoC #3', desc: 'Work stopped by Bigu Rural Municipality', basis: 'Force Majeure', usd: 0.155, npr: null, status: 'Not Approved' },
-      { no: 'SoC #4', desc: 'Relocation of Adit-3 tunnel portal', basis: 'Site / design change', usd: 0.098, npr: null, status: 'Not Approved' },
-      { no: 'SoC #5', desc: 'Work stoppage at Crusher Plant & Adit', basis: 'Force Majeure', usd: 0.111, npr: null, status: 'Not Approved' },
-      { no: 'SoC #6', desc: 'Employer-instructed suspension of works', basis: 'Delays ordered by Employer', usd: 0.894, npr: 50.945, status: 'Not Approved' },
-      { no: 'SoC #7', desc: 'Increase in excise duty of cement', basis: 'Change in legislation', usd: null, npr: 1.490, status: 'Not Approved' },
-      { no: 'SoC #8', desc: 'Political insurrection, curfew & unrest', basis: 'Force Majeure', usd: 0.021, npr: 1.208, status: 'Not Approved' },
-      { no: 'Prolongation', desc: 'Prolongation cost claim (EoT-related)', basis: 'Employer risk event', usd: 5.476, npr: null, status: 'Under review' },
-    ],
-    variations: [
-      { desc: 'Additional Tailrace Surge Tunnel', basis: 'Value engineering', npr: 429.691, status: 'Estimating' },
-      { desc: 'Head Race Tunnel variation', basis: "Errors in Employer's Requirements", npr: null, status: 'Rejected' },
-      { desc: 'MAT / CVT relocation', basis: 'Cost & time', npr: null, status: 'Under review' },
-      { desc: 'Crushing plant relocation (BP1 → Gongar)', basis: 'Compensation event', npr: null, status: 'Under review' },
-    ],
-    eot: [
-      { desc: 'EoT-01 — Extension of Time application', period: '9 Jun 2024 – 30 Jun 2025', days: 350, status: 'Submitted' },
-      { desc: 'Extension of Intended Completion Date', period: 'Baseline (TIA) pending', days: null, status: 'Under review' },
-    ],
+  // ================= Claims & Variations module =================
+  let cvWired = false; const cvSel = {};
+  const CV_BASISCOL = { 'Force Majeure': '#2f6fd0', "Employer's Risk": '#c0414b', 'Compensation Event': '#1d8a63', 'Change in Legislation': '#b9772a', 'Variation': '#e0a52e', 'Other': '#8a8f98' };
+  const cvUsd = (v) => (v == null ? '–' : '$ ' + Math.round(v).toLocaleString('en-US'));
+  const cvUsdShort = (v) => { v = v || 0; return v >= 1e6 ? '$ ' + (v / 1e6).toFixed(2) + ' M' : '$ ' + Math.round(v / 1e3) + ' K'; };
+  const cvDate = (d) => (d || '–');
+  const cvBadge = (t, cls) => (t ? `<span class="badge ${cls}">${t}</span>` : '');
+  const cvStatusClass = (s) => (/approv|grant|settl|determin/i.test(s || '') ? 'ok' : /reject|disput|not\s*approv/i.test(s || '') ? 'bad' : 'warn');
+  const cvChip = (cat) => `<span class="cv-chip" style="background:${(CV_BASISCOL[cat] || '#8a8f98') + '22'};color:${CV_BASISCOL[cat] || '#556'}">${cat}</span>`;
+
+  const CV = {
+    claims: { title: 'Claims', dataKey: 'claims', label: (r) => 'SoC-' + r.ref,
+      cols: [['Ref', (r) => 'SoC-' + r.ref], ['Title', (r) => r.title], ['Contractual Basis', (r) => cvChip(r.basisCat)],
+        ['Value', (r) => cvUsd(r.value)], ['Prob', (r) => (r.prob == null ? '–' : r.prob + '%')], ['Letters', (r) => r.letters.length]] },
+    variations: { title: 'Variations', dataKey: 'variations', label: (r) => 'VAR-' + r.ref,
+      cols: [['Ref', (r) => 'VAR-' + r.ref], ['Title', (r) => r.title], ['Contractual Basis', (r) => cvChip(r.basisCat)],
+        ['Value', (r) => cvUsd(r.value)], ['Prob', (r) => (r.prob == null ? '–' : r.prob + '%')], ['Letters', (r) => r.letters.length]] },
   };
-  const claimBadge = (s) => {
-    // Order matters: 'Not Approved' contains 'approv', so test the negative first.
-    const cls = /reject|not\s*approv/i.test(s) ? 'bad' : /approv|submit|receiv|settl/i.test(s) ? 'ok' : 'neu';
-    return `<span class="badge ${cls}">${s}</span>`;
-  };
-  // Map the live parsed claims payload onto the render shape (falls back to the
-  // built-in CLAIMS snapshot when the workbook isn't available).
-  function normClaims(src) {
-    return {
-      totalUSD: src.totalUSD, totalNPR: src.totalNPR, socCount: src.socCount,
-      approvedNPR: src.approvedNPR, eotDays: src.eotDays, eotGranted: src.eotGranted, surgeNPR: src.surgeNPR,
-      claims: (src.claims || []).map((x) => ({ no: x.no, desc: x.subject, basis: x.basis, usd: x.usd, npr: x.npr, status: x.status })),
-      variations: (src.variations || []).map((x) => ({ desc: x.desc, basis: x.basis, npr: x.npr, status: x.status })),
-      eot: (src.eot || []).map((x) => ({
-        desc: x.no + ((x.usd || x.npr) ? ' — cost ' + (x.usd ? '$ ' + x.usd.toFixed(2) + 'M' : 'NPR ' + x.npr.toFixed(1) + 'M') : ''),
-        period: x.remarks || '', days: x.eotDays, status: x.status,
-      })),
-    };
+
+  function cvKpiCard(lab, val, sub) { return `<div class="cv-kpi"><div class="lab">${lab}</div><div class="val">${val}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`; }
+
+  function renderClaimsModule() {
+    const cv = data && data.claimsRegister;
+    const ov = document.getElementById('cvtab-overview'); if (!ov) return;
+    if (!cv || cv.missing) {
+      ov.innerHTML = '<div class="card"><div class="muted" style="font-size:12px">No Claims &amp; Variations data available yet.</div></div>';
+      ['claims', 'variations'].forEach((k) => { const el = document.getElementById('cvtab-' + k); if (el) el.innerHTML = ''; });
+    } else {
+      renderClaimsOverview(); renderRegisterTab('claims'); renderRegisterTab('variations');
+    }
+    if (!cvWired) {
+      cvWired = true;
+      document.querySelectorAll('#claims .sched-tab[data-cvtab]').forEach((btn) => btn.addEventListener('click', () => {
+        const which = btn.dataset.cvtab;
+        document.querySelectorAll('#claims .sched-tab[data-cvtab]').forEach((b) => b.classList.toggle('on', b === btn));
+        ['overview', 'claims', 'variations'].forEach((k) => { const el = document.getElementById('cvtab-' + k); if (el) el.hidden = k !== which; });
+        setTimeout(() => Object.values(charts).forEach((c) => c.resize()), 80);
+      }));
+    }
   }
-  function renderClaims() {
-    const el = document.getElementById('claims-body');
-    if (!el) return;
-    const c = (data && data.claims && !data.claims.missing) ? normClaims(data.claims) : CLAIMS;
-    const amt = (u, n) => {
-      const p = [];
-      if (u) p.push('$ ' + u.toFixed(u < 0.1 ? 3 : 2) + 'M');
-      if (n) p.push('NPR ' + n.toFixed(1) + 'M');
-      return p.length ? p.join(' + ') : '—';
+
+  function renderRegisterTab(kind) {
+    const cfg = CV[kind], cv = data.claimsRegister, el = document.getElementById('cvtab-' + kind); if (!el) return;
+    const rows = cv[cfg.dataKey] || [];
+    const bases = [...new Set(rows.map((r) => r.basisCat))].sort();
+    const totalVal = rows.reduce((s, r) => s + (r.value || 0), 0);
+    const letters = rows.reduce((s, r) => s + r.letters.length, 0);
+    el.innerHTML =
+      `<div class="cv-kpis">
+        ${cvKpiCard(cfg.title + ' Raised', rows.length)}
+        ${cvKpiCard('Total Value', cvUsdShort(totalVal), cvUsd(totalVal))}
+        ${cvKpiCard('Correspondence', letters + ' letters')}
+       </div>
+       <div class="cv-controls">
+         <input class="fe-input" id="cv-${kind}-q" placeholder="Search ${cfg.title.toLowerCase()}…">
+         <select class="fe-input" id="cv-${kind}-basis"><option value="">All bases</option>${bases.map((b) => `<option>${b}</option>`).join('')}</select>
+       </div>
+       <div class="cv-split">
+         <div class="cv-tbl-wrap"><table class="cv-tbl"><thead><tr>${cfg.cols.map((c) => `<th>${c[0]}</th>`).join('')}</tr></thead><tbody id="cv-${kind}-body"></tbody></table></div>
+         <div class="cv-detail" id="cv-${kind}-detail"><div class="hint">Select a row to see its details &amp; correspondence.</div></div>
+       </div>`;
+    const body = document.getElementById('cv-' + kind + '-body');
+    const draw = () => {
+      const q = (document.getElementById('cv-' + kind + '-q').value || '').toLowerCase();
+      const bs = document.getElementById('cv-' + kind + '-basis').value;
+      const shown = rows.filter((r) => (!bs || r.basisCat === bs) && (!q || (r.title + ' ' + r.description + ' ' + r.basis).toLowerCase().includes(q)));
+      body.innerHTML = shown.map((r) => `<tr data-ref="${String(r.ref).replace(/"/g, '&quot;')}" class="${cvSel[kind] === r.ref ? 'on' : ''}">${cfg.cols.map((c) => `<td>${c[1](r)}</td>`).join('')}</tr>`).join('')
+        || `<tr><td colspan="${cfg.cols.length}" class="muted" style="text-align:center;padding:16px">No matching ${cfg.title.toLowerCase()}.</td></tr>`;
+      if (cvSel[kind]) { const it = rows.find((r) => r.ref === cvSel[kind]); if (it) cvRenderDetail(kind, it); }
     };
-    const claimRows = c.claims.map((x) => `<tr>
-      <td style="white-space:nowrap"><b>${x.no}</b></td>
-      <td style="text-align:left">${x.desc}</td>
-      <td style="text-align:left" class="muted">${x.basis}</td>
-      <td style="white-space:nowrap">${amt(x.usd, x.npr)}</td>
-      <td>${claimBadge(x.status)}</td></tr>`).join('');
-    const varRows = c.variations.map((x) => `<tr>
-      <td style="text-align:left">${x.desc}</td>
-      <td style="text-align:left" class="muted">${x.basis}</td>
-      <td style="white-space:nowrap">${x.npr ? 'NPR ' + x.npr.toFixed(1) + 'M' : '—'}</td>
-      <td>${claimBadge(x.status)}</td></tr>`).join('');
-    const eotRows = c.eot.map((x) => `<tr>
-      <td style="text-align:left">${x.desc}</td>
-      <td class="muted">${x.period}</td>
-      <td style="white-space:nowrap">${x.days ? '<b>' + x.days + ' d</b>' : '—'}</td>
-      <td>${claimBadge(x.status)}</td></tr>`).join('');
-    el.innerHTML = `
-      <div class="grid kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
-        <div class="card kpi"><h3>Total Value Claimed</h3>
-          <div class="valm">$ <span>${c.totalUSD.toFixed(2)}</span> M</div>
-          <div class="valm">NPR <span>${c.totalNPR.toFixed(1)}</span> M</div>
-          <div class="sub">incl. surge-tunnel variation</div></div>
-        <div class="card kpi"><h3>Statements of Claim</h3><div class="val">${c.socCount}</div><div class="sub">SoC #1–#${c.socCount} submitted</div></div>
-        <div class="card kpi"><h3>Approved &amp; Received</h3><div class="valm">NPR ${c.approvedNPR.toFixed(2)} M</div><div class="sub">Provisional Sum — landslide cost</div></div>
-        <div class="card kpi"><h3>EoT Sought</h3><div class="val">${c.eotDays} <span style="font-size:15px">days</span></div><div class="sub">${c.eotGranted ? c.eotGranted + ' days granted so far' : 'baseline (TIA) pending'}</div></div>
-      </div>
-      <div class="card" style="margin-bottom:16px">
-        <h3>Statements of Claim <span class="muted" style="font-weight:600">· amount claimed &amp; engineer's position</span></h3>
-        <table class="tbl"><thead><tr><th>Claim</th><th style="text-align:left">Description</th><th style="text-align:left">Contractual basis</th><th>Amount</th><th>Status</th></tr></thead>
-        <tbody>${claimRows}</tbody></table>
-        <div class="muted" style="font-size:11.5px;margin-top:8px">Total contractor's claim <b>$ ${c.totalUSD.toFixed(2)}M + NPR ${c.totalNPR.toFixed(1)}M</b>${(c.surgeNPR || (c.variations[0] && c.variations[0].npr)) ? ` — of which NPR ${(c.surgeNPR || c.variations[0].npr).toFixed(1)}M is the Additional Surge Tunnel variation` : ''}. Most claims remain pending or rejected by the Engineer.</div>
-      </div>
-      <div class="grid row-2">
-        <div class="card"><h3>Variations &amp; Value Engineering</h3>
-          <table class="tbl"><thead><tr><th style="text-align:left">Item</th><th style="text-align:left">Basis</th><th>Amount</th><th>Status</th></tr></thead>
-          <tbody>${varRows}</tbody></table></div>
-        <div class="card"><h3>Extensions of Time (EoT)</h3>
-          <table class="tbl"><thead><tr><th style="text-align:left">Item</th><th>Period</th><th>EoT</th><th>Status</th></tr></thead>
-          <tbody>${eotRows}</tbody></table></div>
-      </div>`;
+    draw();
+    document.getElementById('cv-' + kind + '-q').oninput = draw;
+    document.getElementById('cv-' + kind + '-basis').onchange = draw;
+    body.onclick = (e) => { const tr = e.target.closest('tr[data-ref]'); if (!tr) return; cvSel[kind] = tr.dataset.ref;
+      body.querySelectorAll('tr').forEach((x) => x.classList.toggle('on', x === tr));
+      const it = rows.find((r) => String(r.ref) === tr.dataset.ref); if (it) cvRenderDetail(kind, it); };
+  }
+
+  function cvRenderDetail(kind, x) {
+    const host = document.getElementById('cv-' + kind + '-detail'); if (!host) return;
+    const kv = [['Contractual Basis', x.basis], ['Category', x.basisCat], ['Value', cvUsd(x.value)], ['Probability', x.prob == null ? null : x.prob + '%']]
+      .filter(([, v]) => v != null && v !== '' && v !== '–').map(([k, v]) => `<div class="k">${k}</div><div>${v}</div>`).join('');
+    const time = (x.letters || []).length ? `<div class="cv-sec">Correspondence (${x.letters.length})</div><ul class="cv-time">${x.letters.map((l) => `<li><span class="d">${cvDate(l.date)}</span> ${l.title}${l.ref ? `<br/><span class="lr">${l.ref}</span>` : ''}</li>`).join('')}</ul>` : '';
+    host.innerHTML =
+      `<div class="dref">${CV[kind].label(x)}${x.value != null ? ' · ' + cvUsd(x.value) : ''}</div>
+       <h4>${x.title}</h4>
+       <div class="cv-badges">${cvChip(x.basisCat)}${x.status ? cvBadge(x.status, cvStatusClass(x.status)) : ''}</div>
+       ${x.description ? `<div class="cv-sec">Description</div><div class="cv-desc">${x.description}</div>` : ''}
+       ${kv ? `<div class="cv-sec">Details</div><div class="cv-kv">${kv}</div>` : ''}
+       ${time}`;
+  }
+
+  function renderClaimsOverview() {
+    const cv = data.claimsRegister, k = cv.kpis, el = document.getElementById('cvtab-overview'); if (!el) return;
+    el.innerHTML =
+      `<div class="cv-kpis">
+        ${cvKpiCard('Total Claims', k.claimsCount, cvUsd(k.claimsValue))}
+        ${cvKpiCard('Variations', k.variationsCount, cvUsd(k.variationsValue))}
+        ${cvKpiCard('Total Exposure', cvUsdShort(k.totalValue), cvUsd(k.totalValue))}
+        ${cvKpiCard('Prob-weighted', cvUsdShort(k.expectedValue), 'expected recovery')}
+        ${cvKpiCard('Correspondence', k.totalLetters + ' letters', 'across all matters')}
+       </div>
+       <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+         <div class="card"><h3>Value by Contractual Basis</h3><div id="cv-donut" class="chart" style="height:260px"></div></div>
+         <div class="card"><h3>Probability vs Value <span class="muted" style="font-weight:600">· each matter</span></h3><div id="cv-scatter" class="chart" style="height:260px"></div>
+           <div class="cv-scatter-leg"><span><i style="background:#2f6fd0"></i>Claim</span><span><i style="background:#e0a52e"></i>Variation</span></div></div>
+       </div>
+       <div class="card"><h3>Commercial Exposure by Matter <span class="muted" style="font-weight:600">· USD</span></h3><div id="cv-expo" class="chart" style="height:${Math.max(180, (cv.claims.length + cv.variations.length) * 26 + 40)}px"></div></div>`;
+
+    const be = Object.entries(k.byBasisValue).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+    makeChart('cv-donut').setOption({
+      tooltip: { trigger: 'item', formatter: (p) => `${p.name}<br/><b>${cvUsd(p.value)}</b> (${p.percent}%)` },
+      legend: { type: 'scroll', bottom: 0, textStyle: { fontSize: 10, color: COL.muted } },
+      series: [{ type: 'pie', radius: ['46%', '70%'], center: ['50%', '44%'], label: { show: false },
+        data: be.map(([n, v]) => ({ name: n, value: Math.round(v), itemStyle: { color: CV_BASISCOL[n] || '#8a8f98' } })) }],
+    }, true);
+
+    const byKind = { claim: [], variation: [] };
+    (k.scatter || []).forEach((s) => { (byKind[s.kind] = byKind[s.kind] || []).push([s.value, s.prob, s.ref]); });
+    makeChart('cv-scatter').setOption({
+      tooltip: { trigger: 'item', formatter: (p) => `<b>${p.data[2]}</b><br/>${cvUsd(p.data[0])} · ${p.data[1]}%` },
+      grid: { left: 58, right: 18, top: 12, bottom: 34 },
+      xAxis: { type: 'value', name: 'Value (USD)', nameLocation: 'middle', nameGap: 22, nameTextStyle: { fontSize: 10, color: COL.muted }, axisLabel: { fontSize: 9, color: COL.muted, formatter: (v) => (v >= 1e6 ? (v / 1e6) + 'M' : v / 1e3 + 'K') }, splitLine: { lineStyle: { color: COL.grid } } },
+      yAxis: { type: 'value', name: 'Prob %', min: 0, max: 100, nameTextStyle: { fontSize: 10, color: COL.muted }, axisLabel: { fontSize: 10, color: COL.muted }, splitLine: { lineStyle: { color: COL.grid } } },
+      series: [{ type: 'scatter', symbolSize: 14, data: byKind.claim, itemStyle: { color: '#2f6fd0', opacity: 0.85 } },
+        { type: 'scatter', symbolSize: 14, data: byKind.variation, itemStyle: { color: '#e0a52e', opacity: 0.85 } }],
+    }, true);
+
+    const items = [...cv.claims, ...cv.variations].filter((x) => x.value != null).sort((a, b) => a.value - b.value);
+    makeChart('cv-expo').setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (ps) => `${ps[0].name}<br/><b>${cvUsd(ps[0].value)}</b>` },
+      grid: { left: 210, right: 64, top: 8, bottom: 24 },
+      xAxis: { type: 'value', axisLabel: { fontSize: 9, color: COL.muted, formatter: (v) => (v >= 1e6 ? (v / 1e6) + 'M' : v / 1e3 + 'K') }, splitLine: { lineStyle: { color: COL.grid } } },
+      yAxis: { type: 'category', data: items.map((x) => ((x.kind === 'variation' ? 'VAR-' : 'SoC-') + x.ref + '  ' + x.title.slice(0, 20))), axisLabel: { fontSize: 10, color: COL.muted } },
+      series: [{ type: 'bar', barMaxWidth: 15, data: items.map((x) => ({ value: Math.round(x.value), itemStyle: { color: CV_BASISCOL[x.basisCat] || '#2f6fd0', borderRadius: [0, 3, 3, 0] } })),
+        label: { show: true, position: 'right', fontSize: 9, color: COL.muted, formatter: (p) => cvUsd(p.value) } }],
+    }, true);
   }
 
   function renderAll() {
@@ -1938,7 +1985,7 @@
     renderFuel();
     renderInsurance();
     renderWeekly();
-    renderClaims();
+    renderClaimsModule();
     renderSchedule();
     // Wire the Schedule/Delay sub-tabs once; render the delay view lazily on show.
     if (!schedTabsWired) {
