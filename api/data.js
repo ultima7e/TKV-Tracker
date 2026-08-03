@@ -85,7 +85,7 @@ const EXPLOSIVES_XLSX_PATH = 'Shared Folder/Explosive Record/Daily Explosive Con
 const INSURANCE_XLSX_PATH = 'Insurance and Bank Gurantee/Insurance/insurance.xlsx';
 // Claims & Variations register — its own Nutstore workbook (Claim + Variation
 // sheets), parsed in isolation. Host the register file at this path.
-const CLAIMS_REGISTER_XLSX_PATH = 'Shared Folder/Claims & Variation/Claims & Variations Register.xlsx';
+const CLAIMS_REGISTER_XLSX_PATH = 'Shared Folder/Claims & Variation/claim and variation (details for presentation)(1).xlsx';
 // Fuel consumption workbook — hosted on Dropbox, fetched live and parsed in
 // ISOLATION (only 'Appended_Table') so its 10k rows never merge into finance.
 const FUEL_DBX_URL = 'https://www.dropbox.com/scl/fi/sd47gb80i8857yeq2n8j2/Fuel_Consumption_EN_Categorized.xlsx?rlkey=wx53urwmerfralt5dwhj4mz4f&dl=1';
