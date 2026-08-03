@@ -1851,13 +1851,26 @@
   const CV = {
     claims: { title: 'Claims', dataKey: 'claims', label: (r) => 'SoC-' + r.ref,
       cols: [['Ref', (r) => 'SoC-' + r.ref], ['Title', (r) => r.title], ['Contractual Basis', (r) => cvChip(r.basisCat)],
-        ['Value', (r) => cvUsd(r.value)], ['Prob', (r) => (r.prob == null ? '–' : r.prob + '%')], ['Letters', (r) => r.letters.length]] },
+        ['Value', (r) => cvUsd(r.value)], ['Prob', (r) => (r.prob == null ? '–' : r.prob + '%')],
+        ['Status', (r) => (r.status ? cvBadge(r.status, cvStatusClass(r.status)) : '<span class="muted">—</span>')], ['Letters', (r) => r.letters.length]] },
     variations: { title: 'Variations', dataKey: 'variations', label: (r) => 'VAR-' + r.ref,
       cols: [['Ref', (r) => 'VAR-' + r.ref], ['Title', (r) => r.title], ['Contractual Basis', (r) => cvChip(r.basisCat)],
-        ['Value', (r) => cvUsd(r.value)], ['Prob', (r) => (r.prob == null ? '–' : r.prob + '%')], ['Letters', (r) => r.letters.length]] },
+        ['Value', (r) => cvUsd(r.value)], ['Prob', (r) => (r.prob == null ? '–' : r.prob + '%')],
+        ['Status', (r) => (r.status ? cvBadge(r.status, cvStatusClass(r.status)) : '<span class="muted">—</span>')], ['Letters', (r) => r.letters.length]] },
   };
 
-  function cvKpiCard(lab, val, sub) { return `<div class="cv-kpi"><div class="lab">${lab}</div><div class="val">${val}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`; }
+  const CV_ICON = {
+    doc: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
+    scales: '<path d="M12 3v18"/><path d="M4 21h16"/><path d="M6.5 7 3 14h7z"/><path d="M17.5 7 14 14h7z"/><path d="M8 5h8"/>',
+    edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+    target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4"/>',
+    mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+  };
+  function cvKpiCard(lab, val, sub, icon, color) {
+    color = color || '#2f6fd0';
+    const ic = icon ? `<div class="ic" style="background:${color}18;color:${color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${CV_ICON[icon] || ''}</svg></div>` : '';
+    return `<div class="cv-kpi">${ic}<div class="txt"><div class="lab">${lab}</div><div class="val">${val}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div></div>`;
+  }
 
   function renderClaimsModule() {
     const cv = data && data.claimsRegister;
@@ -1887,9 +1900,9 @@
     const letters = rows.reduce((s, r) => s + r.letters.length, 0);
     el.innerHTML =
       `<div class="cv-kpis">
-        ${cvKpiCard(cfg.title + ' Raised', rows.length)}
-        ${cvKpiCard('Total Value', cvUsdShort(totalVal), cvUsd(totalVal))}
-        ${cvKpiCard('Correspondence', letters + ' letters')}
+        ${cvKpiCard(cfg.title + ' Raised', rows.length, '', 'doc', '#2f6fd0')}
+        ${cvKpiCard('Total Value', cvUsdShort(totalVal), cvUsd(totalVal), 'scales', '#1d8a63')}
+        ${cvKpiCard('Correspondence', letters + ' letters', '', 'mail', '#e0952e')}
        </div>
        <div class="cv-controls">
          <input class="fe-input" id="cv-${kind}-q" placeholder="Search ${cfg.title.toLowerCase()}…">
@@ -1934,11 +1947,11 @@
     const cv = data.claimsRegister, k = cv.kpis, el = document.getElementById('cvtab-overview'); if (!el) return;
     el.innerHTML =
       `<div class="cv-kpis">
-        ${cvKpiCard('Total Claims', k.claimsCount, cvUsd(k.claimsValue))}
-        ${cvKpiCard('Variations', k.variationsCount, cvUsd(k.variationsValue))}
-        ${cvKpiCard('Total Exposure', cvUsdShort(k.totalValue), cvUsd(k.totalValue))}
-        ${cvKpiCard('Prob-weighted', cvUsdShort(k.expectedValue), 'expected recovery')}
-        ${cvKpiCard('Correspondence', k.totalLetters + ' letters', 'across all matters')}
+        ${cvKpiCard('Total Claims', k.claimsCount, cvUsd(k.claimsValue), 'doc', '#2f6fd0')}
+        ${cvKpiCard('Variations', k.variationsCount, cvUsd(k.variationsValue), 'edit', '#6b46c9')}
+        ${cvKpiCard('Total Exposure', cvUsdShort(k.totalValue), cvUsd(k.totalValue), 'scales', '#1d8a63')}
+        ${cvKpiCard('Prob-weighted', cvUsdShort(k.expectedValue), 'expected recovery', 'target', '#1a9aa8')}
+        ${cvKpiCard('Correspondence', k.totalLetters + ' letters', 'across all matters', 'mail', '#e0952e')}
        </div>
        <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
          <div class="card"><h3>Value by Contractual Basis</h3><div id="cv-donut" class="chart" style="height:260px"></div></div>
