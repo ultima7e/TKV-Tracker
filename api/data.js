@@ -222,7 +222,7 @@ function fuelFromBuffer(buffer) {
 function claimsRegisterFromBuffer(buffer) {
   if (!buffer) return { missing: true, warnings: ['Claims register workbook not available'] };
   try {
-    const { matrices } = workbookSheets(buffer, ['Claim', 'Variation']);
+    const { matrices } = workbookSheets(buffer, ['Claim', 'Variation', 'Potential Claim', 'Potential Variation']);
     return parseClaimsRegister(matrices);
   } catch (e) {
     return { missing: true, warnings: ['Claims register parse failed: ' + String(e.message || e)] };
