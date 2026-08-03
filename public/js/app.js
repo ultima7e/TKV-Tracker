@@ -1865,7 +1865,16 @@
     edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
     target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4"/>',
     mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+    check: '<circle cx="12" cy="12" r="9"/><path d="m8.5 12.3 2.3 2.3 4.7-5.2"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/>',
   };
+  const CV_APPROVED = /approv|grant|settl|determin/i, CV_REJECTED = /reject|disput|not\s*approv/i;
+  function cvValueSplit(rows) {
+    const total = rows.reduce((s, r) => s + (r.value || 0), 0);
+    const approved = rows.filter((r) => CV_APPROVED.test(r.status || '')).reduce((s, r) => s + (r.value || 0), 0);
+    const pending = rows.filter((r) => { const s = r.status || ''; return !CV_APPROVED.test(s) && !CV_REJECTED.test(s); }).reduce((s, r) => s + (r.value || 0), 0);
+    return { total, approved, pending };
+  }
   function cvKpiCard(lab, val, sub, icon, color) {
     color = color || '#2f6fd0';
     const ic = icon ? `<div class="ic" style="background:${color}18;color:${color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${CV_ICON[icon] || ''}</svg></div>` : '';
@@ -1896,13 +1905,13 @@
     const cfg = CV[kind], cv = data.claimsRegister, el = document.getElementById('cvtab-' + kind); if (!el) return;
     const rows = cv[cfg.dataKey] || [];
     const bases = [...new Set(rows.map((r) => r.basisCat))].sort();
-    const totalVal = rows.reduce((s, r) => s + (r.value || 0), 0);
-    const letters = rows.reduce((s, r) => s + r.letters.length, 0);
+    const v = cvValueSplit(rows);
     el.innerHTML =
       `<div class="cv-kpis">
-        ${cvKpiCard(cfg.title + ' Raised', rows.length, '', 'doc', '#2f6fd0')}
-        ${cvKpiCard('Total Value', cvUsdShort(totalVal), cvUsd(totalVal), 'scales', '#1d8a63')}
-        ${cvKpiCard('Correspondence', letters + ' letters', '', 'mail', '#e0952e')}
+        ${cvKpiCard(cfg.title + ' Raised', rows.length, cvUsd(v.total), 'scales', '#6b46c9')}
+        ${cvKpiCard('Submitted Value', cvUsdShort(v.total), '', 'doc', '#1d8a63')}
+        ${cvKpiCard('Approved Value', cvUsdShort(v.approved), '', 'check', '#2f6fd0')}
+        ${cvKpiCard('Pending Value', cvUsdShort(v.pending), '', 'clock', '#e0952e')}
        </div>
        <div class="cv-controls">
          <input class="fe-input" id="cv-${kind}-q" placeholder="Search ${cfg.title.toLowerCase()}…">
@@ -1945,13 +1954,14 @@
 
   function renderClaimsOverview() {
     const cv = data.claimsRegister, k = cv.kpis, el = document.getElementById('cvtab-overview'); if (!el) return;
+    const av = cvValueSplit([...cv.claims, ...cv.variations]);
     el.innerHTML =
       `<div class="cv-kpis">
         ${cvKpiCard('Total Claims', k.claimsCount, cvUsd(k.claimsValue), 'doc', '#2f6fd0')}
         ${cvKpiCard('Variations', k.variationsCount, cvUsd(k.variationsValue), 'edit', '#6b46c9')}
         ${cvKpiCard('Total Exposure', cvUsdShort(k.totalValue), cvUsd(k.totalValue), 'scales', '#1d8a63')}
-        ${cvKpiCard('Prob-weighted', cvUsdShort(k.expectedValue), 'expected recovery', 'target', '#1a9aa8')}
-        ${cvKpiCard('Correspondence', k.totalLetters + ' letters', 'across all matters', 'mail', '#e0952e')}
+        ${cvKpiCard('Approved Value', cvUsdShort(av.approved), 'determined / approved', 'check', '#1a9aa8')}
+        ${cvKpiCard('Pending Value', cvUsdShort(av.pending), 'awaiting outcome', 'clock', '#e0952e')}
        </div>
        <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
          <div class="card"><h3>Value by Contractual Basis</h3><div id="cv-donut" class="chart" style="height:260px"></div></div>
