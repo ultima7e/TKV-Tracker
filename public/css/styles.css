@@ -501,7 +501,23 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .cv-detail h4{font-size:15px;font-weight:800;color:var(--navy);margin:0 0 2px;line-height:1.35}
 .cv-detail .dref{font-size:11px;color:var(--muted);font-weight:700}
 .cv-badges{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
-.cv-sec{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:800;margin:14px 0 6px}
+.cv-sec{display:flex;align-items:center;gap:6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:800;margin:16px 0 7px}
+.cv-sec svg{width:14px;height:14px;color:var(--accent);flex:0 0 auto}
+.cv-dhead{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
+.cv-dhead .dref{font-size:11px;color:var(--muted);font-weight:700}
+.cv-dhead h4{margin:1px 0 0}
+.cv-dval{text-align:right;flex:0 0 auto}
+.cv-dval .lab{font-size:9.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700}
+.cv-dval .v{font-size:18px;font-weight:800;color:var(--navy);line-height:1.2;white-space:nowrap}
+.cv-dval .v2{font-size:14px;font-weight:800;color:var(--accent)}
+.cv-accent{height:4px;border-radius:3px;margin:13px 0 2px;background:linear-gradient(90deg,var(--accent),#e0a52e 85%)}
+.cv-time li.s-c:before{background:#2f6fd0}
+.cv-time li.s-e:before{background:#e0a52e}
+.cv-time li.s-o:before{background:#8a8f98}
+.cv-time li .lr{color:var(--muted);font-size:11px;margin-top:1px}
+.cv-legend{margin-left:auto;font-weight:600;color:var(--muted);font-size:10px;text-transform:none;letter-spacing:0}
+.cv-legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 3px 0 9px;vertical-align:0}
+.cv-legend i.c{background:#2f6fd0}.cv-legend i.e{background:#e0a52e}
 .cv-desc{font-size:12.5px;color:var(--ink);line-height:1.55}
 .cv-kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px}
 .cv-kv .k{color:var(--muted)}

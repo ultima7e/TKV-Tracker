@@ -1867,7 +1867,11 @@
     mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
     check: '<circle cx="12" cy="12" r="9"/><path d="m8.5 12.3 2.3 2.3 4.7-5.2"/>',
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/>',
+    list: '<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
   };
+  const cvSecIcon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${CV_ICON[name] || ''}</svg>`;
+  // Colour correspondence by sender: Contractor (TKV/Dolsar) vs Employer/Engineer.
+  const cvSender = (ref) => (/^\s*(tkv|dolsar|contractor)/i.test(ref || '') ? 'c' : /^\s*(lot|sinohydro|ksns|employer|engineer|er)/i.test(ref || '') ? 'e' : 'o');
   const CV_APPROVED = /approv|grant|settl|determin/i, CV_REJECTED = /reject|disput|not\s*approv/i;
   function cvValueSplit(rows) {
     const total = rows.reduce((s, r) => s + (r.value || 0), 0);
@@ -1940,15 +1944,28 @@
 
   function cvRenderDetail(kind, x) {
     const host = document.getElementById('cv-' + kind + '-detail'); if (!host) return;
-    const kv = [['Contractual Basis', x.basis], ['Category', x.basisCat], ['Value', cvUsd(x.value)], ['Probability', x.prob == null ? null : x.prob + '%']]
-      .filter(([, v]) => v != null && v !== '' && v !== '–').map(([k, v]) => `<div class="k">${k}</div><div>${v}</div>`).join('');
-    const time = (x.letters || []).length ? `<div class="cv-sec">Correspondence (${x.letters.length})</div><ul class="cv-time">${x.letters.map((l) => `<li><span class="d">${cvDate(l.date)}</span> ${l.title}${l.ref ? `<br/><span class="lr">${l.ref}</span>` : ''}</li>`).join('')}</ul>` : '';
+    const kv = [['Contractual Basis', x.basis], ['Category', x.basisCat]]
+      .filter(([, v]) => v != null && v !== '').map(([k, v]) => `<div class="k">${k}</div><div>${v}</div>`).join('');
+    const letters = (x.letters || []).filter((l) => l.date || l.title || l.ref);
+    const time = letters.length
+      ? `<div class="cv-sec">${cvSecIcon('clock')}Correspondence (${letters.length})<span class="cv-legend"><i class="c"></i>Contractor<i class="e"></i>Employer</span></div>
+         <ul class="cv-time">${letters.map((l) => `<li class="s-${cvSender(l.ref)}"><span class="d">${cvDate(l.date)}</span> ${l.title}${l.ref ? `<div class="lr">${l.ref}</div>` : ''}</li>`).join('')}</ul>` : '';
     host.innerHTML =
-      `<div class="dref">${CV[kind].label(x)}${x.value != null ? ' · ' + cvUsd(x.value) : ''}</div>
-       <h4>${x.title}</h4>
-       <div class="cv-badges">${cvChip(x.basisCat)}${x.status ? cvBadge(x.status, cvStatusClass(x.status)) : ''}</div>
-       ${x.description ? `<div class="cv-sec">Description</div><div class="cv-desc">${x.description}</div>` : ''}
-       ${kv ? `<div class="cv-sec">Details</div><div class="cv-kv">${kv}</div>` : ''}
+      `<div class="cv-dhead">
+         <div style="min-width:0">
+           <div class="dref">${CV[kind].label(x)}</div>
+           <h4>${x.title}</h4>
+           <div class="cv-badges">${cvChip(x.basisCat)}${x.status ? cvBadge(x.status, cvStatusClass(x.status)) : ''}</div>
+         </div>
+         <div class="cv-dval">
+           <div class="lab">${kind === 'variation' ? 'Value' : 'Claimed Value'}</div>
+           <div class="v">${cvUsd(x.value)}</div>
+           ${x.prob != null ? `<div class="lab" style="margin-top:8px">Probability</div><div class="v2">${x.prob}%</div>` : ''}
+         </div>
+       </div>
+       <div class="cv-accent"></div>
+       ${x.description ? `<div class="cv-sec">${cvSecIcon('doc')}Summary</div><div class="cv-desc">${x.description}</div>` : ''}
+       ${kv ? `<div class="cv-sec">${cvSecIcon('list')}Details</div><div class="cv-kv">${kv}</div>` : ''}
        ${time}`;
   }
 
