@@ -1841,8 +1841,8 @@
   // ================= Claims & Variations module =================
   let cvWired = false; const cvSel = {};
   const CV_BASISCOL = { 'Force Majeure': '#2f6fd0', "Employer's Risk": '#c0414b', 'Compensation Event': '#1d8a63', 'Change in Legislation': '#b9772a', 'Variation': '#e0a52e', 'Other': '#8a8f98' };
-  const cvUsd = (v) => (v == null ? '–' : '$ ' + Math.round(v).toLocaleString('en-US'));
-  const cvUsdShort = (v) => { v = v || 0; return v >= 1e6 ? '$ ' + (v / 1e6).toFixed(2) + ' M' : '$ ' + Math.round(v / 1e3) + ' K'; };
+  const cvUsd = (v) => (!v ? '–' : '$ ' + Math.round(v).toLocaleString('en-US'));
+  const cvUsdShort = (v) => (!v ? '–' : v >= 1e6 ? '$ ' + (v / 1e6).toFixed(2) + ' M' : '$ ' + Math.round(v / 1e3) + ' K');
   const cvDate = (d) => (d || '–');
   const cvBadge = (t, cls) => (t ? `<span class="badge ${cls}">${t}</span>` : '');
   const cvStatusClass = (s) => (/approv|grant|settl|determin/i.test(s || '') ? 'ok' : /reject|disput|not\s*approv/i.test(s || '') ? 'bad' : 'warn');
