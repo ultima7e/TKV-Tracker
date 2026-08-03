@@ -511,6 +511,10 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .cv-dval .v{font-size:18px;font-weight:800;color:var(--navy);line-height:1.2;white-space:nowrap}
 .cv-dval .v2{font-size:14px;font-weight:800;color:var(--accent)}
 .cv-accent{height:4px;border-radius:3px;margin:13px 0 2px;background:linear-gradient(90deg,var(--accent),#e0a52e 85%)}
+.cv-impact{display:flex;gap:10px;flex-wrap:wrap}
+.cv-imp{flex:1;min-width:120px;background:#f7fafd;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.cv-imp .lab{font-size:9.5px;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);font-weight:700}
+.cv-imp .v{font-size:17px;font-weight:800;color:var(--navy);margin-top:3px}
 .cv-time li.s-c:before{background:#2f6fd0}
 .cv-time li.s-e:before{background:#e0a52e}
 .cv-time li.s-o:before{background:#8a8f98}

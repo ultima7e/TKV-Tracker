@@ -1942,10 +1942,11 @@
       const it = rows.find((r) => String(r.ref) === tr.dataset.ref); if (it) cvRenderDetail(kind, it); };
   }
 
+  const CV_ASSESS = { High: ['#fde8e8', '#b3261e'], Medium: ['#fdf0d8', '#9a6a12'], Low: ['#e7f0fb', '#2f6fd0'] };
   function cvRenderDetail(kind, x) {
     const host = document.getElementById('cv-' + kind + '-detail'); if (!host) return;
-    const kv = [['Contractual Basis', x.basis], ['Category', x.basisCat]]
-      .filter(([, v]) => v != null && v !== '').map(([k, v]) => `<div class="k">${k}</div><div>${v}</div>`).join('');
+    const at = x.prob == null ? null : (x.prob >= 70 ? 'High' : x.prob >= 40 ? 'Medium' : 'Low');
+    const assess = at ? `<span class="cv-chip" style="background:${CV_ASSESS[at][0]};color:${CV_ASSESS[at][1]}">${at}</span>` : '–';
     const letters = (x.letters || []).filter((l) => l.date || l.title || l.ref);
     const time = letters.length
       ? `<div class="cv-sec">${cvSecIcon('clock')}Correspondence (${letters.length})<span class="cv-legend"><i class="c"></i>Contractor<i class="e"></i>Employer</span></div>
@@ -1957,15 +1958,16 @@
            <h4>${x.title}</h4>
            <div class="cv-badges">${cvChip(x.basisCat)}${x.status ? cvBadge(x.status, cvStatusClass(x.status)) : ''}</div>
          </div>
-         <div class="cv-dval">
-           <div class="lab">${kind === 'variation' ? 'Value' : 'Claimed Value'}</div>
-           <div class="v">${cvUsd(x.value)}</div>
-           ${x.prob != null ? `<div class="lab" style="margin-top:8px">Probability</div><div class="v2">${x.prob}%</div>` : ''}
-         </div>
+         <div class="cv-dval"><div class="lab">${kind === 'variation' ? 'Value' : 'Claimed Value'}</div><div class="v">${cvUsd(x.value)}</div></div>
        </div>
        <div class="cv-accent"></div>
        ${x.description ? `<div class="cv-sec">${cvSecIcon('doc')}Summary</div><div class="cv-desc">${x.description}</div>` : ''}
-       ${kv ? `<div class="cv-sec">${cvSecIcon('list')}Details</div><div class="cv-kv">${kv}</div>` : ''}
+       <div class="cv-sec">${cvSecIcon('scales')}Commercial Impact</div>
+       <div class="cv-impact">
+         <div class="cv-imp"><div class="lab">${kind === 'variation' ? 'Estimated Value' : 'Claimed Value'}</div><div class="v">${cvUsd(x.value)}</div></div>
+         <div class="cv-imp"><div class="lab">Probability</div><div class="v">${x.prob == null ? '–' : x.prob + '%'}</div></div>
+         <div class="cv-imp"><div class="lab">Assessment</div><div class="v">${assess}</div></div>
+       </div>
        ${time}`;
   }
 
