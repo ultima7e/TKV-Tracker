@@ -511,6 +511,12 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .cv-dval .v{font-size:18px;font-weight:800;color:var(--navy);line-height:1.2;white-space:nowrap}
 .cv-dval .v2{font-size:14px;font-weight:800;color:var(--accent)}
 .cv-accent{height:4px;border-radius:3px;margin:13px 0 2px;background:linear-gradient(90deg,var(--accent),#e0a52e 85%)}
+.cv-folder{display:inline-flex;align-items:center;gap:7px;margin-top:13px;padding:8px 14px;border-radius:9px;background:var(--accent);color:#fff;font-size:12.5px;font-weight:700;text-decoration:none;box-shadow:0 1px 3px rgba(20,60,120,.18);transition:filter .12s}
+.cv-folder:hover{filter:brightness(1.07)}
+.cv-folder svg{width:15px;height:15px;color:#fff;flex:0 0 auto}
+.cv-flink{display:inline-flex;vertical-align:-3px;margin-left:6px;color:var(--accent)}
+.cv-flink svg{width:14px;height:14px}
+.cv-flink:hover{filter:brightness(1.15)}
 .cv-impact{display:flex;gap:10px;flex-wrap:wrap}
 .cv-imp{flex:1;min-width:120px;background:#f7fafd;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .cv-imp .lab{font-size:9.5px;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);font-weight:700}

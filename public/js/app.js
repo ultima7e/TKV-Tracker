@@ -1852,11 +1852,13 @@
     claims: { title: 'Claims', dataKey: 'claims', label: (r) => 'SoC-' + r.ref,
       cols: [['Ref', (r) => 'SoC-' + r.ref], ['Title', (r) => r.title], ['Contractual Basis', (r) => cvChip(r.basisCat)],
         ['Value', (r) => cvUsd(r.value)], ['Prob', (r) => (r.prob == null ? '–' : r.prob + '%')],
-        ['Status', (r) => (r.status ? cvBadge(r.status, cvStatusClass(r.status)) : '<span class="muted">—</span>')], ['Letters', (r) => r.letters.length]] },
+        ['Status', (r) => (r.status ? cvBadge(r.status, cvStatusClass(r.status)) : '<span class="muted">—</span>')],
+        ['Letters', (r) => r.letters.length + (r.folder ? ` <a class="cv-flink" href="${r.folder}" target="_blank" rel="noopener noreferrer" title="Open letters folder">${cvSecIcon('folder')}</a>` : '')]] },
     variations: { title: 'Variations', dataKey: 'variations', label: (r) => 'VAR-' + r.ref,
       cols: [['Ref', (r) => 'VAR-' + r.ref], ['Title', (r) => r.title], ['Contractual Basis', (r) => cvChip(r.basisCat)],
         ['Value', (r) => cvUsd(r.value)], ['Prob', (r) => (r.prob == null ? '–' : r.prob + '%')],
-        ['Status', (r) => (r.status ? cvBadge(r.status, cvStatusClass(r.status)) : '<span class="muted">—</span>')], ['Letters', (r) => r.letters.length]] },
+        ['Status', (r) => (r.status ? cvBadge(r.status, cvStatusClass(r.status)) : '<span class="muted">—</span>')],
+        ['Letters', (r) => r.letters.length + (r.folder ? ` <a class="cv-flink" href="${r.folder}" target="_blank" rel="noopener noreferrer" title="Open letters folder">${cvSecIcon('folder')}</a>` : '')]] },
   };
 
   const CV_ICON = {
@@ -1868,6 +1870,7 @@
     check: '<circle cx="12" cy="12" r="9"/><path d="m8.5 12.3 2.3 2.3 4.7-5.2"/>',
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/>',
     list: '<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   };
   const cvSecIcon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${CV_ICON[name] || ''}</svg>`;
   // Colour correspondence by sender: Contractor (TKV/Dolsar) vs Employer/Engineer.
@@ -1937,7 +1940,7 @@
     draw();
     document.getElementById('cv-' + kind + '-q').oninput = draw;
     document.getElementById('cv-' + kind + '-basis').onchange = draw;
-    body.onclick = (e) => { const tr = e.target.closest('tr[data-ref]'); if (!tr) return; cvSel[kind] = tr.dataset.ref;
+    body.onclick = (e) => { const tr = e.target.closest('tr[data-ref]'); if (!tr) return; if (e.target.closest('a')) return; cvSel[kind] = tr.dataset.ref;
       body.querySelectorAll('tr').forEach((x) => x.classList.toggle('on', x === tr));
       const it = rows.find((r) => String(r.ref) === tr.dataset.ref); if (it) cvRenderDetail(kind, it); };
   }
@@ -1961,6 +1964,7 @@
          <div class="cv-dval"><div class="lab">${kind === 'variation' ? 'Value' : 'Claimed Value'}</div><div class="v">${cvUsd(x.value)}</div></div>
        </div>
        <div class="cv-accent"></div>
+       ${x.folder ? `<a class="cv-folder" href="${x.folder}" target="_blank" rel="noopener noreferrer">${cvSecIcon('folder')}Open letters folder</a>` : ''}
        ${x.description ? `<div class="cv-sec">${cvSecIcon('doc')}Summary</div><div class="cv-desc">${x.description}</div>` : ''}
        <div class="cv-sec">${cvSecIcon('scales')}Commercial Impact</div>
        <div class="cv-impact">
