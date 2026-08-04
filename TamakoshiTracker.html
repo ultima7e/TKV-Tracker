@@ -477,10 +477,14 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .cv-desc{font-size:12.5px;color:var(--ink);line-height:1.55}
 .cv-kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px}
 .cv-kv .k{color:var(--muted)}
-.cv-time{list-style:none;margin:0;padding:0;max-height:300px;overflow:auto}
+.cv-time{list-style:none;margin:0;padding:0}
 .cv-time li{position:relative;padding:0 0 11px 16px;border-left:2px solid #dbe4f0;font-size:12px;line-height:1.45}
 .cv-time li:last-child{border-left-color:transparent}
 .cv-time li:before{content:'';position:absolute;left:-5px;top:3px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.cv-time li .d{font-weight:700;color:var(--navy);margin-right:3px}
+.cv-time.collapsed li:nth-child(n+5){display:none}
+.cv-viewall{display:inline-block;margin-top:8px;background:none;border:none;color:var(--accent);font-weight:700;font-size:11.5px;cursor:pointer;padding:2px 0}
+.cv-viewall:hover{text-decoration:underline}
 .cv-time .d{font-weight:700;color:var(--navy)}
 .cv-time .lr{color:var(--muted);font-size:11px}
 .cv-scatter-leg{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:6px}
@@ -1013,8 +1017,15 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   }
   // One delegated listener — panels are re-rendered on every refresh.
   document.addEventListener('click', (e) => {
-    const b = e.target.closest && e.target.closest('[data-close]');
-    if (b) collapseDetail(b.getAttribute('data-close'));
+    if (!e.target.closest) return;
+    const b = e.target.closest('[data-close]');
+    if (b) { collapseDetail(b.getAttribute('data-close')); return; }
+    // Chronology "View all" toggle in the claims detail panel.
+    const m = e.target.closest('[data-cvmore]');
+    if (m) {
+      const ul = m.parentElement && m.parentElement.querySelector('.cv-time');
+      if (ul) { const collapsed = ul.classList.toggle('collapsed'); m.textContent = collapsed ? `View all ${ul.children.length} →` : 'Show less ↑'; }
+    }
   });
 
   // Binary IPC status: a completed/paid certificate is "Settled"; anything else
@@ -2747,11 +2758,14 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const noValue = x.kind === 'pclaim', isVar = x.kind === 'variation' || x.kind === 'pvariation';
     const at = x.prob == null ? null : (x.prob >= 70 ? 'High' : x.prob >= 40 ? 'Medium' : 'Low');
     const assess = at ? `<span class="cv-chip" style="background:${CV_ASSESS[at][0]};color:${CV_ASSESS[at][1]}">${at}</span>` : '–';
-    // Correspondence newest-first (reverse chronological).
+    // Chronology, newest-first (reverse chronological). Collapsed to the first
+    // few entries with a "View all" toggle so the panel needs no inner scroll.
+    const CV_CHRONO_N = 4;
     const letters = (x.letters || []).filter((l) => l.date || l.title || l.ref).slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
     const time = letters.length
-      ? `<div class="cv-sec">${cvSecIcon('clock')}Correspondence (${letters.length})<span class="cv-legend"><i class="c"></i>Contractor<i class="e"></i>Employer</span></div>
-         <ul class="cv-time">${letters.map((l) => `<li class="s-${cvSender(l.ref)}"><span class="d">${cvDate(l.date)}</span> ${l.title}${l.ref ? `<div class="lr">${l.ref}</div>` : ''}</li>`).join('')}</ul>` : '';
+      ? `<div class="cv-sec">${cvSecIcon('clock')}Chronology (${letters.length})<span class="cv-legend"><i class="c"></i>Contractor<i class="e"></i>Employer</span></div>
+         <ul class="cv-time${letters.length > CV_CHRONO_N ? ' collapsed' : ''}">${letters.map((l) => `<li class="s-${cvSender(l.ref)}"><span class="d">${cvDate(l.date)}</span> ${l.title}${l.ref ? `<div class="lr">${l.ref}</div>` : ''}</li>`).join('')}</ul>` +
+        (letters.length > CV_CHRONO_N ? `<button type="button" class="cv-viewall" data-cvmore>View all ${letters.length} →</button>` : '') : '';
     // Value-less items (Potential Claims) show Location + Clause instead of a
     // commercial-impact block and drop the header value chip.
     const body = noValue

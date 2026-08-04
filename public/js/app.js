@@ -429,8 +429,15 @@
   }
   // One delegated listener — panels are re-rendered on every refresh.
   document.addEventListener('click', (e) => {
-    const b = e.target.closest && e.target.closest('[data-close]');
-    if (b) collapseDetail(b.getAttribute('data-close'));
+    if (!e.target.closest) return;
+    const b = e.target.closest('[data-close]');
+    if (b) { collapseDetail(b.getAttribute('data-close')); return; }
+    // Chronology "View all" toggle in the claims detail panel.
+    const m = e.target.closest('[data-cvmore]');
+    if (m) {
+      const ul = m.parentElement && m.parentElement.querySelector('.cv-time');
+      if (ul) { const collapsed = ul.classList.toggle('collapsed'); m.textContent = collapsed ? `View all ${ul.children.length} →` : 'Show less ↑'; }
+    }
   });
 
   // Map the sheet's casual status text to professional payment-cycle terms.
@@ -1969,11 +1976,14 @@
     const noValue = x.kind === 'pclaim', isVar = x.kind === 'variation' || x.kind === 'pvariation';
     const at = x.prob == null ? null : (x.prob >= 70 ? 'High' : x.prob >= 40 ? 'Medium' : 'Low');
     const assess = at ? `<span class="cv-chip" style="background:${CV_ASSESS[at][0]};color:${CV_ASSESS[at][1]}">${at}</span>` : '–';
-    // Correspondence newest-first (reverse chronological).
+    // Chronology, newest-first (reverse chronological). Collapsed to the first
+    // few entries with a "View all" toggle so the panel needs no inner scroll.
+    const CV_CHRONO_N = 4;
     const letters = (x.letters || []).filter((l) => l.date || l.title || l.ref).slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
     const time = letters.length
-      ? `<div class="cv-sec">${cvSecIcon('clock')}Correspondence (${letters.length})<span class="cv-legend"><i class="c"></i>Contractor<i class="e"></i>Employer</span></div>
-         <ul class="cv-time">${letters.map((l) => `<li class="s-${cvSender(l.ref)}"><span class="d">${cvDate(l.date)}</span> ${l.title}${l.ref ? `<div class="lr">${l.ref}</div>` : ''}</li>`).join('')}</ul>` : '';
+      ? `<div class="cv-sec">${cvSecIcon('clock')}Chronology (${letters.length})<span class="cv-legend"><i class="c"></i>Contractor<i class="e"></i>Employer</span></div>
+         <ul class="cv-time${letters.length > CV_CHRONO_N ? ' collapsed' : ''}">${letters.map((l) => `<li class="s-${cvSender(l.ref)}"><span class="d">${cvDate(l.date)}</span> ${l.title}${l.ref ? `<div class="lr">${l.ref}</div>` : ''}</li>`).join('')}</ul>` +
+        (letters.length > CV_CHRONO_N ? `<button type="button" class="cv-viewall" data-cvmore>View all ${letters.length} →</button>` : '') : '';
     // Value-less items (Potential Claims) show Location + Clause instead of a
     // commercial-impact block and drop the header value chip.
     const body = noValue
