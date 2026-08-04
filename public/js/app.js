@@ -411,6 +411,7 @@
     'f-donut-detail': 'Click “Certified” to see the breakdown.',
     'f-bardetail': 'NPR millions received per certificate.',
     'cv-donut-detail': 'Click a slice to see its matters.',
+    'cv-scatter-detail': 'Click a dot to see the matter’s details.',
   };
   function expandDetail(id, html) {
     const el = document.getElementById(id);
@@ -2018,8 +2019,9 @@
        <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
          <div class="card"><h3>Value by Contractual Basis <span class="muted" style="font-weight:600">· click a slice</span></h3><div id="cv-donut" class="chart" style="height:260px"></div>
            <div id="cv-donut-detail" class="muted" style="text-align:center;margin-top:4px;font-size:11px">Click a slice to see its matters.</div></div>
-         <div class="card"><h3>Probability vs Value Matrix</h3><div id="cv-scatter" class="chart" style="height:340px"></div>
-           <div class="cv-scatter-leg"><span><i style="background:#2f6fd0"></i>Claim</span><span><i style="background:#e0a52e"></i>Variation</span></div></div>
+         <div class="card"><h3>Probability vs Value Matrix <span class="muted" style="font-weight:600">· click a dot</span></h3><div id="cv-scatter" class="chart" style="height:340px"></div>
+           <div class="cv-scatter-leg"><span><i style="background:#2f6fd0"></i>Claim</span><span><i style="background:#e0a52e"></i>Variation</span></div>
+           <div id="cv-scatter-detail" class="muted" style="text-align:center;margin-top:4px;font-size:11px">Click a dot to see the matter’s details.</div></div>
        </div>
        <div class="card"><h3>Commercial Exposure by Matter <span class="muted" style="font-weight:600">· USD</span></h3><div id="cv-expo" class="chart" style="height:${Math.max(180, (cv.claims.length + cv.variations.length) * 26 + 40)}px"></div></div>`;
 
@@ -2056,7 +2058,8 @@
     // Deterministic label layout: stack colliding labels vertically with leader
     // lines so co-located points (e.g. the ~$20-30K / 30% cluster) stay legible.
     const placed = [];
-    makeChart('cv-scatter').setOption({
+    const scatter = makeChart('cv-scatter');
+    scatter.setOption({
       tooltip: { trigger: 'item', formatter: (pm) => `<b>${pm.data.name}</b><br/>${cvUsd(pm.data.value[0])} · ${pm.data.value[1]}%` },
       grid: { left: 64, right: 132, top: 20, bottom: 44 },
       xAxis: { type: 'value', min: 0, max: xMax, name: 'Value (USD)', nameLocation: 'middle', nameGap: 26, nameTextStyle: { fontSize: 11, color: COL.muted }, axisLabel: { fontSize: 9, color: COL.muted, formatter: (v) => (v >= 1e6 ? (v / 1e6) + 'M' : (v / 1e3) + 'K') }, splitLine: { show: false } },
@@ -2085,6 +2088,27 @@
         ] },
       }],
     }, true);
+    // Click a dot -> show that matter's details below the chart.
+    scatter.off('click');
+    scatter.on('click', (pm) => {
+      if (!pm.data || !pm.data.name) return;
+      const x = [...cv.claims, ...cv.variations].find((it) => cvItemLabel(it) === pm.data.name);
+      if (!x) return;
+      const isVar = x.kind === 'variation';
+      const at = x.prob == null ? null : (x.prob >= 70 ? 'High' : x.prob >= 40 ? 'Medium' : 'Low');
+      const assess = at ? `<span class="cv-chip" style="background:${CV_ASSESS[at][0]};color:${CV_ASSESS[at][1]}">${at}</span>` : '–';
+      expandDetail('cv-scatter-detail',
+        `<div class="ipc-sub" style="text-align:left">${cvItemLabel(x)} — ${x.title}</div>
+         <table class="tbl"><tbody>
+           <tr><td>Contractual Basis</td><td style="text-align:right">${cvChip(x.basisCat)}</td></tr>
+           <tr><td>${isVar ? 'Expected Value' : 'Claimed Value'}</td><td style="text-align:right"><b>${cvUsd(x.value)}</b></td></tr>
+           <tr><td>Probability</td><td style="text-align:right">${x.prob == null ? '–' : x.prob + '%'}</td></tr>
+           <tr><td>Risk assessment</td><td style="text-align:right">${assess}</td></tr>
+           <tr><td>Correspondence</td><td style="text-align:right">${x.letters.length} letter${x.letters.length !== 1 ? 's' : ''}</td></tr>
+         </tbody></table>
+         ${x.description ? `<div class="muted" style="font-size:11px;text-align:left;margin-top:6px">${x.description}</div>` : ''}
+         ${x.folder ? `<a class="cv-folder" href="${x.folder}" target="_blank" rel="noopener noreferrer" style="margin-top:8px">${cvSecIcon('folder')}Open letters folder</a>` : ''}`);
+    });
 
     const items = [...cv.claims, ...cv.variations].filter((x) => x.value != null).sort((a, b) => a.value - b.value);
     makeChart('cv-expo').setOption({
