@@ -2808,14 +2808,17 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     }, true);
 
     const byKind = { claim: [], variation: [] };
-    (k.scatter || []).forEach((s) => { (byKind[s.kind] = byKind[s.kind] || []).push([s.value, s.prob, s.ref]); });
+    (k.scatter || []).forEach((s) => { (byKind[s.kind] = byKind[s.kind] || []).push([s.value, s.prob, (s.kind === 'variation' ? 'VAR-' : 'SoC-') + s.ref]); });
+    // Always-on point labels (ref visible without hovering); shift overlaps apart.
+    const scatterSeries = (arr, color) => ({ type: 'scatter', symbolSize: 14, data: arr, itemStyle: { color, opacity: 0.85 },
+      label: { show: true, position: 'right', distance: 5, formatter: (p) => p.data[2], fontSize: 9, fontWeight: 700, color },
+      labelLayout: { moveOverlap: 'shiftY', hideOverlap: false } });
     makeChart('cv-scatter').setOption({
       tooltip: { trigger: 'item', formatter: (p) => `<b>${p.data[2]}</b><br/>${cvUsd(p.data[0])} · ${p.data[1]}%` },
-      grid: { left: 58, right: 18, top: 12, bottom: 34 },
+      grid: { left: 58, right: 64, top: 12, bottom: 34 },
       xAxis: { type: 'value', name: 'Value (USD)', nameLocation: 'middle', nameGap: 22, nameTextStyle: { fontSize: 10, color: COL.muted }, axisLabel: { fontSize: 9, color: COL.muted, formatter: (v) => (v >= 1e6 ? (v / 1e6) + 'M' : v / 1e3 + 'K') }, splitLine: { lineStyle: { color: COL.grid } } },
       yAxis: { type: 'value', name: 'Prob %', min: 0, max: 100, nameTextStyle: { fontSize: 10, color: COL.muted }, axisLabel: { fontSize: 10, color: COL.muted }, splitLine: { lineStyle: { color: COL.grid } } },
-      series: [{ type: 'scatter', symbolSize: 14, data: byKind.claim, itemStyle: { color: '#2f6fd0', opacity: 0.85 } },
-        { type: 'scatter', symbolSize: 14, data: byKind.variation, itemStyle: { color: '#e0a52e', opacity: 0.85 } }],
+      series: [scatterSeries(byKind.claim, '#2f6fd0'), scatterSeries(byKind.variation, '#b9772a')],
     }, true);
 
     const items = [...cv.claims, ...cv.variations].filter((x) => x.value != null).sort((a, b) => a.value - b.value);
