@@ -2016,7 +2016,7 @@
        </div>
        <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
          <div class="card"><h3>Value by Contractual Basis</h3><div id="cv-donut" class="chart" style="height:260px"></div></div>
-         <div class="card"><h3>Probability vs Value <span class="muted" style="font-weight:600">· each matter</span></h3><div id="cv-scatter" class="chart" style="height:320px"></div>
+         <div class="card"><h3>Probability vs Value Matrix</h3><div id="cv-scatter" class="chart" style="height:340px"></div>
            <div class="cv-scatter-leg"><span><i style="background:#2f6fd0"></i>Claim</span><span><i style="background:#e0a52e"></i>Variation</span></div></div>
        </div>
        <div class="card"><h3>Commercial Exposure by Matter <span class="muted" style="font-weight:600">· USD</span></h3><div id="cv-expo" class="chart" style="height:${Math.max(180, (cv.claims.length + cv.variations.length) * 26 + 40)}px"></div></div>`;
@@ -2029,19 +2029,47 @@
         data: be.map(([n, v]) => ({ name: n, value: Math.round(v), itemStyle: { color: CV_BASISCOL[n] || '#8a8f98' } })) }],
     }, true);
 
-    const byKind = { claim: [], variation: [] };
-    (k.scatter || []).forEach((s) => { (byKind[s.kind] = byKind[s.kind] || []).push([s.value, s.prob, (s.kind === 'variation' ? 'VAR-' : 'SoC-') + s.ref]); });
-    // Always-on point labels (ref visible without hovering); shift overlaps apart.
-    const scatterSeries = (arr, color) => ({ type: 'scatter', symbolSize: 13, data: arr, itemStyle: { color, opacity: 0.85 },
-      label: { show: true, position: 'right', distance: 7, formatter: (p) => p.data[2], fontSize: 9, fontWeight: 700, color },
-      labelLine: { show: true, length2: 7, lineStyle: { color, width: 0.8 } },
-      labelLayout: { moveOverlap: 'shiftY', hideOverlap: false } });
+    // ---- Probability vs Value risk matrix: 4 quadrants + collision-free labels ----
+    const pts = (k.scatter || []).map((s) => ({ v: s.value, p: s.prob, name: (s.kind === 'variation' ? 'VAR-' : 'SoC-') + s.ref, kind: s.kind }));
+    const maxV = Math.max(1, ...pts.map((s) => s.v));
+    const xMax = Math.max(250000, Math.ceil((maxV * 1.08) / 250000) * 250000);
+    const vThresh = xMax / 2;
+    const KIND_COL = { claim: '#2f6fd0', variation: '#e0a52e' };
+    const quad = (x0, y0, x1, y1, fill, txt, tcol, pos) => ([
+      { coord: [x0, y0], itemStyle: { color: fill }, label: { show: true, position: pos, distance: 10, color: tcol, fontSize: 10.5, fontWeight: 700, lineHeight: 14, formatter: txt } },
+      { coord: [x1, y1] },
+    ]);
+    // Deterministic label layout: stack colliding labels vertically with leader
+    // lines so co-located points (e.g. the ~$20-30K / 30% cluster) stay legible.
+    const placed = [];
     makeChart('cv-scatter').setOption({
-      tooltip: { trigger: 'item', formatter: (p) => `<b>${p.data[2]}</b><br/>${cvUsd(p.data[0])} · ${p.data[1]}%` },
-      grid: { left: 58, right: 64, top: 12, bottom: 34 },
-      xAxis: { type: 'value', name: 'Value (USD)', nameLocation: 'middle', nameGap: 22, nameTextStyle: { fontSize: 10, color: COL.muted }, axisLabel: { fontSize: 9, color: COL.muted, formatter: (v) => (v >= 1e6 ? (v / 1e6) + 'M' : v / 1e3 + 'K') }, splitLine: { lineStyle: { color: COL.grid } } },
-      yAxis: { type: 'value', name: 'Prob %', min: 0, max: 100, nameTextStyle: { fontSize: 10, color: COL.muted }, axisLabel: { fontSize: 10, color: COL.muted }, splitLine: { lineStyle: { color: COL.grid } } },
-      series: [scatterSeries(byKind.claim, '#2f6fd0'), scatterSeries(byKind.variation, '#b9772a')],
+      tooltip: { trigger: 'item', formatter: (pm) => `<b>${pm.data.name}</b><br/>${cvUsd(pm.data.value[0])} · ${pm.data.value[1]}%` },
+      grid: { left: 64, right: 132, top: 20, bottom: 44 },
+      xAxis: { type: 'value', min: 0, max: xMax, name: 'Value (USD)', nameLocation: 'middle', nameGap: 26, nameTextStyle: { fontSize: 11, color: COL.muted }, axisLabel: { fontSize: 9, color: COL.muted, formatter: (v) => (v >= 1e6 ? (v / 1e6) + 'M' : (v / 1e3) + 'K') }, splitLine: { show: false } },
+      yAxis: { type: 'value', min: 0, max: 100, name: 'Probability %', nameLocation: 'middle', nameGap: 40, nameTextStyle: { fontSize: 11, color: COL.muted }, axisLabel: { fontSize: 10, color: COL.muted, formatter: '{value}%' }, splitLine: { show: false } },
+      series: [{
+        type: 'scatter', symbolSize: 16, z: 5,
+        data: pts.map((s) => ({ value: [s.v, s.p], name: s.name, itemStyle: { color: KIND_COL[s.kind] || '#8a8f98' } })),
+        label: { show: true, formatter: (pm) => pm.data.name, fontSize: 10, fontWeight: 700, color: '#2a3550' },
+        labelLine: { show: true, lineStyle: { color: '#aab2bf', width: 1 } },
+        labelLayout: (params) => {
+          if (params.dataIndex === 0) placed.length = 0;
+          const r = params.rect, lw = params.labelRect.width, lh = params.labelRect.height;
+          const cx = r.x + r.width / 2, cy = r.y + r.height / 2, lx = r.x + r.width + 10;
+          let ly = cy, guard = 0;
+          const hit = (y) => placed.some((q) => Math.abs(q.y - y) < (lh + 4) && lx < q.x + q.w + 8 && q.x < lx + lw + 8);
+          while (hit(ly) && guard < 80) { const step = Math.ceil((guard + 1) / 2) * (lh + 4); ly = cy + (guard % 2 ? -step : step); guard++; }
+          placed.push({ x: lx, y: ly, w: lw, h: lh });
+          return { x: lx, y: ly, align: 'left', verticalAlign: 'middle', labelLinePoints: [[cx, cy], [(cx + lx) / 2, ly], [lx - 5, ly]] };
+        },
+        markLine: { silent: true, symbol: 'none', label: { show: false }, lineStyle: { color: '#e2554e', width: 1.3 }, data: [{ yAxis: 50 }, { xAxis: vThresh }] },
+        markArea: { silent: true, z: 0, data: [
+          quad(0, 50, vThresh, 100, 'rgba(120,190,120,0.12)', 'High Probability\nLow Value', '#3a9d4e', 'insideTopLeft'),
+          quad(vThresh, 50, xMax, 100, 'rgba(224,90,80,0.12)', 'High Probability\nHigh Value', '#d0433f', 'insideTopRight'),
+          quad(0, 0, vThresh, 50, 'rgba(90,140,215,0.10)', 'Low Probability\nLow Value', '#2f6fd0', 'insideBottomLeft'),
+          quad(vThresh, 0, xMax, 50, 'rgba(120,110,160,0.12)', 'Low Probability\nHigh Value', '#6a5f8a', 'insideBottomRight'),
+        ] },
+      }],
     }, true);
 
     const items = [...cv.claims, ...cv.variations].filter((x) => x.value != null).sort((a, b) => a.value - b.value);
