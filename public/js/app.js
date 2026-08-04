@@ -412,6 +412,7 @@
     'f-bardetail': 'NPR millions received per certificate.',
     'cv-donut-detail': 'Click a slice to see its matters.',
     'cv-scatter-detail': 'Click a dot to see the matter’s details.',
+    'cv-expo-detail': 'Click a bar to see the claim summary.',
   };
   function expandDetail(id, html) {
     const el = document.getElementById(id);
@@ -2023,7 +2024,8 @@
            <div class="cv-scatter-leg"><span><i style="background:#2f6fd0"></i>Claim</span><span><i style="background:#e0a52e"></i>Variation</span></div>
            <div id="cv-scatter-detail" class="muted" style="text-align:center;margin-top:4px;font-size:11px">Click a dot to see the matter’s details.</div></div>
        </div>
-       <div class="card"><h3>Commercial Exposure by Matter <span class="muted" style="font-weight:600">· USD</span></h3><div id="cv-expo" class="chart" style="height:${Math.max(180, (cv.claims.length + cv.variations.length) * 26 + 40)}px"></div></div>`;
+       <div class="card"><h3>Commercial Exposure by Matter <span class="muted" style="font-weight:600">· USD · click a bar</span></h3><div id="cv-expo" class="chart" style="height:${Math.max(180, (cv.claims.length + cv.variations.length) * 26 + 40)}px"></div>
+         <div id="cv-expo-detail" class="muted" style="text-align:center;margin-top:4px;font-size:11px">Click a bar to see the claim summary.</div></div>`;
 
     const be = Object.entries(k.byBasisValue).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
     const donut = makeChart('cv-donut');
@@ -2111,7 +2113,8 @@
     });
 
     const items = [...cv.claims, ...cv.variations].filter((x) => x.value != null).sort((a, b) => a.value - b.value);
-    makeChart('cv-expo').setOption({
+    const expo = makeChart('cv-expo');
+    expo.setOption({
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (ps) => `${ps[0].name}<br/><b>${cvUsd(ps[0].value)}</b>` },
       grid: { left: 210, right: 64, top: 8, bottom: 24 },
       xAxis: { type: 'value', axisLabel: { fontSize: 9, color: COL.muted, formatter: (v) => (v >= 1e6 ? (v / 1e6) + 'M' : v / 1e3 + 'K') }, splitLine: { lineStyle: { color: COL.grid } } },
@@ -2119,6 +2122,22 @@
       series: [{ type: 'bar', barMaxWidth: 15, data: items.map((x) => ({ value: Math.round(x.value), itemStyle: { color: CV_BASISCOL[x.basisCat] || '#2f6fd0', borderRadius: [0, 3, 3, 0] } })),
         label: { show: true, position: 'right', fontSize: 9, color: COL.muted, formatter: (p) => cvUsd(p.value) } }],
     }, true);
+    // Click a bar -> show that claim/variation's summary below the chart.
+    expo.off('click');
+    expo.on('click', (pm) => {
+      const x = items[pm.dataIndex]; if (!x) return;
+      const isVar = x.kind === 'variation';
+      expandDetail('cv-expo-detail',
+        `<div class="ipc-sub" style="text-align:left">${cvItemLabel(x)} — ${x.title}</div>
+         <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:6px 0 2px">
+           ${cvChip(x.basisCat)}
+           <span class="muted" style="font-size:11px">${isVar ? 'Expected' : 'Claimed'} value <b style="color:var(--navy)">${cvUsd(x.value)}</b></span>
+           <span class="muted" style="font-size:11px">Probability <b style="color:var(--navy)">${x.prob == null ? '–' : x.prob + '%'}</b></span>
+         </div>
+         ${x.description ? `<div style="text-align:left;font-size:12px;line-height:1.55;margin-top:6px">${x.description}</div>`
+          : `<div class="muted" style="font-size:11px;margin-top:6px">No summary recorded for this matter.</div>`}
+         ${x.folder ? `<a class="cv-folder" href="${x.folder}" target="_blank" rel="noopener noreferrer" style="margin-top:8px">${cvSecIcon('folder')}Open letters folder</a>` : ''}`);
+    });
   }
 
   function renderAll() {
