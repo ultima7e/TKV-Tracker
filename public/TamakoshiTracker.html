@@ -699,14 +699,12 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
           <button class="sched-tab on" data-cvtab="overview">Overview</button>
           <button class="sched-tab" data-cvtab="claims">Claims</button>
           <button class="sched-tab" data-cvtab="variations">Variations</button>
-          <button class="sched-tab" data-cvtab="pclaims">Potential Claims</button>
-          <button class="sched-tab" data-cvtab="pvariations">Potential Variations</button>
+          <button class="sched-tab" data-cvtab="potential">Potential Claims &amp; Variations</button>
         </div>
         <div class="stab-pane" id="cvtab-overview"></div>
         <div class="stab-pane" id="cvtab-claims" hidden></div>
         <div class="stab-pane" id="cvtab-variations" hidden></div>
-        <div class="stab-pane" id="cvtab-pclaims" hidden></div>
-        <div class="stab-pane" id="cvtab-pvariations" hidden></div>
+        <div class="stab-pane" id="cvtab-potential" hidden></div>
       </section>
       <section class="view" id="inv">
         <div class="sched-tabs">
@@ -2627,6 +2625,9 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   const cvBadge = (t, cls) => (t ? `<span class="badge ${cls}">${t}</span>` : '');
   const cvStatusClass = (s) => (/approv|grant|settl|determin/i.test(s || '') ? 'ok' : /reject|disput|not\s*approv/i.test(s || '') ? 'bad' : 'warn');
   const cvChip = (cat) => `<span class="cv-chip" style="background:${(CV_BASISCOL[cat] || '#8a8f98') + '22'};color:${CV_BASISCOL[cat] || '#556'}">${cat}</span>`;
+  const CV_PREFIX = { claim: 'SoC-', variation: 'VAR-', pclaim: 'PC-', pvariation: 'PV-' };
+  const cvItemLabel = (r) => (CV_PREFIX[r.kind] || '') + r.ref; // unique within a tab; also the row key
+  const cvKindChip = (kind) => { const v = kind === 'pvariation' || kind === 'variation'; return `<span class="cv-chip" style="background:${v ? '#e0a52e22' : '#2f6fd022'};color:${v ? '#b9772a' : '#2f6fd0'}">${v ? 'Variation' : 'Claim'}</span>`; };
 
   const CV = {
     claims: { title: 'Claims', dataKey: 'claims', label: (r) => 'SoC-' + r.ref,
@@ -2639,13 +2640,9 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
         ['Value', (r) => cvUsd(r.value)], ['Prob', (r) => (r.prob == null ? '–' : r.prob + '%')],
         ['Status', (r) => (r.status ? cvBadge(r.status, cvStatusClass(r.status)) : '<span class="muted">—</span>')],
         ['Letters', (r) => r.letters.length + (r.folder ? ` <a class="cv-flink" href="${r.folder}" target="_blank" rel="noopener noreferrer" title="Open letters folder">${cvSecIcon('folder')}</a>` : '')]] },
-    pclaims: { title: 'Potential Claims', dataKey: 'pclaims', label: (r) => 'PC-' + r.ref, noValue: true,
-      cols: [['Ref', (r) => 'PC-' + r.ref], ['Title', (r) => r.title], ['Contractual Basis', (r) => cvChip(r.basisCat)],
-        ['Location', (r) => r.location || '<span class="muted">—</span>'], ['Letters', (r) => r.letters.length]] },
-    pvariations: { title: 'Potential Variations', dataKey: 'pvariations', label: (r) => 'PV-' + r.ref,
-      cols: [['Ref', (r) => 'PV-' + r.ref], ['Title', (r) => r.title], ['Contractual Basis', (r) => cvChip(r.basisCat)],
-        ['Expected Value', (r) => cvUsd(r.value)], ['Prob', (r) => (r.prob == null ? '–' : r.prob + '%')],
-        ['Status', (r) => (r.status ? cvBadge(r.status, cvStatusClass(r.status)) : '<span class="muted">—</span>')],
+    potential: { title: 'Potential Claims & Variations', merge: true, label: (r) => cvItemLabel(r),
+      cols: [['Ref', (r) => cvItemLabel(r)], ['Type', (r) => cvKindChip(r.kind)], ['Title', (r) => r.title],
+        ['Contractual Basis', (r) => cvChip(r.basisCat)], ['Value', (r) => cvUsd(r.value)],
         ['Letters', (r) => r.letters.length]] },
   };
 
@@ -2681,18 +2678,17 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const ov = document.getElementById('cvtab-overview'); if (!ov) return;
     if (!cv || cv.missing) {
       ov.innerHTML = '<div class="card"><div class="muted" style="font-size:12px">No Claims &amp; Variations data available yet.</div></div>';
-      ['claims', 'variations', 'pclaims', 'pvariations'].forEach((k) => { const el = document.getElementById('cvtab-' + k); if (el) el.innerHTML = ''; });
+      ['claims', 'variations', 'potential'].forEach((k) => { const el = document.getElementById('cvtab-' + k); if (el) el.innerHTML = ''; });
     } else {
       renderClaimsOverview(); renderRegisterTab('claims'); renderRegisterTab('variations');
-      if (cv.pclaims) renderRegisterTab('pclaims');
-      if (cv.pvariations) renderRegisterTab('pvariations');
+      if (cv.pclaims || cv.pvariations) renderRegisterTab('potential');
     }
     if (!cvWired) {
       cvWired = true;
       document.querySelectorAll('#claims .sched-tab[data-cvtab]').forEach((btn) => btn.addEventListener('click', () => {
         const which = btn.dataset.cvtab;
         document.querySelectorAll('#claims .sched-tab[data-cvtab]').forEach((b) => b.classList.toggle('on', b === btn));
-        ['overview', 'claims', 'variations', 'pclaims', 'pvariations'].forEach((k) => { const el = document.getElementById('cvtab-' + k); if (el) el.hidden = k !== which; });
+        ['overview', 'claims', 'variations', 'potential'].forEach((k) => { const el = document.getElementById('cvtab-' + k); if (el) el.hidden = k !== which; });
         setTimeout(() => Object.values(charts).forEach((c) => c.resize()), 80);
       }));
     }
@@ -2700,14 +2696,15 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 
   function renderRegisterTab(kind) {
     const cfg = CV[kind], cv = data.claimsRegister, el = document.getElementById('cvtab-' + kind); if (!el) return;
-    const rows = cv[cfg.dataKey] || [];
+    const rows = cfg.merge ? [...(cv.pclaims || []), ...(cv.pvariations || [])] : (cv[cfg.dataKey] || []);
+    const keyOf = (r) => cvItemLabel(r);
     const bases = [...new Set(rows.map((r) => r.basisCat))].sort();
     const v = cvValueSplit(rows);
     const totalLetters = rows.reduce((s, r) => s + r.letters.length, 0);
-    const kpiCards = cfg.noValue
-      ? `${cvKpiCard(cfg.title, rows.length, 'identified', 'scales', '#6b46c9')}
-         ${cvKpiCard('Correspondence', totalLetters, 'letters logged', 'clock', '#2f6fd0')}
-         ${cvKpiCard('Contractual Bases', bases.length, 'distinct matters', 'list', '#1d8a63')}`
+    const kpiCards = cfg.merge
+      ? `${cvKpiCard('Potential Claims', (cv.pclaims || []).length, 'no value yet', 'target', '#c2557a')}
+         ${cvKpiCard('Potential Variations', (cv.pvariations || []).length, cvUsd(v.total), 'edit', '#7a6ad0')}
+         ${cvKpiCard('Correspondence', totalLetters, 'letters logged', 'clock', '#2f6fd0')}`
       : `${cvKpiCard(cfg.title + ' Raised', rows.length, cvUsd(v.total), 'scales', '#6b46c9')}
          ${cvKpiCard('Submitted Value', cvUsdShort(v.total), '', 'doc', '#1d8a63')}
          ${cvKpiCard('Approved Value', cvUsdShort(v.approved), '', 'check', '#2f6fd0')}
@@ -2726,32 +2723,35 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const draw = () => {
       const q = (document.getElementById('cv-' + kind + '-q').value || '').toLowerCase();
       const bs = document.getElementById('cv-' + kind + '-basis').value;
-      const shown = rows.filter((r) => (!bs || r.basisCat === bs) && (!q || (r.title + ' ' + r.description + ' ' + r.basis).toLowerCase().includes(q)));
-      body.innerHTML = shown.map((r) => `<tr data-ref="${String(r.ref).replace(/"/g, '&quot;')}" class="${cvSel[kind] === r.ref ? 'on' : ''}">${cfg.cols.map((c) => `<td>${c[1](r)}</td>`).join('')}</tr>`).join('')
+      const shown = rows.filter((r) => (!bs || r.basisCat === bs) && (!q || (r.title + ' ' + r.description + ' ' + r.basis + ' ' + (r.location || '')).toLowerCase().includes(q)));
+      body.innerHTML = shown.map((r) => `<tr data-ref="${keyOf(r).replace(/"/g, '&quot;')}" class="${cvSel[kind] === keyOf(r) ? 'on' : ''}">${cfg.cols.map((c) => `<td>${c[1](r)}</td>`).join('')}</tr>`).join('')
         || `<tr><td colspan="${cfg.cols.length}" class="muted" style="text-align:center;padding:16px">No matching ${cfg.title.toLowerCase()}.</td></tr>`;
-      if (cvSel[kind]) { const it = rows.find((r) => r.ref === cvSel[kind]); if (it) cvRenderDetail(kind, it); }
+      if (cvSel[kind]) { const it = rows.find((r) => keyOf(r) === cvSel[kind]); if (it) cvRenderDetail(kind, it); }
     };
     draw();
     document.getElementById('cv-' + kind + '-q').oninput = draw;
     document.getElementById('cv-' + kind + '-basis').onchange = draw;
     body.onclick = (e) => { const tr = e.target.closest('tr[data-ref]'); if (!tr) return; if (e.target.closest('a')) return; cvSel[kind] = tr.dataset.ref;
       body.querySelectorAll('tr').forEach((x) => x.classList.toggle('on', x === tr));
-      const it = rows.find((r) => String(r.ref) === tr.dataset.ref); if (it) cvRenderDetail(kind, it); };
+      const it = rows.find((r) => keyOf(r) === tr.dataset.ref); if (it) cvRenderDetail(kind, it); };
   }
 
   const CV_ASSESS = { High: ['#fde8e8', '#b3261e'], Medium: ['#fdf0d8', '#9a6a12'], Low: ['#e7f0fb', '#2f6fd0'] };
   function cvRenderDetail(kind, x) {
     const host = document.getElementById('cv-' + kind + '-detail'); if (!host) return;
-    const cfg = CV[kind], isVar = kind.indexOf('variation') !== -1;
+    // Branch on the ITEM's kind so the merged Potential tab renders each row
+    // correctly: Potential Claims (pclaim) have no value; the rest do.
+    const noValue = x.kind === 'pclaim', isVar = x.kind === 'variation' || x.kind === 'pvariation';
     const at = x.prob == null ? null : (x.prob >= 70 ? 'High' : x.prob >= 40 ? 'Medium' : 'Low');
     const assess = at ? `<span class="cv-chip" style="background:${CV_ASSESS[at][0]};color:${CV_ASSESS[at][1]}">${at}</span>` : '–';
-    const letters = (x.letters || []).filter((l) => l.date || l.title || l.ref);
+    // Correspondence newest-first (reverse chronological).
+    const letters = (x.letters || []).filter((l) => l.date || l.title || l.ref).slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
     const time = letters.length
       ? `<div class="cv-sec">${cvSecIcon('clock')}Correspondence (${letters.length})<span class="cv-legend"><i class="c"></i>Contractor<i class="e"></i>Employer</span></div>
          <ul class="cv-time">${letters.map((l) => `<li class="s-${cvSender(l.ref)}"><span class="d">${cvDate(l.date)}</span> ${l.title}${l.ref ? `<div class="lr">${l.ref}</div>` : ''}</li>`).join('')}</ul>` : '';
     // Value-less items (Potential Claims) show Location + Clause instead of a
     // commercial-impact block and drop the header value chip.
-    const body = cfg.noValue
+    const body = noValue
       ? `<div class="cv-sec">${cvSecIcon('target')}Details</div>
          <div class="cv-impact">
            <div class="cv-imp"><div class="lab">Location</div><div class="v" style="font-size:14px">${x.location || '–'}</div></div>
@@ -2766,11 +2766,11 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     host.innerHTML =
       `<div class="cv-dhead">
          <div style="min-width:0">
-           <div class="dref">${cfg.label(x)}</div>
+           <div class="dref">${cvItemLabel(x)}</div>
            <h4>${x.title}</h4>
            <div class="cv-badges">${cvChip(x.basisCat)}${x.status ? cvBadge(x.status, cvStatusClass(x.status)) : ''}</div>
          </div>
-         ${cfg.noValue ? '' : `<div class="cv-dval"><div class="lab">${isVar ? 'Value' : 'Claimed Value'}</div><div class="v">${cvUsd(x.value)}</div></div>`}
+         ${noValue ? '' : `<div class="cv-dval"><div class="lab">${isVar ? 'Value' : 'Claimed Value'}</div><div class="v">${cvUsd(x.value)}</div></div>`}
        </div>
        <div class="cv-accent"></div>
        ${x.folder ? `<a class="cv-folder" href="${x.folder}" target="_blank" rel="noopener noreferrer">${cvSecIcon('folder')}Open letters folder</a>` : ''}
@@ -2794,7 +2794,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
        </div>
        <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
          <div class="card"><h3>Value by Contractual Basis</h3><div id="cv-donut" class="chart" style="height:260px"></div></div>
-         <div class="card"><h3>Probability vs Value <span class="muted" style="font-weight:600">· each matter</span></h3><div id="cv-scatter" class="chart" style="height:260px"></div>
+         <div class="card"><h3>Probability vs Value <span class="muted" style="font-weight:600">· each matter</span></h3><div id="cv-scatter" class="chart" style="height:320px"></div>
            <div class="cv-scatter-leg"><span><i style="background:#2f6fd0"></i>Claim</span><span><i style="background:#e0a52e"></i>Variation</span></div></div>
        </div>
        <div class="card"><h3>Commercial Exposure by Matter <span class="muted" style="font-weight:600">· USD</span></h3><div id="cv-expo" class="chart" style="height:${Math.max(180, (cv.claims.length + cv.variations.length) * 26 + 40)}px"></div></div>`;
@@ -2810,8 +2810,9 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const byKind = { claim: [], variation: [] };
     (k.scatter || []).forEach((s) => { (byKind[s.kind] = byKind[s.kind] || []).push([s.value, s.prob, (s.kind === 'variation' ? 'VAR-' : 'SoC-') + s.ref]); });
     // Always-on point labels (ref visible without hovering); shift overlaps apart.
-    const scatterSeries = (arr, color) => ({ type: 'scatter', symbolSize: 14, data: arr, itemStyle: { color, opacity: 0.85 },
-      label: { show: true, position: 'right', distance: 5, formatter: (p) => p.data[2], fontSize: 9, fontWeight: 700, color },
+    const scatterSeries = (arr, color) => ({ type: 'scatter', symbolSize: 13, data: arr, itemStyle: { color, opacity: 0.85 },
+      label: { show: true, position: 'right', distance: 7, formatter: (p) => p.data[2], fontSize: 9, fontWeight: 700, color },
+      labelLine: { show: true, length2: 7, lineStyle: { color, width: 0.8 } },
       labelLayout: { moveOverlap: 'shiftY', hideOverlap: false } });
     makeChart('cv-scatter').setOption({
       tooltip: { trigger: 'item', formatter: (p) => `<b>${p.data[2]}</b><br/>${cvUsd(p.data[0])} · ${p.data[1]}%` },
