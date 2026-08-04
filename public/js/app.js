@@ -1853,7 +1853,8 @@
   const CV_BASISCOL = { 'Force Majeure': '#2f6fd0', "Employer's Risk": '#c0414b', 'Compensation Event': '#1d8a63', 'Change in Legislation': '#b9772a', 'Variation': '#e0a52e', 'Other': '#8a8f98' };
   const cvUsd = (v) => (!v ? '–' : '$ ' + Math.round(v).toLocaleString('en-US'));
   const cvUsdShort = (v) => (!v ? '–' : v >= 1e6 ? '$ ' + (v / 1e6).toFixed(2) + ' M' : '$ ' + Math.round(v / 1e3) + ' K');
-  const cvDate = (d) => (d || '–');
+  const CV_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const cvDate = (d) => { if (!d) return '–'; const t = Date.parse(d); if (isNaN(t)) return d; const dt = new Date(t); return dt.getUTCDate() + ' ' + CV_MON[dt.getUTCMonth()] + ' ' + dt.getUTCFullYear(); };
   const cvBadge = (t, cls) => (t ? `<span class="badge ${cls}">${t}</span>` : '');
   const cvStatusClass = (s) => (/approv|grant|settl|determin/i.test(s || '') ? 'ok' : /reject|disput|not\s*approv/i.test(s || '') ? 'bad' : 'warn');
   const cvChip = (cat) => `<span class="cv-chip" style="background:${(CV_BASISCOL[cat] || '#8a8f98') + '22'};color:${CV_BASISCOL[cat] || '#556'}">${cat}</span>`;
@@ -1982,7 +1983,7 @@
     const letters = (x.letters || []).filter((l) => l.date || l.title || l.ref).slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
     const time = letters.length
       ? `<div class="cv-sec">${cvSecIcon('clock')}Chronology (${letters.length})<span class="cv-legend"><i class="c"></i>Contractor<i class="e"></i>Employer</span></div>
-         <ul class="cv-time${letters.length > CV_CHRONO_N ? ' collapsed' : ''}">${letters.map((l) => `<li class="s-${cvSender(l.ref)}"><span class="d">${cvDate(l.date)}</span> ${l.title}${l.ref ? `<div class="lr">${l.ref}</div>` : ''}</li>`).join('')}</ul>` +
+         <ul class="cv-time${letters.length > CV_CHRONO_N ? ' collapsed' : ''}">${letters.map((l) => `<li class="s-${cvSender(l.ref)}"><span class="dt">${cvDate(l.date)}</span><span class="rail"></span><span class="txt">${l.title}${l.ref ? `<div class="lr">${l.ref}</div>` : ''}</span></li>`).join('')}</ul>` +
         (letters.length > CV_CHRONO_N ? `<button type="button" class="cv-viewall" data-cvmore>View all ${letters.length} →</button>` : '') : '';
     // Value-less items (Potential Claims) show Location + Clause instead of a
     // commercial-impact block and drop the header value chip.
