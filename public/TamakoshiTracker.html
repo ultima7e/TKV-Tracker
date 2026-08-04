@@ -994,6 +994,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     'f-evdetail': 'Click a slice to see its contribution.',
     'f-donut-detail': 'Click “Certified” to see the breakdown.',
     'f-bardetail': 'NPR millions received per certificate.',
+    'cv-donut-detail': 'Click a slice to see its matters.',
   };
   function expandDetail(id, html) {
     const el = document.getElementById(id);
@@ -2793,19 +2794,32 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
         ${cvKpiCard('Potential Variations', k.pVariationsCount == null ? '–' : k.pVariationsCount, cvUsd(k.pVariationsValue), 'edit', '#7a6ad0')}
        </div>
        <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-         <div class="card"><h3>Value by Contractual Basis</h3><div id="cv-donut" class="chart" style="height:260px"></div></div>
+         <div class="card"><h3>Value by Contractual Basis <span class="muted" style="font-weight:600">· click a slice</span></h3><div id="cv-donut" class="chart" style="height:260px"></div>
+           <div id="cv-donut-detail" class="muted" style="text-align:center;margin-top:4px;font-size:11px">Click a slice to see its matters.</div></div>
          <div class="card"><h3>Probability vs Value Matrix</h3><div id="cv-scatter" class="chart" style="height:340px"></div>
            <div class="cv-scatter-leg"><span><i style="background:#2f6fd0"></i>Claim</span><span><i style="background:#e0a52e"></i>Variation</span></div></div>
        </div>
        <div class="card"><h3>Commercial Exposure by Matter <span class="muted" style="font-weight:600">· USD</span></h3><div id="cv-expo" class="chart" style="height:${Math.max(180, (cv.claims.length + cv.variations.length) * 26 + 40)}px"></div></div>`;
 
     const be = Object.entries(k.byBasisValue).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
-    makeChart('cv-donut').setOption({
+    const donut = makeChart('cv-donut');
+    donut.setOption({
       tooltip: { trigger: 'item', formatter: (p) => `${p.name}<br/><b>${cvUsd(p.value)}</b> (${p.percent}%)` },
       legend: { type: 'scroll', bottom: 0, textStyle: { fontSize: 10, color: COL.muted } },
       series: [{ type: 'pie', radius: ['46%', '70%'], center: ['50%', '44%'], label: { show: false },
         data: be.map(([n, v]) => ({ name: n, value: Math.round(v), itemStyle: { color: CV_BASISCOL[n] || '#8a8f98' } })) }],
     }, true);
+    // Click a basis slice -> break it open into the individual matters it holds.
+    donut.off('click');
+    donut.on('click', (p) => {
+      const items = [...cv.claims, ...cv.variations].filter((x) => x.basisCat === p.name && x.value != null).sort((a, b) => b.value - a.value);
+      const total = k.byBasisValue[p.name] || 0;
+      const rows = items.map((x) => `<tr><td>${cvItemLabel(x)}</td><td>${x.title}</td><td>${cvUsd(x.value)}</td>` +
+        `<td>${total ? Math.round((x.value / total) * 1000) / 10 : 0}%</td></tr>`).join('');
+      expandDetail('cv-donut-detail', `<div class="ipc-sub" style="text-align:left">${p.name} — <b>${cvUsd(total)}</b> · ${items.length} matter${items.length !== 1 ? 's' : ''}</div>` +
+        (items.length ? `<table class="tbl"><thead><tr><th>Ref</th><th>Matter</th><th>Value</th><th>Share</th></tr></thead><tbody>${rows}</tbody></table>`
+          : `<div class="muted" style="font-size:11px;margin-top:6px">No itemised matters for this basis.</div>`));
+    });
 
     // ---- Probability vs Value risk matrix: 4 quadrants + collision-free labels ----
     const pts = (k.scatter || []).map((s) => ({ v: s.value, p: s.prob, name: (s.kind === 'variation' ? 'VAR-' : 'SoC-') + s.ref, kind: s.kind }));
