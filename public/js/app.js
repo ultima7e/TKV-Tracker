@@ -447,8 +447,12 @@
     const t = (s || '').toLowerCase();
     if (/reject/.test(t)) return 'Rejected';
     if (/settl|complete|paid/.test(t)) return 'Settled';
+    if (/partial/.test(t)) return 'Partial';
+    if (/remain/.test(t)) return 'Remaining';
     return 'Under Review';
   }
+  // Badge colour per status: Settled green, Partial amber, Remaining/Rejected red.
+  const ipcStatusClass = (label) => (label === 'Settled' ? 'ok' : label === 'Rejected' || label === 'Remaining' ? 'bad' : 'warn');
 
   function renderIpc() {
     // Interim Payment Certificates only — the Advance Payment is a separate
@@ -471,7 +475,7 @@
     const nprM = (v) => (v ? (v / 1e6).toFixed(1) : '–');
     const ipcRow = (r) => {
       const lab = ipcStatusLabel(r.status);
-      const cls = lab === 'Settled' ? 'ok' : lab === 'Rejected' ? 'warn' : 'warn';
+      const cls = ipcStatusClass(lab);
       return `<tr class="${cls}">
         <td>${r.ipc}</td><td>${fmtDate(r.certifiedDate)}</td>
         <td>${usdM(r.netUSD)}</td><td>${nprM(r.netNPR)}</td>
@@ -837,7 +841,7 @@
       const i = barIpcs[p.dataIndex];
       if (!i) return;
       const lbl = ipcStatusLabel(i.status);
-      const badge = `<span class="badge ${lbl === 'Settled' ? 'ok' : lbl === 'Rejected' ? 'bad' : 'warn'}">${lbl}</span>`;
+      const badge = `<span class="badge ${ipcStatusClass(lbl)}">${lbl}</span>`;
       const head = `<div style="text-align:left"><b>${i.ipc}</b>`
         + (i.certifiedDate ? ` <span class="muted">· certified ${i.certifiedDate}</span>` : '') + ` ${badge}`
         + `<br/><span class="muted">Received</span> <b>NPR ${nprM(i.receivedNPR)} M</b>`
@@ -882,7 +886,7 @@
             <td>${x.amountNPR ? nprM(x.amountNPR) + ' M' : '–'}</td></tr>`).join('')}
         </tbody>
       </table>`;
-    const statusBadge = (s) => { const l = ipcStatusLabel(s); return `<span class="badge ${l === 'Settled' ? 'ok' : l === 'Rejected' ? 'bad' : 'warn'}">${l}</span>`; };
+    const statusBadge = (s) => { const l = ipcStatusLabel(s); return `<span class="badge ${ipcStatusClass(l)}">${l}</span>`; };
     // Full accounting breakdown (taxable → net) shown when "Details" is toggled.
     const fUSD = (v) => (v ? '$ ' + (+v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '–');
     const fNPR = (v) => (v ? (+v).toLocaleString('en-US', { maximumFractionDigits: 0 }) : '–');
