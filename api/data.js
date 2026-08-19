@@ -105,13 +105,15 @@ const FRESH_WINDOW_MS = 20000;
 // with the same name is skipped. Dropbox returns an ETag that changes on every
 // edit, so a conditional GET both detects changes and avoids re-downloading.
 const DROPBOX_SOURCES = [
+  // Milestone Payment Summary — the per-IPC sub-activity breakdown ('IPCs and
+  // Details' sheet) that powers each IPC's Details panel. Back on Dropbox after
+  // the Nutstore copy (Shared Folder/ProgressTracker/Milestone Payment Summary.xlsx)
+  // was deleted. It also has a 'Summary' sheet, so it MUST be listed BEFORE the EV
+  // workbook below — later Dropbox sources win, and EV must win the shared
+  // 'Summary' sheet (source of truth for the headline financials).
+  { name: 'Milestone Payment Summary.xlsx', url: 'https://www.dropbox.com/scl/fi/6vdehgln4vzy2yxak108s/Milestone-Payment-Summary.xlsx?rlkey=7oh560te8pwoop875ngwzjxhe&dl=1' },
   // Earned Value Calculation workbook — source of truth for the headline
   // financials (earned value, contract, received, financial-progress %).
-  // The Milestone Payment Summary (per-IPC sub-activity breakdown) now comes from
-  // Nutstore (Shared Folder/ProgressTracker/Milestone Payment Summary.xlsx) — the
-  // old Dropbox "conflicted copy" link was deleted and started returning HTML.
-  // Nutstore files load BEFORE Dropbox, so the EV workbook still wins the shared
-  // 'Summary' sheet name.
   { name: 'Earned Value Calculation_Tamakoshi-V.xlsx', url: 'https://www.dropbox.com/scl/fi/v4dij9hy9ki9qc6acxv9a/Earned-Value-Calculation_Tamakoshi-V.xlsx?rlkey=tshumcv26pkuc4ceh0r33wxfp&dl=1' },
 ];
 const dbxCache = new Map(); // url -> { etag, buffer }
