@@ -205,7 +205,7 @@ function explosivesFromBuffer(buffer) {
 function insuranceFromBuffer(buffer) {
   if (!buffer) return null;
   try {
-    const { matrices } = workbookSheets(buffer, ['Summary']);
+    const { matrices } = workbookSheets(buffer, ['Summary', '1.CAR Policy', '2. Professional Indemnity', '3. GPA', '4.P&E(CPM)', 'Guarantee Summary']);
     const i = parseInsurance(matrices);
     return i && !i.missing ? i : null;
   } catch (e) { return null; }
