@@ -1669,6 +1669,35 @@
         : d <= 90 ? { dcls: 'soon', badge: 'warn', lab: 'Due soon' }
           : { dcls: 'ok', badge: 'ok', lab: 'Valid' });
   const insN = (v) => (v ? Math.round(v).toLocaleString('en-US') : '–');
+  // Drill-down shown when a policy row is expanded — one of three shapes.
+  function insDetailHtml(p) {
+    const d = p.detail;
+    if (!d || !d.items || !d.items.length) return '<div class="muted" style="font-size:11px;padding:6px 2px">No further breakdown recorded for this policy.</div>';
+    if (d.type === 'installments') {
+      const cur = d.currency === 'USD' ? '$ ' : 'NPR ';
+      const rows = d.items.map((it) => `<tr><td style="text-align:left">${it.label}</td><td>${it.pct == null ? '–' : it.pct + '%'}</td><td>${cur}${insN(it.premium)}</td></tr>`).join('');
+      return `<div class="ins-dsub">Installment payment schedule${d.issueDate ? ' · issued ' + d.issueDate : ''}</div>
+        <table class="tbl ins-dtl"><thead><tr><th style="text-align:left">Installment</th><th>%</th><th>Premium (${d.currency || 'NPR'})</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
+    if (d.type === 'subpolicies') {
+      const badge = (st) => { const l = st || '–'; const cls = /active|valid/i.test(l) ? 'ok' : /expir/i.test(l) ? 'bad' : 'warn'; return `<span class="badge ${cls}">${l}</span>`; };
+      const groups = [], gm = {};
+      for (const it of d.items) { if (!gm[it.group]) { gm[it.group] = []; groups.push(it.group); } gm[it.group].push(it); }
+      let body = '';
+      for (const gn of groups) {
+        body += `<tr class="ins-grp"><td colspan="6" style="text-align:left">${gn}</td></tr>`;
+        for (const it of gm[gn]) body += `<tr><td style="text-align:left">${it.code || '–'}</td><td style="text-align:left" class="muted">${it.policyNo || '–'}</td><td>${insN(it.insuredNPR)}</td><td>${it.validFrom || '–'}</td><td>${it.validTill || '–'}</td><td>${badge(it.status)}</td></tr>`;
+      }
+      return `<div class="ins-dsub">Sub-policies (${d.items.length})</div>
+        <div class="ins-dscroll"><table class="tbl ins-dtl"><thead><tr><th style="text-align:left">Group / Code</th><th style="text-align:left">Policy No.</th><th>Insured (NPR)</th><th>Valid From</th><th>Valid Till</th><th>Status</th></tr></thead><tbody>${body}</tbody></table></div>`;
+    }
+    if (d.type === 'equipment') {
+      const rows = d.items.map((it) => `<tr><td style="text-align:left">${it.desc}</td><td style="text-align:left" class="muted">${it.model || '–'}</td><td>${it.qty || '–'}</td><td>${insN(it.insuredNPR)}</td><td>${it.validFrom || '–'}</td><td>${it.validTill || '–'}</td></tr>`).join('');
+      return `<div class="ins-dsub">Insured equipment (${d.items.length})</div>
+        <div class="ins-dscroll"><table class="tbl ins-dtl"><thead><tr><th style="text-align:left">Equipment</th><th style="text-align:left">Model / Spec.</th><th>Qty</th><th>Insured (NPR)</th><th>Valid From</th><th>Valid Till</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+    return '';
+  }
   function renderInsTable() {
     const host = document.getElementById('ins-table'); if (!host) return;
     const f = insState.filter, q = insState.search.toLowerCase();
@@ -1687,8 +1716,9 @@
     const rowHtml = (p) => {
       const s = insStatus(p.daysLeft);
       const dtxt = p.daysLeft == null ? '–' : (p.daysLeft < 0 ? Math.abs(p.daysLeft) + ' d ago' : p.daysLeft + ' d left');
-      return `<tr>
-        <td style="text-align:left">${p.sn ? `<span class="muted">${p.sn}</span> ` : ''}${p.desc}</td>
+      const hasD = p.detail && p.detail.items && p.detail.items.length;
+      return `<tr class="ins-row${hasD ? ' has-d' : ''}"${hasD ? ` data-ip="${p.idx}"` : ''}>
+        <td style="text-align:left">${hasD ? '<span class="ins-caret">▸</span> ' : ''}${p.sn ? `<span class="muted">${p.sn}</span> ` : ''}${p.desc}</td>
         <td style="text-align:left" class="muted">${p.policyNo || '–'}</td>
         <td>${p.validFrom || '–'}</td><td>${p.validTill || '–'}</td>
         <td><span class="ins-days ${s.dcls}">${dtxt}</span></td>
@@ -1705,7 +1735,10 @@
         const lab = cat || (parent && parent.desc) || g.items[0].desc;
         body += `<tr class="tbl-grp"><td colspan="7" style="text-align:left">${lab} <span style="opacity:.65;font-weight:600">(${g.items.length})</span></td></tr>`;
       }
-      for (const p of g.items) body += rowHtml(p);
+      for (const p of g.items) {
+        body += rowHtml(p);
+        if (p.detail && p.detail.items && p.detail.items.length) body += `<tr class="ins-drow" data-ipd="${p.idx}" hidden><td colspan="7">${insDetailHtml(p)}</td></tr>`;
+      }
     }
     host.innerHTML = `<div style="overflow-x:auto"><table class="tbl" style="min-width:840px"><thead><tr>
       <th style="text-align:left">Insurance / Description</th><th style="text-align:left">Policy No.</th><th>Valid From</th><th>Valid Till</th><th>Days to Expiry</th><th>Paid (NPR)</th><th>Status</th>
@@ -1729,6 +1762,14 @@
       insState.filter = b.dataset.ifilter; filt.querySelectorAll('.ins-fbtn').forEach((x) => x.classList.toggle('on', x === b)); renderInsTable(); });
     const search = document.getElementById('ins-search');
     if (search) search.addEventListener('input', () => { insState.search = search.value; renderInsTable(); });
+    // Expand/collapse a policy row to reveal its sub-policies / installments / equipment.
+    const tbl = document.getElementById('ins-table');
+    if (tbl) tbl.addEventListener('click', (e) => {
+      const row = e.target.closest('.ins-row.has-d'); if (!row || !tbl.contains(row)) return;
+      const idx = row.getAttribute('data-ip');
+      const drow = tbl.querySelector('.ins-drow[data-ipd="' + idx + '"]'); if (!drow) return;
+      const show = drow.hidden; drow.hidden = !show; row.classList.toggle('open', show);
+    });
   }
   function renderInsurance() {
     const tiles = document.getElementById('ins-tiles'); if (!tiles) return;

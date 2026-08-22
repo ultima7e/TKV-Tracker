@@ -224,6 +224,17 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .ins-fbtn.on{background:var(--navy);color:#fff;border-color:var(--navy)}
 .ins-days{font-weight:800;white-space:nowrap}
 .ins-days.exp{color:#b3261e} .ins-days.soon{color:#c77700} .ins-days.ok{color:#1c7a52}
+.ins-row.has-d{cursor:pointer}
+.ins-row.has-d:hover td{background:#f6f9fd}
+.ins-caret{display:inline-block;width:10px;color:var(--muted);font-size:10px;transition:transform .15s}
+.ins-row.open .ins-caret{transform:rotate(90deg)}
+.ins-row.open > td{background:#eef4fc}
+.ins-drow > td{background:#fbfdff;padding:10px 14px 14px}
+.ins-dsub{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:800;margin:2px 0 7px}
+.ins-dtl{font-size:11.5px}
+.ins-dtl th{background:#eef2f7;position:static}
+.ins-dtl tr.ins-grp td{background:#eaf1f9;color:var(--navy);font-weight:800}
+.ins-dscroll{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px}
 .ins-claim{border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:12px 15px;margin-bottom:10px;background:#fff}
 .ins-claim h4{font-size:13.5px;font-weight:800;color:var(--navy);margin-bottom:3px}
 .ins-claim .meta{font-size:11.5px;color:var(--muted)}
