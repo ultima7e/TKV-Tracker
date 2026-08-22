@@ -1288,10 +1288,10 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const d = p.detail;
     if (!d || !d.items || !d.items.length) return '<div class="muted" style="font-size:11px;padding:6px 2px">No further breakdown recorded for this policy.</div>';
     if (d.type === 'installments') {
-      const stBadge = (s) => s ? `<span class="badge ${/complet|paid|settl/i.test(s) ? 'ok' : 'warn'}">${s}</span>` : '–';
-      const rows = d.items.map((it) => `<tr><td style="text-align:left">${it.label}</td><td>${it.pct == null ? '–' : it.pct + '%'}</td><td>NPR ${insN(it.paidNPR)}</td><td>${it.exchangeRate ? it.exchangeRate.toFixed(2) : '–'}</td><td>${stBadge(it.status)}</td></tr>`).join('');
+      const cur = d.currency === 'USD' ? '$ ' : 'NPR ';
+      const rows = d.items.map((it) => `<tr><td style="text-align:left">${it.label}</td><td>${it.pct == null ? '–' : it.pct + '%'}</td><td>${cur}${insN(it.premium)}</td></tr>`).join('');
       return `<div class="ins-dsub">Installment payment schedule${d.issueDate ? ' · issued ' + d.issueDate : ''}</div>
-        <table class="tbl ins-dtl"><thead><tr><th style="text-align:left">Installment</th><th>%</th><th>Paid (NPR)</th><th>Exch. Rate</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+        <table class="tbl ins-dtl"><thead><tr><th style="text-align:left">Installment</th><th>%</th><th>Premium (${d.currency || 'NPR'})</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
     if (d.type === 'subpolicies') {
       const badge = (st) => { const l = st || '–'; const cls = /active|valid/i.test(l) ? 'ok' : /expir/i.test(l) ? 'bad' : 'warn'; return `<span class="badge ${cls}">${l}</span>`; };
