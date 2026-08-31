@@ -1033,6 +1033,21 @@
     } catch (err) { alert('Could not clear the baseline: ' + err.message); }
   }
 
+  // Wipe BOTH uploaded slots (baseline + progressed schedule) so the Schedule tab
+  // reverts to the default baseline XER in Nutstore — a clean slate to re-upload.
+  async function clearAllSchedule() {
+    if (!confirm('Clear ALL uploaded schedule files — both the fixed baseline AND the progressed schedule?\n\nThe Schedule tab reverts to the default baseline in Nutstore. This cannot be undone; you would re-upload to restore them.')) return;
+    const del = async (kind) => {
+      const r = await authFetch('/api/schedule?kind=' + kind, { method: 'DELETE' });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || ('HTTP ' + r.status));
+    };
+    try {
+      await del('progress');
+      await del('baseline');
+      await load();
+    } catch (err) { alert('Could not clear the schedule files: ' + err.message); }
+  }
+
   function renderSchedule() {
     const sch = data.schedule || {};
     const all = sch.activities || [];
@@ -1049,6 +1064,8 @@
       : '· no baseline set';
     const clr = document.getElementById('sch-clear-base');
     if (clr) clr.style.display = bl.set ? '' : 'none';
+    const clrAll = document.getElementById('sch-clear-all');
+    if (clrAll) clrAll.style.display = (bl.set || sch.progressUploaded) ? '' : 'none';
 
     const byTask = {};
     all.forEach((a) => { byTask[a.taskId] = a; });
@@ -2311,6 +2328,8 @@
   if (progInput) progInput.addEventListener('change', (e) => { const f = e.target.files[0]; if (f) handleXerUpload(f, 'progress'); e.target.value = ''; });
   const clearBaseBtn = document.getElementById('sch-clear-base');
   if (clearBaseBtn) clearBaseBtn.addEventListener('click', clearBaseline);
+  const clearAllBtn = document.getElementById('sch-clear-all');
+  if (clearAllBtn) clearAllBtn.addEventListener('click', clearAllSchedule);
 
   // ---------- boot: gate the whole app behind login ----------
   wireAuthUI();
