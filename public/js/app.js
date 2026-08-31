@@ -975,6 +975,10 @@
     const num = (v) => (v == null || v === '' ? 0 : parseFloat(v));
     const wbs = {};
     (tables.PROJWBS || []).forEach((w) => { wbs[w.wbs_id] = { name: w.wbs_name, parentId: w.parent_wbs_id, seq: parseInt(w.seq_num, 10) || 0 }; });
+    // Calendar hours/day, so total float converts to days the way P6 shows it
+    // (these schedules use 11h/day calendars, not the generic 8).
+    const cal = {};
+    (tables.CALENDAR || []).forEach((c) => { const h = num(c.day_hr_cnt); cal[c.clndr_id] = h > 0 ? h : 8; });
     const activities = (tables.TASK || []).map((r) => ({
       taskId: r.task_id, id: r.task_code, name: r.task_name, wbsId: r.wbs_id,
       status: ST[r.status_code] || r.status_code, pct: Math.round(num(r.phys_complete_pct)),
@@ -983,7 +987,7 @@
       finish: iso(r.act_end_date) || iso(r.early_end_date) || iso(r.target_end_date) || iso(r.reend_date),
       actualStart: iso(r.act_start_date), actualFinish: iso(r.act_end_date),
       baselineStart: iso(r.target_start_date), baselineFinish: iso(r.target_end_date),
-      totalFloatDays: Math.round((num(r.total_float_hr_cnt) / 8) * 10) / 10,
+      totalFloatDays: Math.round((num(r.total_float_hr_cnt) / (cal[r.clndr_id] || 8)) * 10) / 10,
       critical: num(r.total_float_hr_cnt) <= 0,
     }));
     const relationships = (tables.TASKPRED || []).map((r) => ({
@@ -1149,7 +1153,14 @@
     // Critical Path filters to critical-only; a near-critical threshold (days)
     // filters to near-critical-only; with both on, shows critical + near-critical.
     const filtering = () => critOnly || nearDays > 0;
-    const visActs = (id) => (actsByWbs[id] || []).filter((a) => !filtering() || (critOnly && a._crit) || (nearDays > 0 && a.nearCritical));
+    // Near-critical threshold matches P6: show every activity with total float ≤ N
+    // (the critical ones — float ≤ 0 — included, shown red; the extra 0<float≤N band
+    // shown amber). Critical Path alone = float ≤ 0 only.
+    const visActs = (id) => (actsByWbs[id] || []).filter((a) => {
+      if (!filtering()) return true;
+      if (nearDays > 0) return a._crit || a.nearCritical;
+      return a._crit;
+    });
     const subHas = (id) => visActs(id).length > 0 || (kids[id] || []).some(subHas);
 
     const buildRows = () => {
@@ -1182,7 +1193,7 @@
       rows = buildRows();
       const nAct = rows.reduce((n, r) => n + (r.kind === 'act' ? 1 : 0), 0);
       $('#sch-count').textContent = filtering()
-        ? nAct + (critOnly && nearDays > 0 ? ' critical + near-critical' : (critOnly ? ' critical' : ` near-critical (≤${nearDays}d float)`))
+        ? (nearDays > 0 ? `${nAct} · total float ≤ ${nearDays}d` : `${nAct} critical`)
         : acts.length;
       list.innerHTML = HEADER + rows.map((r, i) => {
         if (r.kind === 'wbs') {

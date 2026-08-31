@@ -677,7 +677,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
             <input id="sch-search" placeholder="Search Activity ID or name…">
             <button id="sch-rellines" class="sch-toggle">Show relationships</button>
             <button id="sch-critical" class="sch-toggle">Critical Path</button>
-            <span class="sch-toggle" style="cursor:default" title="Enter a number of days and press Enter to show ONLY near-critical activities (total float between 0 and this many days). Set 0 to clear. Combine with Critical Path to show critical + near-critical.">Near-critical ≤ <input id="sch-nearcrit" type="number" min="0" step="1" value="0" title="Type days, press Enter" style="width:42px;padding:1px 4px;margin:0 1px;border:1px solid #cdd6e2;border-radius:5px;font:inherit;font-size:12px"> d</span>
+            <span class="sch-toggle" style="cursor:default" title="Enter days and press Enter to show every activity with total float ≤ that many days (P6-style). Critical (float ≤ 0) shown red, the extra near-critical band amber. Set 0 to clear.">Near-critical ≤ <input id="sch-nearcrit" type="number" min="0" step="1" value="0" title="Type days, press Enter" style="width:42px;padding:1px 4px;margin:0 1px;border:1px solid #cdd6e2;border-radius:5px;font:inherit;font-size:12px"> d</span>
             <span id="sch-admin-tools" style="display:none">
               <label class="sch-toggle" style="cursor:pointer" title="Upload the FIXED baseline (re-upload to re-baseline after EoT)">⬆ Upload Baseline<input type="file" id="sch-upload-base" accept=".xer" style="display:none"></label>
               <label class="sch-toggle" style="cursor:pointer" title="Upload the latest monthly progressed XER">⬆ Upload Progress<input type="file" id="sch-upload-prog" accept=".xer" style="display:none"></label>
@@ -2172,6 +2172,10 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const num = (v) => (v == null || v === '' ? 0 : parseFloat(v));
     const wbs = {};
     (tables.PROJWBS || []).forEach((w) => { wbs[w.wbs_id] = { name: w.wbs_name, parentId: w.parent_wbs_id, seq: parseInt(w.seq_num, 10) || 0 }; });
+    // Calendar hours/day, so total float converts to days the way P6 shows it
+    // (these schedules use 11h/day calendars, not the generic 8).
+    const cal = {};
+    (tables.CALENDAR || []).forEach((c) => { const h = num(c.day_hr_cnt); cal[c.clndr_id] = h > 0 ? h : 8; });
     const activities = (tables.TASK || []).map((r) => ({
       taskId: r.task_id, id: r.task_code, name: r.task_name, wbsId: r.wbs_id,
       status: ST[r.status_code] || r.status_code, pct: Math.round(num(r.phys_complete_pct)),
@@ -2180,7 +2184,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       finish: iso(r.act_end_date) || iso(r.early_end_date) || iso(r.target_end_date) || iso(r.reend_date),
       actualStart: iso(r.act_start_date), actualFinish: iso(r.act_end_date),
       baselineStart: iso(r.target_start_date), baselineFinish: iso(r.target_end_date),
-      totalFloatDays: Math.round((num(r.total_float_hr_cnt) / 8) * 10) / 10,
+      totalFloatDays: Math.round((num(r.total_float_hr_cnt) / (cal[r.clndr_id] || 8)) * 10) / 10,
       critical: num(r.total_float_hr_cnt) <= 0,
     }));
     const relationships = (tables.TASKPRED || []).map((r) => ({
@@ -2346,7 +2350,14 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     // Critical Path filters to critical-only; a near-critical threshold (days)
     // filters to near-critical-only; with both on, shows critical + near-critical.
     const filtering = () => critOnly || nearDays > 0;
-    const visActs = (id) => (actsByWbs[id] || []).filter((a) => !filtering() || (critOnly && a._crit) || (nearDays > 0 && a.nearCritical));
+    // Near-critical threshold matches P6: show every activity with total float ≤ N
+    // (the critical ones — float ≤ 0 — included, shown red; the extra 0<float≤N band
+    // shown amber). Critical Path alone = float ≤ 0 only.
+    const visActs = (id) => (actsByWbs[id] || []).filter((a) => {
+      if (!filtering()) return true;
+      if (nearDays > 0) return a._crit || a.nearCritical;
+      return a._crit;
+    });
     const subHas = (id) => visActs(id).length > 0 || (kids[id] || []).some(subHas);
 
     const buildRows = () => {
@@ -2379,7 +2390,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       rows = buildRows();
       const nAct = rows.reduce((n, r) => n + (r.kind === 'act' ? 1 : 0), 0);
       $('#sch-count').textContent = filtering()
-        ? nAct + (critOnly && nearDays > 0 ? ' critical + near-critical' : (critOnly ? ' critical' : ` near-critical (≤${nearDays}d float)`))
+        ? (nearDays > 0 ? `${nAct} · total float ≤ ${nearDays}d` : `${nAct} critical`)
         : acts.length;
       list.innerHTML = HEADER + rows.map((r, i) => {
         if (r.kind === 'wbs') {
