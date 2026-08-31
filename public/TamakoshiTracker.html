@@ -2175,6 +2175,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       isMilestone: MILE.has(r.task_type),
       start: iso(r.act_start_date) || iso(r.early_start_date) || iso(r.target_start_date) || iso(r.restart_date),
       finish: iso(r.act_end_date) || iso(r.early_end_date) || iso(r.target_end_date) || iso(r.reend_date),
+      actualStart: iso(r.act_start_date), actualFinish: iso(r.act_end_date),
       baselineStart: iso(r.target_start_date), baselineFinish: iso(r.target_end_date),
       totalFloatDays: Math.round((num(r.total_float_hr_cnt) / 8) * 10) / 10,
       critical: num(r.total_float_hr_cnt) <= 0,
