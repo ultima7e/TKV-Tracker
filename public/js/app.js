@@ -1149,7 +1149,7 @@
     // Critical Path filters to critical-only; a near-critical threshold (days)
     // filters to near-critical-only; with both on, shows critical + near-critical.
     const filtering = () => critOnly || nearDays > 0;
-    const visActs = (id) => (actsByWbs[id] || []).filter((a) => !filtering() || (critOnly && a.critical) || (nearDays > 0 && a.nearCritical));
+    const visActs = (id) => (actsByWbs[id] || []).filter((a) => !filtering() || (critOnly && a._crit) || (nearDays > 0 && a.nearCritical));
     const subHas = (id) => visActs(id).length > 0 || (kids[id] || []).some(subHas);
 
     const buildRows = () => {
@@ -1170,9 +1170,15 @@
       '<span class="g-cbs">BL Start</span><span class="g-cbs">BL Finish</span><span class="g-cpc">%</span></div>';
 
     const paint = () => {
-      // Near-critical = not critical, but total float within the chosen threshold
-      // (0 < float ≤ nearDays). Recomputed each paint so the input updates live.
-      acts.forEach((a) => { a.nearCritical = !a.critical && nearDays > 0 && a.totalFloatDays != null && a.totalFloatDays > 0 && a.totalFloatDays <= nearDays; });
+      // Critical/near-critical apply to REMAINING work only (P6-style): a completed
+      // activity is done — it drops off the critical path and renders as normal.
+      // _crit = incomplete & float ≤ 0; near-critical = incomplete & 0 < float ≤ N.
+      acts.forEach((a) => {
+        const done = a.pct >= 100 || /complete/i.test(a.status || '');
+        a._done = done;
+        a._crit = !done && a.critical;
+        a.nearCritical = !done && !a.critical && nearDays > 0 && a.totalFloatDays != null && a.totalFloatDays > 0 && a.totalFloatDays <= nearDays;
+      });
       rows = buildRows();
       const nAct = rows.reduce((n, r) => n + (r.kind === 'act' ? 1 : 0), 0);
       $('#sch-count').textContent = filtering()
@@ -1202,13 +1208,13 @@
           ? `<div class="g-base" style="left:${xOf(schDay(a.baselineStart))}px;width:${Math.max(2, (schDay(a.baselineFinish) - schDay(a.baselineStart)) * pxd)}px;top:${top + 17}px" title="Baseline: ${schFmt(a.baselineStart)} → ${schFmt(a.baselineFinish)}"></div>` : '';
         if (!a.start || !a.finish) return base; // baseline-only row: baseline bar only, no current bar
         const x = xOf(schDay(a.start));
-        if (a.isMilestone) return `${base}<div class="g-ms ${a.critical ? 'crit' : (a.nearCritical ? 'near' : '')}" data-i="${i}" data-tid="${a.taskId}" style="left:${x - 5}px;top:${top + (ROW - 11) / 2}px"></div>`;
+        if (a.isMilestone) return `${base}<div class="g-ms ${a._crit ? 'crit' : (a.nearCritical ? 'near' : '')}" data-i="${i}" data-tid="${a.taskId}" style="left:${x - 5}px;top:${top + (ROW - 11) / 2}px"></div>`;
         const w = Math.max(3, (schDay(a.finish) - schDay(a.start)) * pxd);
         // Two-tone progress: solid "done" segment (left, = pct%) over a light
         // "remaining" track — clear even on the red critical bars.
-        const cls = a.critical ? 'crit' : (a.nearCritical ? 'near' : 'norm');
+        const cls = a._crit ? 'crit' : (a.nearCritical ? 'near' : 'norm');
         const fl = a.totalFloatDays != null ? ` · float ${a.totalFloatDays}d` : '';
-        const ttl = a.critical ? ' · critical' : (a.nearCritical ? ' · near-critical' : '');
+        const ttl = a._done ? ' · complete' : (a._crit ? ' · critical' : (a.nearCritical ? ' · near-critical' : ''));
         return `${base}<div class="g-bar ${cls}" data-i="${i}" data-tid="${a.taskId}" style="left:${x}px;width:${w}px;top:${top + (ROW - 11) / 2}px" title="${a.id} · ${a.name || ''} · ${a.pct}%${fl}${ttl}"><div class="g-done" style="width:${a.pct}%"></div></div>`;
       }).join('');
       const H = HEAD + rows.length * ROW;
