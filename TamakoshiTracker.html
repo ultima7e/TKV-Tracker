@@ -1286,7 +1286,22 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   // Drill-down shown when a policy row is expanded — one of three shapes.
   function insDetailHtml(p) {
     const d = p.detail;
-    if (!d || !d.items || !d.items.length) return '<div class="muted" style="font-size:11px;padding:6px 2px">No further breakdown recorded for this policy.</div>';
+    if (!d || (!(d.items && d.items.length) && !(d.groups && d.groups.length))) return '<div class="muted" style="font-size:11px;padding:6px 2px">No further breakdown recorded for this policy.</div>';
+    if (d.type === 'insuredItems') {
+      // Full insured-item register (e.g. CPM): each policy group, then every
+      // covered equipment / vehicle with its own insured amount and validity.
+      const badge = (st) => { const l = st || '–'; const cls = /active|valid/i.test(l) ? 'ok' : /expir/i.test(l) ? 'bad' : 'warn'; return `<span class="badge ${cls}">${l}</span>`; };
+      let body = '';
+      for (const grp of d.groups) {
+        const meta = [grp.policyNo, grp.items.length + ' item' + (grp.items.length === 1 ? '' : 's'),
+          grp.paymentNPR ? 'paid ' + insN(grp.paymentNPR) : null, grp.validTill ? 'till ' + grp.validTill : null].filter(Boolean).join(' · ');
+        body += `<tr class="ins-grp"><td colspan="5" style="text-align:left">${grp.name} <span class="muted" style="font-weight:500">· ${meta}</span> ${badge(grp.status)}</td></tr>`;
+        for (const it of grp.items) body += `<tr><td style="text-align:left">${it.desc}</td><td style="text-align:left" class="muted">${it.model || '–'}</td><td>${insN(it.insuredNPR)}</td><td>${it.validFrom || '–'}</td><td>${it.validTill || '–'}</td></tr>`;
+      }
+      const total = d.groups.reduce((n, g) => n + g.items.length, 0);
+      return `<div class="ins-dsub">Insured items (${total})</div>
+        <div class="ins-dscroll" style="max-height:360px;overflow:auto"><table class="tbl ins-dtl"><thead><tr><th style="text-align:left">Description</th><th style="text-align:left">Model / Spec.</th><th>Insured (NRs)</th><th>Valid From</th><th>Valid Till</th></tr></thead><tbody>${body}</tbody></table></div>`;
+    }
     if (d.type === 'installments') {
       // Payment schedule. CAR is billed in USD (premium) and paid in NPR at a
       // per-installment exchange rate; PI is NPR throughout.
@@ -1333,7 +1348,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const rowHtml = (p) => {
       const s = insStatus(p.daysLeft);
       const dtxt = p.daysLeft == null ? '–' : (p.daysLeft < 0 ? Math.abs(p.daysLeft) + ' d ago' : p.daysLeft + ' d left');
-      const hasD = p.detail && p.detail.items && p.detail.items.length;
+      const hasD = p.detail && ((p.detail.items && p.detail.items.length) || (p.detail.groups && p.detail.groups.length));
       return `<tr class="ins-row${hasD ? ' has-d' : ''}"${hasD ? ` data-ip="${p.idx}"` : ''}>
         <td style="text-align:left">${hasD ? '<span class="ins-caret">▸</span> ' : ''}${p.sn ? `<span class="muted">${p.sn}</span> ` : ''}${p.desc}</td>
         <td style="text-align:left" class="muted">${p.policyNo || '–'}</td>
@@ -1354,7 +1369,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       }
       for (const p of g.items) {
         body += rowHtml(p);
-        if (p.detail && p.detail.items && p.detail.items.length) body += `<tr class="ins-drow" data-ipd="${p.idx}" hidden><td colspan="7">${insDetailHtml(p)}</td></tr>`;
+        if (p.detail && ((p.detail.items && p.detail.items.length) || (p.detail.groups && p.detail.groups.length))) body += `<tr class="ins-drow" data-ipd="${p.idx}" hidden><td colspan="7">${insDetailHtml(p)}</td></tr>`;
       }
     }
     host.innerHTML = `<div style="overflow-x:auto"><table class="tbl" style="min-width:840px"><thead><tr>
