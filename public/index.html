@@ -179,7 +179,7 @@
             <input id="sch-search" placeholder="Search Activity ID or name…">
             <button id="sch-rellines" class="sch-toggle">Show relationships</button>
             <button id="sch-critical" class="sch-toggle">Critical Path</button>
-            <span class="sch-toggle" style="cursor:default" title="Enter days and press Enter to show every activity with total float ≤ that many days (P6-style). Critical (float ≤ 0) shown red, the extra near-critical band amber. Set 0 to clear.">Near-critical ≤ <input id="sch-nearcrit" type="number" min="0" step="1" value="0" title="Type days, press Enter" style="width:42px;padding:1px 4px;margin:0 1px;border:1px solid #cdd6e2;border-radius:5px;font:inherit;font-size:12px"> d</span>
+            <span class="sch-toggle" style="cursor:default" title="Critical (red) = P6 Longest Path (the driving chain to project finish). Enter days + Enter to also show near-critical activities — those off the longest path with total float ≤ that many days (amber). Set 0 to clear.">Near-critical ≤ <input id="sch-nearcrit" type="number" min="0" step="1" value="0" title="Type days, press Enter" style="width:42px;padding:1px 4px;margin:0 1px;border:1px solid #cdd6e2;border-radius:5px;font:inherit;font-size:12px"> d</span>
             <span id="sch-admin-tools" style="display:none">
               <label class="sch-toggle" style="cursor:pointer" title="Upload the FIXED baseline (re-upload to re-baseline after EoT)">⬆ Upload Baseline<input type="file" id="sch-upload-base" accept=".xer" style="display:none"></label>
               <label class="sch-toggle" style="cursor:pointer" title="Upload the latest monthly progressed XER">⬆ Upload Progress<input type="file" id="sch-upload-prog" accept=".xer" style="display:none"></label>

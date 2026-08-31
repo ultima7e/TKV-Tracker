@@ -979,6 +979,36 @@
     // (these schedules use 11h/day calendars, not the generic 8).
     const cal = {};
     (tables.CALENDAR || []).forEach((c) => { const h = num(c.day_hr_cnt); cal[c.clndr_id] = h > 0 ? h : 8; });
+    // Longest Path (P6 driving path) → critical; falls back to total float ≤ 0.
+    const lp = (() => {
+      const day = (s) => (s && /^\d{4}-\d{2}-\d{2}/.test(s) ? Math.floor(new Date(s.slice(0, 10) + 'T00:00:00Z').getTime() / 86400000) : null);
+      const A = {};
+      (tables.TASK || []).forEach((r) => {
+        const es = day(r.early_start_date) ?? day(r.act_start_date) ?? day(r.target_start_date) ?? day(r.restart_date);
+        const ef = day(r.early_end_date) ?? day(r.act_end_date) ?? day(r.target_end_date) ?? day(r.reend_date);
+        A[r.task_id] = { es, ef, clndr: r.clndr_id };
+      });
+      const preds = {};
+      (tables.TASKPRED || []).forEach((p) => {
+        const a = A[p.task_id]; const hpd = (a && cal[a.clndr]) || 8;
+        const lag = Math.round((parseFloat(p.lag_hr_cnt) || 0) / hpd);
+        (preds[p.task_id] = preds[p.task_id] || []).push({ pred: p.pred_task_id, type: p.pred_type, lag });
+      });
+      let projEF = -Infinity;
+      for (const id in A) if (A[id].ef != null && A[id].ef > projEF) projEF = A[id].ef;
+      const onLP = new Set();
+      if (projEF === -Infinity) return onLP;
+      const imp = (P, type, lag) => ((type === 'PR_SS' || type === 'PR_SF') ? (P.es != null ? P.es + lag : null) : (P.ef != null ? P.ef + lag : null));
+      const q = [];
+      for (const id in A) if (A[id].ef != null && A[id].ef >= projEF - 1) { onLP.add(id); q.push(id); }
+      while (q.length) {
+        const list = preds[q.pop()] || []; let mx = -Infinity;
+        for (const rel of list) { const P = A[rel.pred]; if (!P) continue; const v = imp(P, rel.type, rel.lag); if (v != null && v > mx) mx = v; }
+        if (mx === -Infinity) continue;
+        for (const rel of list) { const P = A[rel.pred]; if (!P) continue; const v = imp(P, rel.type, rel.lag); if (v != null && v >= mx - 2 && !onLP.has(rel.pred)) { onLP.add(rel.pred); q.push(rel.pred); } }
+      }
+      return onLP;
+    })();
     const activities = (tables.TASK || []).map((r) => ({
       taskId: r.task_id, id: r.task_code, name: r.task_name, wbsId: r.wbs_id,
       status: ST[r.status_code] || r.status_code, pct: Math.round(num(r.phys_complete_pct)),
@@ -988,7 +1018,7 @@
       actualStart: iso(r.act_start_date), actualFinish: iso(r.act_end_date),
       baselineStart: iso(r.target_start_date), baselineFinish: iso(r.target_end_date),
       totalFloatDays: Math.round((num(r.total_float_hr_cnt) / (cal[r.clndr_id] || 8)) * 10) / 10,
-      critical: num(r.total_float_hr_cnt) <= 0,
+      critical: lp.size ? lp.has(r.task_id) : (num(r.total_float_hr_cnt) <= 0),
     }));
     const relationships = (tables.TASKPRED || []).map((r) => ({
       taskId: r.task_id, predTaskId: r.pred_task_id, type: PR[r.pred_type] || r.pred_type,
@@ -1188,7 +1218,7 @@
         const done = a.pct >= 100 || /complete/i.test(a.status || '');
         a._done = done;
         a._crit = !done && a.critical;
-        a.nearCritical = !done && !a.critical && nearDays > 0 && a.totalFloatDays != null && a.totalFloatDays > 0 && a.totalFloatDays <= nearDays;
+        a.nearCritical = !done && !a.critical && nearDays > 0 && a.totalFloatDays != null && a.totalFloatDays <= nearDays;
       });
       rows = buildRows();
       const nAct = rows.reduce((n, r) => n + (r.kind === 'act' ? 1 : 0), 0);
