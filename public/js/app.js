@@ -1192,8 +1192,10 @@
       });
       rows = buildRows();
       const nAct = rows.reduce((n, r) => n + (r.kind === 'act' ? 1 : 0), 0);
+      const critN = acts.filter((a) => a._crit).length;
+      const nearN = acts.filter((a) => a.nearCritical).length;
       $('#sch-count').textContent = filtering()
-        ? (nearDays > 0 ? `${nAct} · total float ≤ ${nearDays}d` : `${nAct} critical`)
+        ? (nearDays > 0 ? `${critN} critical + ${nearN} near-critical (≤${nearDays}d float)` : `${critN} critical`)
         : acts.length;
       list.innerHTML = HEADER + rows.map((r, i) => {
         if (r.kind === 'wbs') {
