@@ -1682,11 +1682,21 @@
         <div class="ins-dscroll"><table class="tbl ins-dtl"><thead><tr><th style="text-align:left">Installment</th><th>%</th><th>Premium (${d.currency})</th><th>Paid (NPR)</th><th>Ex. Rate</th><th>Status</th></tr></thead><tbody>${body}</tbody></table></div>`;
     }
     if (d.type === 'subpolicies') {
-      // Renewals / sub-policies of one register entry: each with its own policy no,
-      // paid amount and validity. Newest coverage sits at the bottom (S.N. order).
+      // Sub-policies of one register entry, sub-grouped by insured group (for GPA:
+      // Employer & Engineer, Army, …) — each row with its own policy no, paid
+      // amount and validity. A row per insured group only shows a header when the
+      // policy actually spans more than one group.
       const badge = (st) => { const l = st || '–'; const cls = /active|valid/i.test(l) ? 'ok' : /expir/i.test(l) ? 'bad' : 'warn'; return `<span class="badge ${cls}">${l}</span>`; };
-      const body = d.items.map((it) => `<tr><td style="text-align:left">${it.code || '–'}</td><td style="text-align:left" class="muted">${it.policyNo || '–'}</td><td>${insN(it.paidNPR != null ? it.paidNPR : it.insuredNPR)}</td><td>${it.validFrom || '–'}</td><td>${it.validTill || '–'}</td><td>${badge(it.status)}</td></tr>`).join('');
-      return `<div class="ins-dsub">Renewals / sub-policies (${d.items.length})</div>
+      const order = [], gm = {};
+      for (const it of d.items) { const k = it.group || ''; if (!gm[k]) { gm[k] = []; order.push(k); } gm[k].push(it); }
+      const multi = order.length > 1;
+      const rowHtml = (it) => `<tr><td style="text-align:left">${it.code || '–'}</td><td style="text-align:left" class="muted">${it.policyNo || '–'}</td><td>${insN(it.paidNPR != null ? it.paidNPR : it.insuredNPR)}</td><td>${it.validFrom || '–'}</td><td>${it.validTill || '–'}</td><td>${badge(it.status)}</td></tr>`;
+      let body = '';
+      for (const k of order) {
+        if (multi && k) body += `<tr class="ins-grp"><td colspan="6" style="text-align:left">${k}</td></tr>`;
+        body += gm[k].map(rowHtml).join('');
+      }
+      return `<div class="ins-dsub">Sub-policies (${d.items.length})</div>
         <div class="ins-dscroll"><table class="tbl ins-dtl"><thead><tr><th style="text-align:left">S.N.</th><th style="text-align:left">Policy No.</th><th>Paid (NPR)</th><th>Valid From</th><th>Valid Till</th><th>Status</th></tr></thead><tbody>${body}</tbody></table></div>`;
     }
     return '';
