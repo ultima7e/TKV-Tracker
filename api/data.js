@@ -82,7 +82,7 @@ const CLAIMS_XLSX_PATH = "Shared Folder/Claims & Variation/Contractor's Claims/C
 // Explosive consumption workbook — its own Nutstore file, parsed in isolation.
 const EXPLOSIVES_XLSX_PATH = 'Shared Folder/Explosive Record/Daily Explosive Consumption.xlsx';
 // Insurance register — its own Nutstore file (only the 'Summary' sheet is read).
-const INSURANCE_XLSX_PATH = 'Insurance and Bank Gurantee/Insurance/insurance.xlsx';
+const INSURANCE_XLSX_PATH = 'Insurance and Bank Gurantee/Insurance/Insurance.xlsx';
 // Claims & Variations register — its own Nutstore workbook (Claim + Variation
 // sheets), parsed in isolation. Host the register file at this path.
 const CLAIMS_REGISTER_XLSX_PATH = 'Shared Folder/Claims & Variation/claim and variation (details for presentation)(1).xlsx';
@@ -205,7 +205,7 @@ function explosivesFromBuffer(buffer) {
 function insuranceFromBuffer(buffer) {
   if (!buffer) return null;
   try {
-    const { matrices } = workbookSheets(buffer, ['Summary', '1.CAR Policy', '2. Professional Indemnity', '3. GPA', '4.P&E(CPM)', 'Guarantee Summary']);
+    const { matrices } = workbookSheets(buffer, ['Summary']);
     const i = parseInsurance(matrices);
     return i && !i.missing ? i : null;
   } catch (e) { return null; }
