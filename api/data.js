@@ -356,7 +356,7 @@ async function buildPayload() {
     const buffers = [...nutBuffers, ...dbx.filter((d) => d.buffer).map((d) => d.buffer)];
     const payload = assemble(buffers, xerText, delayXerText, 'nutstore', claimsBuffer, explosivesBuffer, insuranceBuffer, fuelDbx && fuelDbx.buffer, claimsRegBuffer);
     payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
-    if (schedCleared) payload.schedule = { activities: [], relationships: [], wbs: {}, cleared: true };
+    if (schedCleared && !schedVer) payload.schedule = { activities: [], relationships: [], wbs: {}, cleared: true };
     if (schedVer) await applyScheduleOverride(payload);
     await applyBaselineOverlay(payload);
     payloadCache = { sig, payload, ts: Date.now() };
@@ -402,7 +402,7 @@ async function buildPayload() {
   const claimsRegBuffer = cvFile ? fs.readFileSync(path.join(dir, cvFile)) : null;
   const payload = assemble(buffers, readXer(baselineXf), readXer(delayXf), 'local-file', claimsBuffer, explosivesBuffer, insuranceBuffer, fuelDbx && fuelDbx.buffer, claimsRegBuffer);
   payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
-  if (schedCleared) payload.schedule = { activities: [], relationships: [], wbs: {}, cleared: true };
+  if (schedCleared && !schedVer) payload.schedule = { activities: [], relationships: [], wbs: {}, cleared: true };
   if (schedVer) await applyScheduleOverride(payload);
   await applyBaselineOverlay(payload);
   payloadCache = { sig, payload, ts: Date.now() };

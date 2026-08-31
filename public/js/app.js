@@ -1014,7 +1014,20 @@
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
         if (src) src.textContent = '· uploaded: ' + file.name + ' (saved)';
-        await load();                      // re-fetch so the baseline overlay applies
+        // Re-fetch so the baseline overlay applies. Vercel KV can briefly serve a
+        // stale (pre-upload) read right after the write, which would blank the
+        // schedule we just uploaded — so if a reload comes back empty, keep it on
+        // screen and retry until the store settles.
+        const renderable = (s) => !!(s && (s.activities || []).some((a) => (a.start && a.finish) || (a.baselineStart && a.baselineFinish)));
+        let tries = 0;
+        const settle = async () => {
+          await load();
+          if (renderable(data && data.schedule) || tries >= 4) return;
+          tries++;
+          if (kind === 'progress') { data.schedule = parsed; schedBuiltFor = null; renderSchedule(); }
+          setTimeout(settle, 1500);
+        };
+        await settle();
       } catch (err) {
         if (src) src.textContent = '· uploaded: ' + file.name + ' — NOT saved';
         alert('The schedule was not saved: ' + err.message);
