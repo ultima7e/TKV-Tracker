@@ -1207,8 +1207,9 @@
         // Two-tone progress: solid "done" segment (left, = pct%) over a light
         // "remaining" track — clear even on the red critical bars.
         const cls = a.critical ? 'crit' : (a.nearCritical ? 'near' : 'norm');
-        const ttl = a.critical ? ' · critical' : (a.nearCritical ? ` · near-critical (${a.totalFloatDays}d float)` : '');
-        return `${base}<div class="g-bar ${cls}" data-i="${i}" data-tid="${a.taskId}" style="left:${x}px;width:${w}px;top:${top + (ROW - 11) / 2}px" title="${a.id} · ${a.name || ''} · ${a.pct}%${ttl}"><div class="g-done" style="width:${a.pct}%"></div></div>`;
+        const fl = a.totalFloatDays != null ? ` · float ${a.totalFloatDays}d` : '';
+        const ttl = a.critical ? ' · critical' : (a.nearCritical ? ' · near-critical' : '');
+        return `${base}<div class="g-bar ${cls}" data-i="${i}" data-tid="${a.taskId}" style="left:${x}px;width:${w}px;top:${top + (ROW - 11) / 2}px" title="${a.id} · ${a.name || ''} · ${a.pct}%${fl}${ttl}"><div class="g-done" style="width:${a.pct}%"></div></div>`;
       }).join('');
       const H = HEAD + rows.length * ROW;
       const todayLine = (todayD >= minDay && todayD <= maxDay)
