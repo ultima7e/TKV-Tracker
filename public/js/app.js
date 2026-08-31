@@ -1016,14 +1016,20 @@
         if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
         if (src) src.textContent = '· uploaded: ' + file.name + ' (saved)';
         // Re-fetch so the baseline overlay applies. Vercel KV can briefly serve a
-        // stale (pre-upload) read right after the write, which would blank the
-        // schedule we just uploaded — so if a reload comes back empty, keep it on
-        // screen and retry until the store settles.
-        const renderable = (s) => !!(s && (s.activities || []).some((a) => (a.start && a.finish) || (a.baselineStart && a.baselineFinish)));
+        // stale (pre-upload) read right after the write; for a progress upload that
+        // stale read is the baseline-only view (all 0%, no actual dates), which
+        // still has bars — so we retry until the PROGRESS itself is applied, keeping
+        // the just-uploaded schedule on screen meanwhile.
+        const progressApplied = (s) => !!(s && !s.cleared && (s.activities || []).some((a) => a.start && a.finish));
+        const anyBar = (s) => !!(s && (s.activities || []).some((a) => (a.start && a.finish) || (a.baselineStart && a.baselineFinish)));
         let tries = 0;
         const settle = async () => {
           await load();
-          if (renderable(data && data.schedule) || tries >= 4) return;
+          const done = kind === 'progress' ? progressApplied(data && data.schedule) : anyBar(data && data.schedule);
+          if (done || tries >= 6) {
+            if (kind === 'progress' && !done) { data.schedule = parsed; schedBuiltFor = null; renderSchedule(); }
+            return;
+          }
           tries++;
           if (kind === 'progress') { data.schedule = parsed; schedBuiltFor = null; renderSchedule(); }
           setTimeout(settle, 1500);

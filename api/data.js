@@ -15,6 +15,9 @@ const { kvGet } = require('../lib/store');
 
 // If an admin uploaded a schedule (stored in KV), it permanently replaces the
 // Schedule tab's baseline. Only read the (larger) blob when rebuilding.
+// Serve the uploaded progressed schedule (tkv:schedule) as the working schedule.
+// Reads the slot directly and returns whether it applied one — the caller uses
+// that (not a possibly-stale version key) to decide the empty/cleared fallback.
 async function applyScheduleOverride(payload) {
   try {
     const raw = await kvGet('tkv:schedule');
@@ -22,10 +25,11 @@ async function applyScheduleOverride(payload) {
       const s = JSON.parse(raw);
       if (s && Array.isArray(s.activities) && s.activities.length) {
         payload.schedule = { activities: s.activities, relationships: s.relationships || [], wbs: s.wbs || {} };
+        return true;
       }
     }
   } catch (e) { /* keep the baseline on any store error */ }
-  return payload;
+  return false;
 }
 
 // Overlay the FIXED baseline (tkv:baseline) onto the working schedule: set each
@@ -356,8 +360,8 @@ async function buildPayload() {
     const buffers = [...nutBuffers, ...dbx.filter((d) => d.buffer).map((d) => d.buffer)];
     const payload = assemble(buffers, xerText, delayXerText, 'nutstore', claimsBuffer, explosivesBuffer, insuranceBuffer, fuelDbx && fuelDbx.buffer, claimsRegBuffer);
     payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
-    if (schedCleared && !schedVer) payload.schedule = { activities: [], relationships: [], wbs: {}, cleared: true };
-    if (schedVer) await applyScheduleOverride(payload);
+    const applied = await applyScheduleOverride(payload);
+    if (!applied && schedCleared) payload.schedule = { activities: [], relationships: [], wbs: {}, cleared: true };
     await applyBaselineOverlay(payload);
     payloadCache = { sig, payload, ts: Date.now() };
     return stamp(payload);
@@ -402,8 +406,8 @@ async function buildPayload() {
   const claimsRegBuffer = cvFile ? fs.readFileSync(path.join(dir, cvFile)) : null;
   const payload = assemble(buffers, readXer(baselineXf), readXer(delayXf), 'local-file', claimsBuffer, explosivesBuffer, insuranceBuffer, fuelDbx && fuelDbx.buffer, claimsRegBuffer);
   payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
-  if (schedCleared && !schedVer) payload.schedule = { activities: [], relationships: [], wbs: {}, cleared: true };
-  if (schedVer) await applyScheduleOverride(payload);
+  const applied = await applyScheduleOverride(payload);
+  if (!applied && schedCleared) payload.schedule = { activities: [], relationships: [], wbs: {}, cleared: true };
   await applyBaselineOverlay(payload);
   payloadCache = { sig, payload, ts: Date.now() };
   return stamp(payload);
