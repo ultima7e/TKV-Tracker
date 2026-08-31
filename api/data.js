@@ -21,7 +21,7 @@ async function applyScheduleOverride(payload) {
     if (raw) {
       const s = JSON.parse(raw);
       if (s && Array.isArray(s.activities) && s.activities.length) {
-        payload.schedule = { activities: s.activities, relationships: s.relationships || [], wbs: s.wbs || {}, progressUploaded: true };
+        payload.schedule = { activities: s.activities, relationships: s.relationships || [], wbs: s.wbs || {} };
       }
     }
   } catch (e) { /* keep the baseline on any store error */ }

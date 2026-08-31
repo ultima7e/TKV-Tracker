@@ -22,8 +22,10 @@ module.exports = async (req, res) => {
       if (!Array.isArray(s.activities) || !s.activities.length) {
         return res.status(400).json({ error: 'No activities in the uploaded schedule.' });
       }
-      await kvDel('tkv:schedule_cleared');   // any upload lifts the cleared-all state
       if (kind === 'baseline') {
+        // A baseline upload keeps the "cleared" (fresh) state: with no progress
+        // yet, /api/data renders the baseline itself. The cleared flag is only
+        // lifted by a progress upload below.
         const blob = JSON.stringify({
           activities: s.activities, wbs: s.wbs || {},
           name: typeof s.name === 'string' ? s.name : '', uploadedAt: Date.now(),
@@ -32,6 +34,8 @@ module.exports = async (req, res) => {
         await kvSet('tkv:baseline_ver', String(Date.now()));
         return res.status(200).json({ ok: true, kind, activities: s.activities.length });
       }
+      // Progress upload = the live working schedule, so it lifts the cleared state.
+      await kvDel('tkv:schedule_cleared');
       const blob = JSON.stringify({ activities: s.activities, relationships: s.relationships || [], wbs: s.wbs || {} });
       await kvSet('tkv:schedule', blob);
       await kvSet('tkv:schedule_ver', String(Date.now()));

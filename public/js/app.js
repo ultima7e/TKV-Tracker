@@ -1023,16 +1023,6 @@
     reader.readAsText(file);
   }
 
-  async function clearBaseline() {
-    if (!confirm('Remove the fixed baseline? Monthly progress uploads are not affected. You can upload a new baseline afterwards.')) return;
-    try {
-      const r = await authFetch('/api/schedule?kind=baseline', { method: 'DELETE' });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
-      await load();
-    } catch (err) { alert('Could not clear the baseline: ' + err.message); }
-  }
-
   // Wipe BOTH uploaded slots (baseline + progressed schedule) so the Schedule tab
   // reverts to the default baseline XER in Nutstore — a clean slate to re-upload.
   async function clearAllSchedule() {
@@ -1057,7 +1047,7 @@
       $('#sch-count').textContent = 0;
       const badge = document.getElementById('sch-baseline-badge');
       if (badge) badge.textContent = '· no schedule loaded';
-      ['sch-clear-base', 'sch-clear-all'].forEach((id) => { const b = document.getElementById(id); if (b) b.style.display = 'none'; });
+      const clrAllEmpty = document.getElementById('sch-clear-all'); if (clrAllEmpty) clrAllEmpty.style.display = 'none';
       const gl = document.getElementById('g-list');
       if (gl) gl.innerHTML = '<div class="muted" style="padding:24px 16px">No schedule loaded. Upload a baseline and a progressed XER file to begin.</div>';
       const gt = document.getElementById('g-time'); if (gt) gt.innerHTML = '';
@@ -1072,10 +1062,10 @@
     if (badge) badge.textContent = bl.set
       ? '· baseline set' + (bl.uploadedAt ? ' ' + new Date(bl.uploadedAt).toLocaleDateString() : '') + ' (' + bl.count + ' acts)'
       : '· no baseline set';
-    const clr = document.getElementById('sch-clear-base');
-    if (clr) clr.style.display = bl.set ? '' : 'none';
+    // "Clear all" is available whenever a schedule is on screen; the baseline is
+    // only ever removed by Clear all, so there is no separate "clear baseline".
     const clrAll = document.getElementById('sch-clear-all');
-    if (clrAll) clrAll.style.display = (bl.set || sch.progressUploaded) ? '' : 'none';
+    if (clrAll) clrAll.style.display = '';
 
     const byTask = {};
     all.forEach((a) => { byTask[a.taskId] = a; });
@@ -2336,8 +2326,6 @@
   if (baseInput) baseInput.addEventListener('change', (e) => { const f = e.target.files[0]; if (f) handleXerUpload(f, 'baseline'); e.target.value = ''; });
   const progInput = document.getElementById('sch-upload-prog');
   if (progInput) progInput.addEventListener('change', (e) => { const f = e.target.files[0]; if (f) handleXerUpload(f, 'progress'); e.target.value = ''; });
-  const clearBaseBtn = document.getElementById('sch-clear-base');
-  if (clearBaseBtn) clearBaseBtn.addEventListener('click', clearBaseline);
   const clearAllBtn = document.getElementById('sch-clear-all');
   if (clearAllBtn) clearAllBtn.addEventListener('click', clearAllSchedule);
 
