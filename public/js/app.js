@@ -1146,9 +1146,10 @@
     const collapsed = new Set();
     let rows = [], selTask = null, relOn = false, critOnly = false, nearDays = 0;
 
-    // Critical Path toggle filters the visible activities (and prunes empty WBS).
-    // When a near-critical threshold is set, the filter also keeps near-critical ones.
-    const visActs = (id) => (actsByWbs[id] || []).filter((a) => !critOnly || a.critical || a.nearCritical);
+    // Critical Path filters to critical-only; a near-critical threshold (days)
+    // filters to near-critical-only; with both on, shows critical + near-critical.
+    const filtering = () => critOnly || nearDays > 0;
+    const visActs = (id) => (actsByWbs[id] || []).filter((a) => !filtering() || (critOnly && a.critical) || (nearDays > 0 && a.nearCritical));
     const subHas = (id) => visActs(id).length > 0 || (kids[id] || []).some(subHas);
 
     const buildRows = () => {
@@ -1174,10 +1175,9 @@
       acts.forEach((a) => { a.nearCritical = !a.critical && nearDays > 0 && a.totalFloatDays != null && a.totalFloatDays > 0 && a.totalFloatDays <= nearDays; });
       rows = buildRows();
       const nAct = rows.reduce((n, r) => n + (r.kind === 'act' ? 1 : 0), 0);
-      const nearN = acts.filter((a) => a.nearCritical).length;
-      $('#sch-count').textContent = critOnly
-        ? nAct + (nearDays > 0 ? ' critical + near-critical' : ' critical')
-        : acts.length + (nearDays > 0 ? ` · ${nearN} near-critical` : '');
+      $('#sch-count').textContent = filtering()
+        ? nAct + (critOnly && nearDays > 0 ? ' critical + near-critical' : (critOnly ? ' critical' : ` near-critical (≤${nearDays}d float)`))
+        : acts.length;
       list.innerHTML = HEADER + rows.map((r, i) => {
         if (r.kind === 'wbs') {
           return `<div class="g-row g-wbs ${collapsed.has(r.id) ? 'collapsed' : ''}" data-i="${i}" data-wbs="${r.id}">
@@ -1349,12 +1349,18 @@
       if (selTask) select(selTask); // keep selection highlighted after re-paint
     };
     const nearInput = document.getElementById('sch-nearcrit');
-    if (nearInput) nearInput.oninput = (e) => {
-      nearDays = Math.max(0, parseFloat(e.target.value) || 0);
-      const leg = document.getElementById('leg-near'); if (leg) leg.style.display = nearDays > 0 ? '' : 'none';
-      paint();
-      if (selTask) select(selTask);
-    };
+    if (nearInput) {
+      // Apply on commit (Enter / leaving the field), not live per-keystroke:
+      // filters the Gantt to only near-critical activities.
+      const applyNear = (e) => {
+        nearDays = Math.max(0, parseFloat(e.target.value) || 0);
+        const leg = document.getElementById('leg-near'); if (leg) leg.style.display = nearDays > 0 ? '' : 'none';
+        paint();
+        if (selTask) select(selTask);
+      };
+      nearInput.onchange = applyNear;
+      nearInput.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); applyNear(e); nearInput.blur(); } };
+    }
     document.getElementById('sch-search').oninput = (e) => {
       const q = e.target.value.trim().toLowerCase();
       if (!q) return;
