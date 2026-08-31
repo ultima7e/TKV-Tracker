@@ -2216,14 +2216,10 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   // Wipe BOTH uploaded slots (baseline + progressed schedule) so the Schedule tab
   // reverts to the default baseline XER in Nutstore — a clean slate to re-upload.
   async function clearAllSchedule() {
-    if (!confirm('Clear ALL uploaded schedule files — both the fixed baseline AND the progressed schedule?\n\nThe Schedule tab reverts to the default baseline in Nutstore. This cannot be undone; you would re-upload to restore them.')) return;
-    const del = async (kind) => {
-      const r = await authFetch('/api/schedule?kind=' + kind, { method: 'DELETE' });
-      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || ('HTTP ' + r.status));
-    };
+    if (!confirm('Clear ALL uploaded schedule files — both the fixed baseline AND the progressed schedule?\n\nThe Schedule tab will be empty until you upload fresh files. This cannot be undone.')) return;
     try {
-      await del('progress');
-      await del('baseline');
+      const r = await authFetch('/api/schedule?kind=all', { method: 'DELETE' });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || ('HTTP ' + r.status));
       await load();
     } catch (err) { alert('Could not clear the schedule files: ' + err.message); }
   }
@@ -2234,7 +2230,21 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const wbs = sch.wbs || {};
     const hasBar = (a) => (a.start && a.finish) || (a.baselineStart && a.baselineFinish);
     const acts = all.filter(hasBar);
-    if (!acts.length || schedBuiltFor === data) return;
+    // Empty schedule (e.g. after "Clear all") — blank the Gantt and prompt to
+    // upload, instead of leaving the previous render on screen.
+    if (!acts.length) {
+      schedBuiltFor = data;
+      $('#sch-count').textContent = 0;
+      const badge = document.getElementById('sch-baseline-badge');
+      if (badge) badge.textContent = '· no schedule loaded';
+      ['sch-clear-base', 'sch-clear-all'].forEach((id) => { const b = document.getElementById(id); if (b) b.style.display = 'none'; });
+      const gl = document.getElementById('g-list');
+      if (gl) gl.innerHTML = '<div class="muted" style="padding:24px 16px">No schedule loaded. Upload a baseline and a progressed XER file to begin.</div>';
+      const gt = document.getElementById('g-time'); if (gt) gt.innerHTML = '';
+      const gr = document.getElementById('g-rellines'); if (gr) gr.innerHTML = '';
+      return;
+    }
+    if (schedBuiltFor === data) return;
     schedBuiltFor = data;
     $('#sch-count').textContent = acts.length;
     const bl = (data.schedule && data.schedule.baseline) || { set: false };

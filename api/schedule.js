@@ -22,6 +22,7 @@ module.exports = async (req, res) => {
       if (!Array.isArray(s.activities) || !s.activities.length) {
         return res.status(400).json({ error: 'No activities in the uploaded schedule.' });
       }
+      await kvDel('tkv:schedule_cleared');   // any upload lifts the cleared-all state
       if (kind === 'baseline') {
         const blob = JSON.stringify({
           activities: s.activities, wbs: s.wbs || {},
@@ -38,7 +39,16 @@ module.exports = async (req, res) => {
     }
 
     if (req.method === 'DELETE') {
-      const kind = (req.query && req.query.kind) === 'baseline' ? 'baseline' : 'progress';
+      const qk = req.query && req.query.kind;
+      const kind = qk === 'baseline' ? 'baseline' : qk === 'all' ? 'all' : 'progress';
+      if (kind === 'all') {
+        // Wipe both uploaded slots AND flag the schedule cleared, so /api/data stops
+        // falling back to the default Nutstore baseline until the next upload.
+        await kvDel('tkv:schedule'); await kvDel('tkv:schedule_ver');
+        await kvDel('tkv:baseline'); await kvDel('tkv:baseline_ver');
+        await kvSet('tkv:schedule_cleared', String(Date.now()));
+        return res.status(200).json({ ok: true, cleared: 'all' });
+      }
       if (kind === 'baseline') {
         await kvDel('tkv:baseline');
         await kvDel('tkv:baseline_ver');

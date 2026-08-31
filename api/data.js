@@ -299,7 +299,7 @@ async function buildPayload() {
 
     // Nutstore folder PROPFIND + both XER PROPFINDs + claims PROPFIND + Dropbox
     // fetches + the small schedule-override version marker, all parallel.
-    const [listing, xerInfo, delayXerInfo, claimsInfo, explInfo, insInfo, dbx, schedVer, baseVer, fuelDbx, cvInfo] = await Promise.all([
+    const [listing, xerInfo, delayXerInfo, claimsInfo, explInfo, insInfo, dbx, schedVer, baseVer, fuelDbx, cvInfo, schedCleared] = await Promise.all([
       propfind(DAV_BASE + encPath(dir) + '/', headers, 1),
       propfind(DAV_BASE + encPath(xerPath), headers, 0),
       propfind(DAV_BASE + encPath(delayXerPath), headers, 0),
@@ -311,6 +311,7 @@ async function buildPayload() {
       kvGet('tkv:baseline_ver').catch(() => null),
       dbxFetch(FUEL_DBX_URL).catch(() => null),
       propfind(DAV_BASE + encPath(CLAIMS_REGISTER_XLSX_PATH), headers, 0).catch(() => []),
+      kvGet('tkv:schedule_cleared').catch(() => null),
     ]);
     const claimsMtime = (claimsInfo[0] && claimsInfo[0].mtime) || '';
     const explMtime = (explInfo[0] && explInfo[0].mtime) || '';
@@ -333,6 +334,7 @@ async function buildPayload() {
       ins: INSURANCE_XLSX_PATH + '|' + insMtime,
       sched: schedVer || '',
       base: baseVer || '',
+      cleared: schedCleared || '',
       dbx: dbx.map((d) => d.name + '|' + d.etag),
       fuel: fuelDbx ? fuelDbx.etag : '',
       cvreg: CLAIMS_REGISTER_XLSX_PATH + '|' + cvMtime,
@@ -354,6 +356,7 @@ async function buildPayload() {
     const buffers = [...nutBuffers, ...dbx.filter((d) => d.buffer).map((d) => d.buffer)];
     const payload = assemble(buffers, xerText, delayXerText, 'nutstore', claimsBuffer, explosivesBuffer, insuranceBuffer, fuelDbx && fuelDbx.buffer, claimsRegBuffer);
     payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
+    if (schedCleared) payload.schedule = { activities: [], relationships: [], wbs: {}, cleared: true };
     if (schedVer) await applyScheduleOverride(payload);
     await applyBaselineOverlay(payload);
     payloadCache = { sig, payload, ts: Date.now() };
@@ -367,10 +370,12 @@ async function buildPayload() {
   const fuelDbx = await dbxFetch(FUEL_DBX_URL).catch(() => null);
   const schedVer = await kvGet('tkv:schedule_ver').catch(() => null);
   const baseVer = await kvGet('tkv:baseline_ver').catch(() => null);
+  const schedCleared = await kvGet('tkv:schedule_cleared').catch(() => null);
   const sig = JSON.stringify({
     local: files.map((f) => f + '|' + fs.statSync(path.join(dir, f)).mtimeMs),
     sched: schedVer || '',
     base: baseVer || '',
+    cleared: schedCleared || '',
     dbx: dbx.map((d) => d.name + '|' + d.etag),
     fuel: fuelDbx ? fuelDbx.etag : '',
   });
@@ -397,6 +402,7 @@ async function buildPayload() {
   const claimsRegBuffer = cvFile ? fs.readFileSync(path.join(dir, cvFile)) : null;
   const payload = assemble(buffers, readXer(baselineXf), readXer(delayXf), 'local-file', claimsBuffer, explosivesBuffer, insuranceBuffer, fuelDbx && fuelDbx.buffer, claimsRegBuffer);
   payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
+  if (schedCleared) payload.schedule = { activities: [], relationships: [], wbs: {}, cleared: true };
   if (schedVer) await applyScheduleOverride(payload);
   await applyBaselineOverlay(payload);
   payloadCache = { sig, payload, ts: Date.now() };
