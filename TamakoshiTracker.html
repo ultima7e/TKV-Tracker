@@ -339,11 +339,12 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .g-bar{position:absolute;height:11px;border-radius:2px;cursor:pointer;overflow:hidden}
 .g-bar.norm{background:#cfe0f7} .g-bar.norm .g-done{background:#2f7de1}
 .g-bar.crit{background:#f7c6c1} .g-bar.crit .g-done{background:#e5554e}
+.g-bar.near{background:#ffe2b0} .g-bar.near .g-done{background:#f2a02a}
 .g-done{position:absolute;left:0;top:0;height:100%;border-radius:2px}
 .g-base{position:absolute;height:4px;background:#aab6c8;border-radius:1px}
 .g-bar.hl{outline:2px solid var(--amber);outline-offset:1px;z-index:5}
 .g-ms{position:absolute;width:11px;height:11px;background:#2c3e50;transform:rotate(45deg);cursor:pointer}
-.g-ms.crit{background:#e5554e} .g-ms.hl{outline:2px solid var(--amber);outline-offset:1px}
+.g-ms.crit{background:#e5554e} .g-ms.near{background:#f2a02a} .g-ms.hl{outline:2px solid var(--amber);outline-offset:1px}
 .g-today{position:absolute;width:0;border-left:2px dashed #ef6c57;z-index:2}
 .g-rellines{position:absolute;top:0;left:0;pointer-events:none;z-index:4;overflow:visible}
 .g-rellines path{stroke:#b3c1d4;stroke-width:.8;fill:none}
@@ -676,6 +677,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
             <input id="sch-search" placeholder="Search Activity ID or name…">
             <button id="sch-rellines" class="sch-toggle">Show relationships</button>
             <button id="sch-critical" class="sch-toggle">Critical Path</button>
+            <span class="sch-toggle" style="cursor:default" title="Highlight activities whose total float is within this many days of the critical path (0 = off). Turn on Critical Path to filter to critical + near-critical.">Near-critical ≤ <input id="sch-nearcrit" type="number" min="0" step="1" value="0" style="width:42px;padding:1px 4px;margin:0 1px;border:1px solid #cdd6e2;border-radius:5px;font:inherit;font-size:12px"> d</span>
             <span id="sch-admin-tools" style="display:none">
               <label class="sch-toggle" style="cursor:pointer" title="Upload the FIXED baseline (re-upload to re-baseline after EoT)">⬆ Upload Baseline<input type="file" id="sch-upload-base" accept=".xer" style="display:none"></label>
               <label class="sch-toggle" style="cursor:pointer" title="Upload the latest monthly progressed XER">⬆ Upload Progress<input type="file" id="sch-upload-prog" accept=".xer" style="display:none"></label>
@@ -684,6 +686,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
             </span>
             <span class="leg"><i style="background:#cfe0f7"></i><i style="background:#2f7de1;margin-left:-3px"></i>Normal (done/left)</span>
             <span class="leg"><i style="background:#f7c6c1"></i><i style="background:#e5554e;margin-left:-3px"></i>Critical (done/left)</span>
+            <span class="leg" id="leg-near" style="display:none"><i style="background:#ffe2b0"></i><i style="background:#f2a02a;margin-left:-3px"></i>Near-critical (done/left)</span>
             <span class="leg"><i style="width:14px;height:4px;background:#aab6c8"></i>Baseline</span>
             <span class="leg"><i style="width:9px;height:9px;background:#2c3e50;transform:rotate(45deg);border-radius:1px"></i>Milestone</span>
           </div>
@@ -2338,10 +2341,11 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const list = document.getElementById('g-list');
     const time = document.getElementById('g-time');
     const collapsed = new Set();
-    let rows = [], selTask = null, relOn = false, critOnly = false;
+    let rows = [], selTask = null, relOn = false, critOnly = false, nearDays = 0;
 
     // Critical Path toggle filters the visible activities (and prunes empty WBS).
-    const visActs = (id) => (actsByWbs[id] || []).filter((a) => !critOnly || a.critical);
+    // When a near-critical threshold is set, the filter also keeps near-critical ones.
+    const visActs = (id) => (actsByWbs[id] || []).filter((a) => !critOnly || a.critical || a.nearCritical);
     const subHas = (id) => visActs(id).length > 0 || (kids[id] || []).some(subHas);
 
     const buildRows = () => {
@@ -2362,9 +2366,15 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       '<span class="g-cbs">BL Start</span><span class="g-cbs">BL Finish</span><span class="g-cpc">%</span></div>';
 
     const paint = () => {
+      // Near-critical = not critical, but total float within the chosen threshold
+      // (0 < float ≤ nearDays). Recomputed each paint so the input updates live.
+      acts.forEach((a) => { a.nearCritical = !a.critical && nearDays > 0 && a.totalFloatDays != null && a.totalFloatDays > 0 && a.totalFloatDays <= nearDays; });
       rows = buildRows();
       const nAct = rows.reduce((n, r) => n + (r.kind === 'act' ? 1 : 0), 0);
-      $('#sch-count').textContent = critOnly ? nAct + ' critical' : acts.length;
+      const nearN = acts.filter((a) => a.nearCritical).length;
+      $('#sch-count').textContent = critOnly
+        ? nAct + (nearDays > 0 ? ' critical + near-critical' : ' critical')
+        : acts.length + (nearDays > 0 ? ` · ${nearN} near-critical` : '');
       list.innerHTML = HEADER + rows.map((r, i) => {
         if (r.kind === 'wbs') {
           return `<div class="g-row g-wbs ${collapsed.has(r.id) ? 'collapsed' : ''}" data-i="${i}" data-wbs="${r.id}">
@@ -2389,11 +2399,13 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
           ? `<div class="g-base" style="left:${xOf(schDay(a.baselineStart))}px;width:${Math.max(2, (schDay(a.baselineFinish) - schDay(a.baselineStart)) * pxd)}px;top:${top + 17}px" title="Baseline: ${schFmt(a.baselineStart)} → ${schFmt(a.baselineFinish)}"></div>` : '';
         if (!a.start || !a.finish) return base; // baseline-only row: baseline bar only, no current bar
         const x = xOf(schDay(a.start));
-        if (a.isMilestone) return `${base}<div class="g-ms ${a.critical ? 'crit' : ''}" data-i="${i}" data-tid="${a.taskId}" style="left:${x - 5}px;top:${top + (ROW - 11) / 2}px"></div>`;
+        if (a.isMilestone) return `${base}<div class="g-ms ${a.critical ? 'crit' : (a.nearCritical ? 'near' : '')}" data-i="${i}" data-tid="${a.taskId}" style="left:${x - 5}px;top:${top + (ROW - 11) / 2}px"></div>`;
         const w = Math.max(3, (schDay(a.finish) - schDay(a.start)) * pxd);
         // Two-tone progress: solid "done" segment (left, = pct%) over a light
         // "remaining" track — clear even on the red critical bars.
-        return `${base}<div class="g-bar ${a.critical ? 'crit' : 'norm'}" data-i="${i}" data-tid="${a.taskId}" style="left:${x}px;width:${w}px;top:${top + (ROW - 11) / 2}px" title="${a.id} · ${a.name || ''} · ${a.pct}%"><div class="g-done" style="width:${a.pct}%"></div></div>`;
+        const cls = a.critical ? 'crit' : (a.nearCritical ? 'near' : 'norm');
+        const ttl = a.critical ? ' · critical' : (a.nearCritical ? ` · near-critical (${a.totalFloatDays}d float)` : '');
+        return `${base}<div class="g-bar ${cls}" data-i="${i}" data-tid="${a.taskId}" style="left:${x}px;width:${w}px;top:${top + (ROW - 11) / 2}px" title="${a.id} · ${a.name || ''} · ${a.pct}%${ttl}"><div class="g-done" style="width:${a.pct}%"></div></div>`;
       }).join('');
       const H = HEAD + rows.length * ROW;
       const todayLine = (todayD >= minDay && todayD <= maxDay)
@@ -2528,6 +2540,13 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       critOnly = !critOnly; e.currentTarget.classList.toggle('on', critOnly);
       paint();
       if (selTask) select(selTask); // keep selection highlighted after re-paint
+    };
+    const nearInput = document.getElementById('sch-nearcrit');
+    if (nearInput) nearInput.oninput = (e) => {
+      nearDays = Math.max(0, parseFloat(e.target.value) || 0);
+      const leg = document.getElementById('leg-near'); if (leg) leg.style.display = nearDays > 0 ? '' : 'none';
+      paint();
+      if (selTask) select(selTask);
     };
     document.getElementById('sch-search').oninput = (e) => {
       const q = e.target.value.trim().toLowerCase();

@@ -179,6 +179,7 @@
             <input id="sch-search" placeholder="Search Activity ID or name…">
             <button id="sch-rellines" class="sch-toggle">Show relationships</button>
             <button id="sch-critical" class="sch-toggle">Critical Path</button>
+            <span class="sch-toggle" style="cursor:default" title="Highlight activities whose total float is within this many days of the critical path (0 = off). Turn on Critical Path to filter to critical + near-critical.">Near-critical ≤ <input id="sch-nearcrit" type="number" min="0" step="1" value="0" style="width:42px;padding:1px 4px;margin:0 1px;border:1px solid #cdd6e2;border-radius:5px;font:inherit;font-size:12px"> d</span>
             <span id="sch-admin-tools" style="display:none">
               <label class="sch-toggle" style="cursor:pointer" title="Upload the FIXED baseline (re-upload to re-baseline after EoT)">⬆ Upload Baseline<input type="file" id="sch-upload-base" accept=".xer" style="display:none"></label>
               <label class="sch-toggle" style="cursor:pointer" title="Upload the latest monthly progressed XER">⬆ Upload Progress<input type="file" id="sch-upload-prog" accept=".xer" style="display:none"></label>
@@ -187,6 +188,7 @@
             </span>
             <span class="leg"><i style="background:#cfe0f7"></i><i style="background:#2f7de1;margin-left:-3px"></i>Normal (done/left)</span>
             <span class="leg"><i style="background:#f7c6c1"></i><i style="background:#e5554e;margin-left:-3px"></i>Critical (done/left)</span>
+            <span class="leg" id="leg-near" style="display:none"><i style="background:#ffe2b0"></i><i style="background:#f2a02a;margin-left:-3px"></i>Near-critical (done/left)</span>
             <span class="leg"><i style="width:14px;height:4px;background:#aab6c8"></i>Baseline</span>
             <span class="leg"><i style="width:9px;height:9px;background:#2c3e50;transform:rotate(45deg);border-radius:1px"></i>Milestone</span>
           </div>

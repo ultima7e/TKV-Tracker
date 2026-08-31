@@ -379,11 +379,12 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .g-bar{position:absolute;height:11px;border-radius:2px;cursor:pointer;overflow:hidden}
 .g-bar.norm{background:#cfe0f7} .g-bar.norm .g-done{background:#2f7de1}
 .g-bar.crit{background:#f7c6c1} .g-bar.crit .g-done{background:#e5554e}
+.g-bar.near{background:#ffe2b0} .g-bar.near .g-done{background:#f2a02a}
 .g-done{position:absolute;left:0;top:0;height:100%;border-radius:2px}
 .g-base{position:absolute;height:4px;background:#aab6c8;border-radius:1px}
 .g-bar.hl{outline:2px solid var(--amber);outline-offset:1px;z-index:5}
 .g-ms{position:absolute;width:11px;height:11px;background:#2c3e50;transform:rotate(45deg);cursor:pointer}
-.g-ms.crit{background:#e5554e} .g-ms.hl{outline:2px solid var(--amber);outline-offset:1px}
+.g-ms.crit{background:#e5554e} .g-ms.near{background:#f2a02a} .g-ms.hl{outline:2px solid var(--amber);outline-offset:1px}
 .g-today{position:absolute;width:0;border-left:2px dashed #ef6c57;z-index:2}
 .g-rellines{position:absolute;top:0;left:0;pointer-events:none;z-index:4;overflow:visible}
 .g-rellines path{stroke:#b3c1d4;stroke-width:.8;fill:none}

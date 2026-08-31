@@ -1144,10 +1144,11 @@
     const list = document.getElementById('g-list');
     const time = document.getElementById('g-time');
     const collapsed = new Set();
-    let rows = [], selTask = null, relOn = false, critOnly = false;
+    let rows = [], selTask = null, relOn = false, critOnly = false, nearDays = 0;
 
     // Critical Path toggle filters the visible activities (and prunes empty WBS).
-    const visActs = (id) => (actsByWbs[id] || []).filter((a) => !critOnly || a.critical);
+    // When a near-critical threshold is set, the filter also keeps near-critical ones.
+    const visActs = (id) => (actsByWbs[id] || []).filter((a) => !critOnly || a.critical || a.nearCritical);
     const subHas = (id) => visActs(id).length > 0 || (kids[id] || []).some(subHas);
 
     const buildRows = () => {
@@ -1168,9 +1169,15 @@
       '<span class="g-cbs">BL Start</span><span class="g-cbs">BL Finish</span><span class="g-cpc">%</span></div>';
 
     const paint = () => {
+      // Near-critical = not critical, but total float within the chosen threshold
+      // (0 < float ≤ nearDays). Recomputed each paint so the input updates live.
+      acts.forEach((a) => { a.nearCritical = !a.critical && nearDays > 0 && a.totalFloatDays != null && a.totalFloatDays > 0 && a.totalFloatDays <= nearDays; });
       rows = buildRows();
       const nAct = rows.reduce((n, r) => n + (r.kind === 'act' ? 1 : 0), 0);
-      $('#sch-count').textContent = critOnly ? nAct + ' critical' : acts.length;
+      const nearN = acts.filter((a) => a.nearCritical).length;
+      $('#sch-count').textContent = critOnly
+        ? nAct + (nearDays > 0 ? ' critical + near-critical' : ' critical')
+        : acts.length + (nearDays > 0 ? ` · ${nearN} near-critical` : '');
       list.innerHTML = HEADER + rows.map((r, i) => {
         if (r.kind === 'wbs') {
           return `<div class="g-row g-wbs ${collapsed.has(r.id) ? 'collapsed' : ''}" data-i="${i}" data-wbs="${r.id}">
@@ -1195,11 +1202,13 @@
           ? `<div class="g-base" style="left:${xOf(schDay(a.baselineStart))}px;width:${Math.max(2, (schDay(a.baselineFinish) - schDay(a.baselineStart)) * pxd)}px;top:${top + 17}px" title="Baseline: ${schFmt(a.baselineStart)} → ${schFmt(a.baselineFinish)}"></div>` : '';
         if (!a.start || !a.finish) return base; // baseline-only row: baseline bar only, no current bar
         const x = xOf(schDay(a.start));
-        if (a.isMilestone) return `${base}<div class="g-ms ${a.critical ? 'crit' : ''}" data-i="${i}" data-tid="${a.taskId}" style="left:${x - 5}px;top:${top + (ROW - 11) / 2}px"></div>`;
+        if (a.isMilestone) return `${base}<div class="g-ms ${a.critical ? 'crit' : (a.nearCritical ? 'near' : '')}" data-i="${i}" data-tid="${a.taskId}" style="left:${x - 5}px;top:${top + (ROW - 11) / 2}px"></div>`;
         const w = Math.max(3, (schDay(a.finish) - schDay(a.start)) * pxd);
         // Two-tone progress: solid "done" segment (left, = pct%) over a light
         // "remaining" track — clear even on the red critical bars.
-        return `${base}<div class="g-bar ${a.critical ? 'crit' : 'norm'}" data-i="${i}" data-tid="${a.taskId}" style="left:${x}px;width:${w}px;top:${top + (ROW - 11) / 2}px" title="${a.id} · ${a.name || ''} · ${a.pct}%"><div class="g-done" style="width:${a.pct}%"></div></div>`;
+        const cls = a.critical ? 'crit' : (a.nearCritical ? 'near' : 'norm');
+        const ttl = a.critical ? ' · critical' : (a.nearCritical ? ` · near-critical (${a.totalFloatDays}d float)` : '');
+        return `${base}<div class="g-bar ${cls}" data-i="${i}" data-tid="${a.taskId}" style="left:${x}px;width:${w}px;top:${top + (ROW - 11) / 2}px" title="${a.id} · ${a.name || ''} · ${a.pct}%${ttl}"><div class="g-done" style="width:${a.pct}%"></div></div>`;
       }).join('');
       const H = HEAD + rows.length * ROW;
       const todayLine = (todayD >= minDay && todayD <= maxDay)
@@ -1337,6 +1346,13 @@
       critOnly = !critOnly; e.currentTarget.classList.toggle('on', critOnly);
       paint();
       if (selTask) select(selTask); // keep selection highlighted after re-paint
+    };
+    const nearInput = document.getElementById('sch-nearcrit');
+    if (nearInput) nearInput.oninput = (e) => {
+      nearDays = Math.max(0, parseFloat(e.target.value) || 0);
+      const leg = document.getElementById('leg-near'); if (leg) leg.style.display = nearDays > 0 ? '' : 'none';
+      paint();
+      if (selTask) select(selTask);
     };
     document.getElementById('sch-search').oninput = (e) => {
       const q = e.target.value.trim().toLowerCase();
