@@ -1673,6 +1673,14 @@
   function insDetailHtml(p) {
     const d = p.detail;
     if (!d || !d.items || !d.items.length) return '<div class="muted" style="font-size:11px;padding:6px 2px">No further breakdown recorded for this policy.</div>';
+    if (d.type === 'installments') {
+      // Payment schedule. CAR is billed in USD (premium) and paid in NPR at a
+      // per-installment exchange rate; PI is NPR throughout.
+      const cur = d.currency === 'USD' ? '$' : 'NPR';
+      const body = d.items.map((it) => `<tr><td style="text-align:left">${it.label}</td><td>${it.pct == null ? '–' : it.pct + '%'}</td><td>${it.premium ? cur + ' ' + insN(it.premium) : '–'}</td><td>${it.paidNPR ? insN(it.paidNPR) : '–'}</td><td>${it.rate ? (+it.rate).toFixed(2) : '–'}</td><td>${it.status || '–'}</td></tr>`).join('');
+      return `<div class="ins-dsub">Installment schedule${d.totalPremium ? ' · total premium ' + (d.currency === 'USD' ? '$ ' : 'NPR ') + insN(d.totalPremium) : ''}</div>
+        <div class="ins-dscroll"><table class="tbl ins-dtl"><thead><tr><th style="text-align:left">Installment</th><th>%</th><th>Premium (${d.currency})</th><th>Paid (NPR)</th><th>Ex. Rate</th><th>Status</th></tr></thead><tbody>${body}</tbody></table></div>`;
+    }
     if (d.type === 'subpolicies') {
       // Renewals / sub-policies of one register entry: each with its own policy no,
       // paid amount and validity. Newest coverage sits at the bottom (S.N. order).
@@ -1707,7 +1715,7 @@
         <td style="text-align:left" class="muted">${p.policyNo || '–'}</td>
         <td>${p.validFrom || '–'}</td><td>${p.validTill || '–'}</td>
         <td><span class="ins-days ${s.dcls}">${dtxt}</span></td>
-        <td>${insN(p.paidNPR)}</td>
+        <td>${insN(p.paidNPR)}${p.premiumUSD ? `<div class="muted" style="font-size:10px">premium $ ${insN(p.premiumUSD)}</div>` : ''}</td>
         <td><span class="badge ${s.badge}">${/expired/i.test(p.remarks || '') ? 'Expired' : (p.remarks || s.lab)}</span></td></tr>`;
     };
     const groups = [], gmap = {};
