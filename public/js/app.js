@@ -1820,46 +1820,34 @@
   function insDetailHtml(p) {
     const d = p.detail;
     if (!d || (!(d.items && d.items.length) && !(d.groups && d.groups.length))) return '<div class="muted" style="font-size:11px;padding:6px 2px">No further breakdown recorded for this policy.</div>';
+    const badge = (st) => { const l = st || '–'; const cls = /active|valid/i.test(l) ? 'ok' : /expir/i.test(l) ? 'bad' : 'warn'; return `<span class="badge ${cls}">${l}</span>`; };
     if (d.type === 'insuredItems') {
-      // Full insured-item register (e.g. CPM): each policy group, then every
-      // covered equipment / vehicle with its own insured amount and validity.
-      const badge = (st) => { const l = st || '–'; const cls = /active|valid/i.test(l) ? 'ok' : /expir/i.test(l) ? 'bad' : 'warn'; return `<span class="badge ${cls}">${l}</span>`; };
+      // Covered items (e.g. CPM): each policy group, then every covered equipment /
+      // vehicle with its validity. Policy no. + validity only (no amounts).
       let body = '';
       for (const grp of d.groups) {
-        const meta = [grp.policyNo, grp.items.length + ' item' + (grp.items.length === 1 ? '' : 's'),
-          grp.paymentNPR ? 'paid ' + insN(grp.paymentNPR) : null, grp.validTill ? 'till ' + grp.validTill : null].filter(Boolean).join(' · ');
-        body += `<tr class="ins-grp"><td colspan="5" style="text-align:left">${grp.name} <span class="muted" style="font-weight:500">· ${meta}</span> ${badge(grp.status)}</td></tr>`;
-        for (const it of grp.items) body += `<tr><td style="text-align:left">${it.desc}</td><td style="text-align:left" class="muted">${it.model || '–'}</td><td>${insN(it.insuredNPR)}</td><td>${it.validFrom || '–'}</td><td>${it.validTill || '–'}</td></tr>`;
+        const meta = [grp.policyNo, grp.items.length + ' item' + (grp.items.length === 1 ? '' : 's'), grp.validTill ? 'till ' + grp.validTill : null].filter(Boolean).join(' · ');
+        body += `<tr class="ins-grp"><td colspan="4" style="text-align:left">${grp.name} <span class="muted" style="font-weight:500">· ${meta}</span> ${badge(grp.status)}</td></tr>`;
+        for (const it of grp.items) body += `<tr><td style="text-align:left">${it.desc}</td><td style="text-align:left" class="muted">${it.model || '–'}</td><td>${it.validFrom || '–'}</td><td>${it.validTill || '–'}</td></tr>`;
       }
       const total = d.groups.reduce((n, g) => n + g.items.length, 0);
-      return `<div class="ins-dsub">Insured items (${total})</div>
-        <div class="ins-dscroll" style="max-height:360px;overflow:auto"><table class="tbl ins-dtl"><thead><tr><th style="text-align:left">Description</th><th style="text-align:left">Model / Spec.</th><th>Insured (NRs)</th><th>Valid From</th><th>Valid Till</th></tr></thead><tbody>${body}</tbody></table></div>`;
-    }
-    if (d.type === 'installments') {
-      // Payment schedule. CAR is billed in USD (premium) and paid in NPR at a
-      // per-installment exchange rate; PI is NPR throughout.
-      const cur = d.currency === 'USD' ? '$' : 'NPR';
-      const body = d.items.map((it) => `<tr><td style="text-align:left">${it.label}</td><td>${it.pct == null ? '–' : it.pct + '%'}</td><td>${it.premium ? cur + ' ' + insN(it.premium) : '–'}</td><td>${it.paidNPR ? insN(it.paidNPR) : '–'}</td><td>${it.rate ? (+it.rate).toFixed(2) : '–'}</td><td>${it.status || '–'}</td></tr>`).join('');
-      return `<div class="ins-dsub">Installment schedule${d.totalPremium ? ' · total premium ' + (d.currency === 'USD' ? '$ ' : 'NPR ') + insN(d.totalPremium) : ''}</div>
-        <div class="ins-dscroll"><table class="tbl ins-dtl"><thead><tr><th style="text-align:left">Installment</th><th>%</th><th>Premium (${d.currency})</th><th>Paid (NPR)</th><th>Ex. Rate</th><th>Status</th></tr></thead><tbody>${body}</tbody></table></div>`;
+      return `<div class="ins-dsub">Covered items (${total})</div>
+        <div class="ins-dscroll" style="max-height:360px;overflow:auto"><table class="tbl ins-dtl"><thead><tr><th style="text-align:left">Description</th><th style="text-align:left">Model / Spec.</th><th>Valid From</th><th>Valid Till</th></tr></thead><tbody>${body}</tbody></table></div>`;
     }
     if (d.type === 'subpolicies') {
-      // Sub-policies of one register entry, sub-grouped by insured group (for GPA:
-      // Employer & Engineer, Army, …) — each row with its own policy no, paid
-      // amount and validity. A row per insured group only shows a header when the
-      // policy actually spans more than one group.
-      const badge = (st) => { const l = st || '–'; const cls = /active|valid/i.test(l) ? 'ok' : /expir/i.test(l) ? 'bad' : 'warn'; return `<span class="badge ${cls}">${l}</span>`; };
+      // Sub-policies of one register entry, sub-grouped by insured group (GPA:
+      // Employer & Engineer, Army, …). Policy no. + validity only (no amounts).
       const order = [], gm = {};
       for (const it of d.items) { const k = it.group || ''; if (!gm[k]) { gm[k] = []; order.push(k); } gm[k].push(it); }
       const multi = order.length > 1;
-      const rowHtml = (it) => `<tr><td style="text-align:left">${it.code || '–'}</td><td style="text-align:left" class="muted">${it.policyNo || '–'}</td><td>${insN(it.paidNPR != null ? it.paidNPR : it.insuredNPR)}</td><td>${it.validFrom || '–'}</td><td>${it.validTill || '–'}</td><td>${badge(it.status)}</td></tr>`;
+      const rowHtml = (it) => `<tr><td style="text-align:left">${it.code || '–'}</td><td style="text-align:left" class="muted">${it.policyNo || '–'}</td><td>${it.validFrom || '–'}</td><td>${it.validTill || '–'}</td><td>${badge(it.status)}</td></tr>`;
       let body = '';
       for (const k of order) {
-        if (multi && k) body += `<tr class="ins-grp"><td colspan="6" style="text-align:left">${k}</td></tr>`;
+        if (multi && k) body += `<tr class="ins-grp"><td colspan="5" style="text-align:left">${k}</td></tr>`;
         body += gm[k].map(rowHtml).join('');
       }
       return `<div class="ins-dsub">Sub-policies (${d.items.length})</div>
-        <div class="ins-dscroll"><table class="tbl ins-dtl"><thead><tr><th style="text-align:left">S.N.</th><th style="text-align:left">Policy No.</th><th>Paid (NPR)</th><th>Valid From</th><th>Valid Till</th><th>Status</th></tr></thead><tbody>${body}</tbody></table></div>`;
+        <div class="ins-dscroll"><table class="tbl ins-dtl"><thead><tr><th style="text-align:left">S.N.</th><th style="text-align:left">Policy No.</th><th>Valid From</th><th>Valid Till</th><th>Status</th></tr></thead><tbody>${body}</tbody></table></div>`;
     }
     return '';
   }
