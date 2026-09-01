@@ -84,7 +84,7 @@ const DELAY_XER_PATH = 'Shared Folder/Schedule/TKV-BL-A-2 (TIA-Bishan).xer';
 // other details" copy is stale and stops at Claim 9).
 const CLAIMS_XLSX_PATH = "Shared Folder/Claims & Variation/Contractor's Claims/Claim & Variation Log.xlsx";
 // Explosive consumption workbook — its own Nutstore file, parsed in isolation.
-const EXPLOSIVES_XLSX_PATH = 'Shared Folder/Explosive Record/Daily Explosive Consumption.xlsx';
+const EXPLOSIVES_XLSX_PATH = 'Shared Folder/Explosive Record/Daily Explosive Consumption-1.xlsx';
 // Insurance register — its own Nutstore file (only the 'Summary' sheet is read).
 const INSURANCE_XLSX_PATH = 'Insurance and Bank Gurantee/Insurance/Insurance.xlsx';
 // Claims & Variations register — its own Nutstore workbook (Claim + Variation
