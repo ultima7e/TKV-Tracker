@@ -769,7 +769,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
               <div class="fe-field"><label>To month</label><select id="fuel-to" class="fe-input"></select></div>
             </div>
             <div class="expl-loc-wrap">
-              <div class="expl-loc-head"><span>Categories <span class="muted">· click to include / exclude</span></span>
+              <div class="expl-loc-head"><span>Equipment groups <span class="muted">· click to toggle · ▸ to break down</span></span>
                 <span><button id="fuel-cat-all" class="fe-btn" type="button">All</button> <button id="fuel-cat-none" class="fe-btn" type="button">None</button></span></div>
               <div id="fuel-cats" class="expl-locs"></div>
             </div>
@@ -1190,20 +1190,55 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   }
 
   // ---- Fuel consumption (Inventory & Explosives → Fuel tab) ----------------
+  // The workbook tags each fill-up with ~12 detailed categories; here we roll them
+  // into 4 equipment groups (matching the site equipment register). Each group is
+  // expandable in the chart (▸ on its chip) to its detailed categories.
   let fuelState = null, fuelWired = false, invTabsWired = false;
-  const FUELCOL = ['#2f6fd0', '#e0a52e', '#1d8a63', '#b9772a', '#c0414b', '#5b46c9', '#2aa7c0', '#c05b8f', '#7a8b3f', '#445876', '#9c6b2e', '#8a8f98', '#d0863a'];
+  const FUEL_GROUPS = [
+    { name: 'Light Vehicle', color: '#2f6fd0', subs: ['Pickup / Light Vehicle'] },
+    { name: 'Truck / Dump Truck', color: '#e0a52e', subs: ['Dump Truck', 'Truck', 'Concrete Mixer'] },
+    { name: 'Heavy Equipment', color: '#1d8a63', subs: ['Excavator / Backhoe', 'Loader', 'Crane', 'Roller', 'Drill Jumbo / Rig'] },
+    { name: 'Other Plants & Equipment', color: '#8a5cc9', subs: ['Generator', 'Air Compressor', 'Other'] },
+  ];
+  // Mix a hex colour toward white by t (0=base … 1=white) — shades for a group's subs.
+  const fuelShade = (hex, t) => { const n = parseInt(hex.slice(1), 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255, mix = (c) => Math.round(c + (255 - c) * t); return '#' + [mix(r), mix(g), mix(b)].map((x) => x.toString(16).padStart(2, '0')).join(''); };
+  // Build the 4 groups from the live categories (any unmapped category falls into
+  // the last group so nothing is lost); each keeps its sub-categories big→small.
+  function fuelGrouped() {
+    const groups = FUEL_GROUPS.map((g) => ({ name: g.name, color: g.color, subs: [], total: 0 }));
+    const other = groups[groups.length - 1];
+    for (const c of data.fuel.categories) {
+      const def = FUEL_GROUPS.find((g) => g.subs.includes(c.name));
+      const grp = def ? groups.find((g) => g.name === def.name) : other;
+      grp.subs.push(c); grp.total += c.total;
+    }
+    groups.forEach((g) => { g.subs.sort((a, b) => b.total - a.total); g.total = Math.round(g.total * 10) / 10; });
+    return groups.filter((g) => g.subs.length);
+  }
   function renderFuelChips() {
-    const fu = data.fuel, st = fuelState, host = document.getElementById('fuel-cats'); if (!host) return;
-    host.innerHTML = fu.categories.map((c, i) => `<span class="expl-chip ${st.cats.has(c.name) ? 'on' : ''}" data-cat="${c.name.replace(/"/g, '&quot;')}"><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${FUELCOL[i % FUELCOL.length]};margin-right:5px;vertical-align:-1px"></i>${c.name} <span class="k">${explFmt(c.total)}</span></span>`).join('');
+    const st = fuelState, host = document.getElementById('fuel-cats'); if (!host) return;
+    host.innerHTML = st.groups.map((g) => {
+      const on = st.vis.has(g.name), exp = st.exp.has(g.name);
+      const caret = g.subs.length > 1 ? `<i class="fuel-exp" data-grp="${g.name.replace(/"/g, '&quot;')}" title="Show / hide breakdown" style="cursor:pointer;font-style:normal;margin-right:4px;color:#8a94a6">${exp ? '▾' : '▸'}</i>` : '';
+      return `<span class="expl-chip ${on ? 'on' : ''}" data-grp="${g.name.replace(/"/g, '&quot;')}">${caret}<i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${g.color};margin-right:5px;vertical-align:-1px"></i>${g.name} <span class="k">${explFmt(g.total)}</span></span>`;
+    }).join('');
   }
   function drawFuelChart() {
     const fu = data.fuel, st = fuelState;
     const months = fu.months.filter((m) => m >= st.from && m <= st.to);
-    const colorOf = {}; fu.categories.forEach((c, i) => { colorOf[c.name] = FUELCOL[i % FUELCOL.length]; });
-    const cats = fu.categories.filter((c) => st.cats.has(c.name));
-    const series = cats.map((c) => ({ name: c.name, type: 'bar', stack: 'f',
-      data: months.map((m) => Math.round(((fu.byMonth[m] || {})[c.name]) || 0)),
-      itemStyle: { color: colorOf[c.name] } }));
+    const series = [];
+    for (const g of st.groups) {
+      if (!st.vis.has(g.name)) continue;
+      if (st.exp.has(g.name) && g.subs.length > 1) {
+        g.subs.forEach((c, i) => series.push({ name: c.name, type: 'bar', stack: 'f',
+          data: months.map((m) => Math.round(((fu.byMonth[m] || {})[c.name]) || 0)),
+          itemStyle: { color: fuelShade(g.color, (i / g.subs.length) * 0.6) } }));
+      } else {
+        series.push({ name: g.name, type: 'bar', stack: 'f',
+          data: months.map((m) => Math.round(g.subs.reduce((s, c) => s + (((fu.byMonth[m] || {})[c.name]) || 0), 0))),
+          itemStyle: { color: g.color } });
+      }
+    }
     makeChart('fuel-chart').setOption({
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, confine: true, enterable: true,
         extraCssText: 'max-height:330px;overflow-y:auto',
@@ -1224,13 +1259,13 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const fu = data.fuel, st = fuelState, host = document.getElementById('fuel-summary'); if (!host) return;
     const months = fu.months.filter((m) => m >= st.from && m <= st.to);
     let sel = 0;
-    for (const m of months) { const bm = fu.byMonth[m] || {}; for (const c of fu.categories) if (st.cats.has(c.name)) sel += bm[c.name] || 0; }
-    const top = fu.categories[0];
+    for (const m of months) { const bm = fu.byMonth[m] || {}; for (const g of st.groups) if (st.vis.has(g.name)) for (const c of g.subs) sel += bm[c.name] || 0; }
+    const top = [...st.groups].sort((a, b) => b.total - a.total)[0];
     const tile = (lab, val, sub) => `<div class="expl-tile"><div class="lab">${lab}</div><div class="val">${val}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
     host.innerHTML =
-      tile('Fuel · selection', explFmt(sel) + ' L', st.cats.size + ' of ' + fu.categories.length + ' categories · ' + MONL(st.from) + '–' + MONL(st.to)) +
+      tile('Fuel · selection', explFmt(sel) + ' L', st.vis.size + ' of ' + st.groups.length + ' groups · ' + MONL(st.from) + '–' + MONL(st.to)) +
       tile('Fuel · all', explFmt(fu.grandTotal) + ' L', fu.months.length + ' months') +
-      tile('Top category', top ? top.name : '—', top ? explFmt(top.total) + ' L' : '');
+      tile('Top group', top ? top.name : '—', top ? explFmt(top.total) + ' L' : '');
   }
   function wireFuelControls() {
     if (fuelWired) return; fuelWired = true;
@@ -1240,14 +1275,16 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     if (to) to.addEventListener('change', () => { fuelState.to = to.value; if (fuelState.to < fuelState.from) { fuelState.from = fuelState.to; fr.value = fuelState.from; } upd(); });
     const catHost = document.getElementById('fuel-cats');
     if (catHost) catHost.addEventListener('click', (e) => {
+      const expBtn = e.target.closest('.fuel-exp');
+      if (expBtn) { const g = expBtn.dataset.grp; if (fuelState.exp.has(g)) fuelState.exp.delete(g); else fuelState.exp.add(g); renderFuelChips(); upd(); return; }
       const chip = e.target.closest('.expl-chip'); if (!chip) return;
-      const c = chip.dataset.cat;
-      if (fuelState.cats.has(c)) fuelState.cats.delete(c); else fuelState.cats.add(c);
+      const g = chip.dataset.grp;
+      if (fuelState.vis.has(g)) fuelState.vis.delete(g); else fuelState.vis.add(g);
       chip.classList.toggle('on'); upd();
     });
     const all = document.getElementById('fuel-cat-all'), none = document.getElementById('fuel-cat-none');
-    if (all) all.addEventListener('click', () => { fuelState.cats = new Set(data.fuel.categories.map((c) => c.name)); renderFuelChips(); upd(); });
-    if (none) none.addEventListener('click', () => { fuelState.cats = new Set(); renderFuelChips(); upd(); });
+    if (all) all.addEventListener('click', () => { fuelState.vis = new Set(fuelState.groups.map((g) => g.name)); renderFuelChips(); upd(); });
+    if (none) none.addEventListener('click', () => { fuelState.vis = new Set(); renderFuelChips(); upd(); });
   }
   function renderFuel() {
     const host = document.getElementById('fuel-chart'); if (!host) return;
@@ -1259,7 +1296,8 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     }
     const sig = fu.months.join('|') + '##' + fu.categories.map((c) => c.name).join('|');
     if (!fuelState || fuelState._sig !== sig) {
-      fuelState = { _sig: sig, from: fu.months[0], to: fu.months[fu.months.length - 1], cats: new Set(fu.categories.map((c) => c.name)) };
+      const groups = fuelGrouped();
+      fuelState = { _sig: sig, from: fu.months[0], to: fu.months[fu.months.length - 1], groups, vis: new Set(groups.map((g) => g.name)), exp: new Set() };
       const opts = fu.months.map((m) => `<option value="${m}">${MONL(m)}</option>`).join('');
       const fr = document.getElementById('fuel-from'), to = document.getElementById('fuel-to');
       if (fr) { fr.innerHTML = opts; fr.value = fuelState.from; }
