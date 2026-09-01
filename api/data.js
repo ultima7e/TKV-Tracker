@@ -84,6 +84,11 @@ const DELAY_XER_PATH = 'Shared Folder/Schedule/TKV-BL-A-2 (TIA-Bishan).xer';
 // other details" copy is stale and stops at Claim 9).
 const CLAIMS_XLSX_PATH = "Shared Folder/Claims & Variation/Contractor's Claims/Claim & Variation Log.xlsx";
 // Explosive consumption workbook — its own Nutstore file, parsed in isolation.
+// The team re-saves this workbook under changing names (…Consumption.xlsx,
+// …Consumption-1.xlsx, …). Resolve it by scanning the folder for the matching
+// file so a rename never breaks the panel; the fixed path is a last-resort fallback.
+const EXPLOSIVES_DIR = 'Shared Folder/Explosive Record';
+const EXPLOSIVES_RE = /daily explosive consumption.*\.xlsx$/i;
 const EXPLOSIVES_XLSX_PATH = 'Shared Folder/Explosive Record/Daily Explosive Consumption-1.xlsx';
 // Insurance register — its own Nutstore file (only the 'Summary' sheet is read).
 const INSURANCE_XLSX_PATH = 'Insurance and Bank Gurantee/Insurance/Insurance.xlsx';
@@ -308,7 +313,7 @@ async function buildPayload() {
       propfind(DAV_BASE + encPath(xerPath), headers, 0),
       propfind(DAV_BASE + encPath(delayXerPath), headers, 0),
       propfind(DAV_BASE + encPath(CLAIMS_XLSX_PATH), headers, 0).catch(() => []),
-      propfind(DAV_BASE + encPath(EXPLOSIVES_XLSX_PATH), headers, 0).catch(() => []),
+      propfind(DAV_BASE + encPath(EXPLOSIVES_DIR) + '/', headers, 1).catch(() => []),
       propfind(DAV_BASE + encPath(INSURANCE_XLSX_PATH), headers, 0).catch(() => []),
       fetchDropbox(),
       kvGet('tkv:schedule_ver').catch(() => null),
@@ -318,7 +323,12 @@ async function buildPayload() {
       kvGet('tkv:schedule_cleared').catch(() => null),
     ]);
     const claimsMtime = (claimsInfo[0] && claimsInfo[0].mtime) || '';
-    const explMtime = (explInfo[0] && explInfo[0].mtime) || '';
+    // Newest xlsx in the Explosive Record folder that matches the workbook name.
+    const explFile = (explInfo || [])
+      .filter((e) => e && e.path && EXPLOSIVES_RE.test(e.path) && !/\/~\$/.test(e.path))
+      .sort((a, b) => new Date(b.mtime || 0) - new Date(a.mtime || 0))[0];
+    const explPath = explFile ? explFile.path : EXPLOSIVES_XLSX_PATH;
+    const explMtime = explFile ? explFile.mtime : '';
     const insMtime = (insInfo[0] && insInfo[0].mtime) || '';
     const cvMtime = (cvInfo[0] && cvInfo[0].mtime) || '';
     let entries = listing.filter((e) => /\.xlsx$/i.test(e.path) && !/\/~\$/.test(e.path));
@@ -334,7 +344,7 @@ async function buildPayload() {
       xer: xerPath + '|' + xerMtime,
       dxer: delayXerPath + '|' + delayXerMtime,
       claims: CLAIMS_XLSX_PATH + '|' + claimsMtime,
-      expl: EXPLOSIVES_XLSX_PATH + '|' + explMtime,
+      expl: explPath + '|' + explMtime,
       ins: INSURANCE_XLSX_PATH + '|' + insMtime,
       sched: schedVer || '',
       base: baseVer || '',
@@ -353,7 +363,7 @@ async function buildPayload() {
       getXer(xerPath, xerMtime, headers),
       getXer(delayXerPath, delayXerMtime, headers),
       claimsMtime ? getBuffer(CLAIMS_XLSX_PATH, claimsMtime, headers).catch(() => null) : Promise.resolve(null),
-      explMtime ? getBuffer(EXPLOSIVES_XLSX_PATH, explMtime, headers).catch(() => null) : Promise.resolve(null),
+      explFile ? getBuffer(explPath, explMtime, headers).catch(() => null) : Promise.resolve(null),
       insMtime ? getBuffer(INSURANCE_XLSX_PATH, insMtime, headers).catch(() => null) : Promise.resolve(null),
       cvMtime ? getBuffer(CLAIMS_REGISTER_XLSX_PATH, cvMtime, headers).catch(() => null) : Promise.resolve(null),
     ]);
@@ -387,7 +397,7 @@ async function buildPayload() {
   const localBuffers = files.filter((f) => f.endsWith('.xlsx') && !DBX_NAMEKEYS.has(normName(f))
       && !/claim.*variation.*log\.xlsx$/i.test(f)   // claims workbook is parsed in isolation below
       && !/claims.*variations.*register\.xlsx$/i.test(f) // claims register likewise
-      && !/explosive.*consumption\.xlsx$/i.test(f)  // explosives workbook likewise
+      && !/explosive.*consumption.*.xlsx$/i.test(f)  // explosives workbook likewise
       && !/^insurance\.xlsx$/i.test(f))             // insurance workbook likewise
     .map((f) => fs.readFileSync(path.join(dir, f)));
   const buffers = [...localBuffers, ...dbx.filter((d) => d.buffer).map((d) => d.buffer)];
@@ -398,7 +408,7 @@ async function buildPayload() {
   // Optional local claims + explosives workbooks (parsed in isolation).
   const claimsFile = files.find((f) => /claim.*variation.*log\.xlsx$/i.test(f));
   const claimsBuffer = claimsFile ? fs.readFileSync(path.join(dir, claimsFile)) : null;
-  const explFile = files.find((f) => /explosive.*consumption\.xlsx$/i.test(f));
+  const explFile = files.find((f) => /explosive.*consumption.*.xlsx$/i.test(f));
   const explosivesBuffer = explFile ? fs.readFileSync(path.join(dir, explFile)) : null;
   const insFile = files.find((f) => /^insurance\.xlsx$/i.test(f));
   const insuranceBuffer = insFile ? fs.readFileSync(path.join(dir, insFile)) : null;
