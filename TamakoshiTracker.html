@@ -606,6 +606,11 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 
       <section class="view" id="tunnel">
         <div class="card" style="margin-bottom:16px">
+          <h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">Tunnel Excavation — by Workfront <span class="muted" id="tunexc-sub" style="font-weight:600;font-size:12.5px"></span></h3>
+          <div id="tunexc-tiles" style="display:flex;gap:12px;flex-wrap:wrap;margin:4px 0 6px"></div>
+          <div id="tunexc-body"></div>
+        </div>
+        <div class="card" style="margin-bottom:16px">
           <h3 style="display:flex;align-items:center;gap:8px">Tunnel 3D Progress View <span class="muted" style="font-weight:600">· click a section</span>
             <button id="t3d-cal-btn" class="sch-toggle" style="display:none;margin-left:auto" title="Drag the dots onto their tunnels, then Copy coords">⊹ Calibrate dots</button></h3>
           <div class="t3d-tabs" id="t3d-tabs"></div>
@@ -1646,6 +1651,41 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     requestAnimationFrame(() => {
       wrap.querySelectorAll('.track > i').forEach((b) => { b.style.width = b.dataset.w + '%'; });
     });
+  }
+
+  // Live per-workfront excavation from the Daily Tunnel Construction Progress file,
+  // grouped by area with a progress bar per workfront (excavated / design length).
+  function renderTunnelExc() {
+    const host = document.getElementById('tunexc-body'); if (!host) return;
+    const te = data && data.tunnelExc;
+    const sub = document.getElementById('tunexc-sub'), tiles = document.getElementById('tunexc-tiles');
+    if (!te || te.missing || !te.areas || !te.areas.length) {
+      if (sub) sub.textContent = '';
+      if (tiles) tiles.innerHTML = '';
+      host.innerHTML = '<div class="muted" style="font-size:12px">No tunnel excavation data available yet.</div>';
+      return;
+    }
+    if (sub) sub.textContent = '· ' + (te.sheet || '') + ' · ' + te.counts.total + ' workfronts';
+    const mAll = te.areas.flatMap((a) => a.workfronts).filter((w) => w.uom === 'm');
+    const design = mAll.reduce((s, w) => s + (w.design || 0), 0);
+    const exc = mAll.reduce((s, w) => s + (w.excavated || 0), 0);
+    const tile = (lab, val, s) => `<div class="expl-tile"><div class="lab">${lab}</div><div class="val">${val}</div>${s ? `<div class="sub">${s}</div>` : ''}</div>`;
+    if (tiles) tiles.innerHTML =
+      tile('Tunnel excavated', Math.round(exc).toLocaleString() + ' m', 'of ' + Math.round(design).toLocaleString() + ' m design · ' + (design ? (exc / design * 100).toFixed(1) : 0) + '%')
+      + tile('In progress', te.counts.inProgress, 'of ' + te.counts.total + ' workfronts')
+      + tile('Completed', te.counts.complete, '')
+      + tile('Not started', te.counts.notStarted, '');
+    const col = (w) => (w.status === 'Complete' ? '#1d8a63' : w.status === 'In Progress' ? '#2f7de1' : '#aab6c8');
+    const badge = (st) => `<span class="badge ${st === 'Complete' ? 'ok' : st === 'In Progress' ? 'warn' : 'neu'}">${st}</span>`;
+    const n = (v) => (v == null ? '–' : (Math.round(v * 100) / 100).toLocaleString());
+    host.innerHTML = te.areas.map((a) => `
+      <h4 style="margin:15px 0 8px;font-size:12.5px;color:var(--navy)">${a.name} <span class="muted" style="font-weight:600">(${a.workfronts.length})</span></h4>
+      ${a.workfronts.map((w) => `
+        <div class="pbar">
+          <div class="lab"><span>${w.loc} <span class="muted">(${n(w.excavated)} / ${n(w.design)} ${w.uom}${(w.chStart != null || w.chEnd != null) ? ' · Ch ' + n(w.chStart) + '–' + n(w.chEnd) : ''})</span></span><span>${w.pct}% ${badge(w.status)}</span></div>
+          <div class="track"><i data-w="${w.pct}" style="background:${col(w)}"></i></div>
+        </div>`).join('')}`).join('');
+    requestAnimationFrame(() => host.querySelectorAll('.track > i').forEach((b) => { b.style.width = b.dataset.w + '%'; }));
   }
 
   function renderManpower() {
@@ -3187,6 +3227,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     renderSCurve('ch-scurve');
     renderAdvanceChart('ch-tunnel-advance');
     renderTunnelBars();
+    renderTunnelExc();
     renderManpower();
     renderIpc();
     $('#data-source').textContent = data.source === 'nutstore' ? 'Nutstore' : 'Local sample';
