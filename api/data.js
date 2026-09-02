@@ -10,6 +10,9 @@ const path = require('path');
 const { workbookToBoth, workbookSheets } = require('../lib/workbook');
 const { parseTunnel, parseKpis, parseSCurve, parseFinance, parseManpower, parseIpc, parseFinanceDetail, parseClaims, parseExplosives, parseInsurance, parseFuel, parseClaimsRegister, parseTunnelExcavation } = require('../lib/parsers');
 const { parseXer } = require('../lib/xer');
+// Baked-in manpower snapshot (not fetched live). Optional — falls back gracefully.
+let manpowerData = null;
+try { manpowerData = require('../lib/manpower-data'); } catch (e) { manpowerData = null; }
 const { currentUser } = require('../lib/auth');
 const { kvGet } = require('../lib/store');
 
@@ -276,7 +279,11 @@ function assemble(buffers, xerText, delayXerText, source, claimsBuffer, explosiv
   const executive = parseKpis(sheets);
   const scurve = parseSCurve(matrices);
   const finance = parseFinance(matrices);
-  const manpower = parseManpower(matrices);
+  // Manpower is baked into the app (lib/manpower-data.js), NOT fetched live — the
+  // source workbook lives in scattered daily folders. Refresh with
+  // `node scripts/gen-manpower.js "<latest .xlsx>"`. Falls back to the folder scan
+  // only if a manpower workbook happens to be present there.
+  const manpower = (manpowerData && manpowerData.date) ? manpowerData : parseManpower(matrices);
   const ipc = parseIpc(matrices);
   const financeDetail = parseFinanceDetail(matrices);
   const schedule = xerText ? parseXer(xerText) : { activities: [], relationships: [], wbs: {}, warnings: [] };
@@ -287,7 +294,7 @@ function assemble(buffers, xerText, delayXerText, source, claimsBuffer, explosiv
     source,
     // tunnel/KPI "sheet not found" warnings are expected (those legacy sample
     // sheets aren't part of the live data) — omit them so the banner stays quiet.
-    warnings: [...skipWarnings, ...scurve.warnings, ...finance.warnings, ...manpower.warnings,
+    warnings: [...skipWarnings, ...scurve.warnings, ...finance.warnings, ...(manpower.warnings || []),
       ...ipc.warnings, ...schedule.warnings],
     tunnel: { tunnels: tunnel.tunnels, monthlyAdvance: tunnel.monthlyAdvance },
     executive: { kpis: executive.kpis },
