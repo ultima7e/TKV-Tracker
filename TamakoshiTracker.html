@@ -804,10 +804,11 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
         </div>
       </section>
       <section class="view" id="man">
-        <div class="grid row-2">
-          <div class="card"><h3>Mobilized Manpower — <span id="mp-date">—</span></h3><div id="mp-mobilized"><p class="muted">Awaiting manpower data.</p></div></div>
-          <div class="card"><h3>Idle Manpower</h3><div id="mp-idle"><p class="muted">Awaiting manpower data.</p></div></div>
+        <div class="card" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+          <h3 style="margin:0">Manpower Deployment <span class="muted" style="font-weight:600">· data date <span id="mp-date">—</span></span></h3>
+          <span class="badge neu" style="font-size:11px">SINOHYDRO · daily site count</span>
         </div>
+        <div id="mp-panel"><p class="muted">Awaiting manpower data.</p></div>
       </section>
       <section class="view" id="equip"><div class="card"><h3>Equipment</h3><p class="muted">Awaiting equipment data sheet (Phase 2).</p></div></section>
       <section class="view" id="safety"><div class="card"><h3>Safety</h3><p class="muted">Awaiting safety data sheet (Phase 2).</p></div></section>
@@ -1648,45 +1649,131 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     });
   }
 
+  // Palette for the manpower bars (locations get distinct hues; categories reuse).
+  const MP_COLORS = ['#2f7de1', '#e23744', '#36b37e', '#f5a623', '#7c5cff', '#e2681f',
+    '#0ea5a4', '#d6427f', '#5b8def', '#8a9a2c', '#c0562a', '#6b7280'];
   function renderManpower() {
     const mp = data.manpower || {};
-    const cell = (v) => (v > 0 ? v : '–');
-    // Expatriate = foreigner; Native = Other Nepali + Local Nepali (merged).
-    const rowHtml = (r, cls) => `
-      <tr${cls ? ' class="' + cls + '"' : ''}>
-        <td>${r.category || 'Total'}</td>
-        <td>${cell(r.foreigner)}</td><td>${cell((r.otherNepali || 0) + (r.localNepali || 0))}</td>
-        <td>${r.total}</td>
-      </tr>`;
-    const table = (rows, total, rowCls) => `
-      <table class="tbl">
-        <thead><tr><th>Manpower Category</th><th>Expatriate</th>
-          <th>Native</th><th>Total</th></tr></thead>
-        <tbody>${rows.map((r) => rowHtml(r, rowCls)).join('')}
-          ${total ? rowHtml(total, 'total') : ''}</tbody>
-      </table>`;
+    const nn = (v) => Number(v || 0).toLocaleString('en-US');
+    const locs = (mp.locations || []).filter((l) => l && l.total > 0);
+    const mob = mp.mobilizedTotal || { foreigner: 0, otherNepali: 0, localNepali: 0, total: 0 };
+    const idl = mp.idleTotal || { foreigner: 0, otherNepali: 0, localNepali: 0, total: 0 };
+    // On-site nationality split (top table = everyone on site, incl. idle).
+    const nat = locs.length
+      ? locs.reduce((a, l) => ({ f: a.f + (l.foreigner || 0), o: a.o + (l.otherNepali || 0), n: a.n + (l.localNepali || 0) }), { f: 0, o: 0, n: 0 })
+      : { f: mob.foreigner + idl.foreigner, o: mob.otherNepali + idl.otherNepali, n: mob.localNepali + idl.localNepali };
+    const onSite = locs.length ? locs.reduce((a, l) => a + l.total, 0) : (mob.total + idl.total);
+
+    // Gradient-filled horizontal bar (animates from 0 on render).
+    const bar = (name, value, max, color, sub) => `
+      <div style="margin-bottom:11px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px">
+          <span style="font-size:12px;font-weight:600;color:var(--navy)">${name}</span>
+          <span style="font-size:12.5px;font-weight:800;color:${color};white-space:nowrap">${nn(value)}${sub ? ` <span style="font-size:9.5px;color:var(--muted);font-weight:600">${sub}</span>` : ''}</span>
+        </div>
+        <div style="height:9px;background:#eef2f7;border-radius:6px;overflow:hidden">
+          <i class="mp-bar" data-w="${max ? Math.max(2, Math.round((value / max) * 100)) : 0}"
+             style="display:block;height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,${color},${color}bb);transition:width 1.1s cubic-bezier(.2,.8,.2,1)"></i>
+        </div>
+      </div>`;
+    const tile = (val, label, color, grad) => `
+      <div style="background:${grad};border-radius:12px;padding:12px 14px">
+        <div style="font-size:23px;font-weight:800;color:${color};letter-spacing:-.5px;line-height:1">${nn(val)}</div>
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:${color}bb;font-weight:700;margin-top:5px">${label}</div>
+      </div>`;
+    const sub = (t) => `<div class="section-title" style="margin:0 0 12px">${t}</div>`;
+
+    // ---------- Hero tiles ----------
+    const hero = `
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+        ${tile(onSite, 'Total on site', '#1f3b66', 'linear-gradient(135deg,#eaf1fb,#dfeaf8)')}
+        ${tile(mob.total, 'Mobilized (working)', '#15764e', 'linear-gradient(135deg,#e8f6ee,#dcefe4)')}
+        ${tile(idl.total, 'Idle', idl.total > 0 ? '#9a6b00' : '#5b7c6c', 'linear-gradient(135deg,#fdf4e2,#f9ecd4)')}
+        ${tile(nat.f, 'Expatriate / foreign', '#b5502a', 'linear-gradient(135deg,#fbefe8,#f6e4d9)')}
+      </div>`;
+
+    // ---------- By location ----------
+    const locMax = Math.max(1, ...locs.map((l) => l.total));
+    const locBars = locs.map((l, i) => bar(l.name, l.total, locMax, MP_COLORS[i % MP_COLORS.length],
+      `${l.foreigner ? l.foreigner + ' exp · ' : ''}${(l.otherNepali || 0) + (l.localNepali || 0)} NP`)).join('');
+    const locCard = `<div class="card">${sub('Manpower by location')}
+      ${locs.length ? locBars : '<p class="muted">No location breakdown available.</p>'}</div>`;
+
+    // ---------- By category ----------
+    const cats = (mp.mobilized || []).filter((c) => c.total > 0).slice().sort((a, b) => b.total - a.total);
+    const catMax = Math.max(1, ...cats.map((c) => c.total));
+    const catBars = cats.map((c, i) => bar(c.category, c.total, catMax, MP_COLORS[i % MP_COLORS.length],
+      c.foreigner ? c.foreigner + ' exp' : '')).join('');
+    const catCard = `<div class="card">${sub('Mobilized by role')}
+      ${cats.length ? catBars : '<p class="muted">No category breakdown available.</p>'}</div>`;
+
+    // ---------- Composition (nationality) ----------
+    const natTot = Math.max(1, nat.f + nat.o + nat.n);
+    const pct = (v) => Math.round((v / natTot) * 100);
+    const seg = (v, color, label) => (v > 0
+      ? `<div title="${label}: ${nn(v)}" style="width:${(v / natTot) * 100}%;background:${color};display:flex;align-items:center;justify-content:center;color:#fff;font-size:10.5px;font-weight:800">${(v / natTot) > 0.07 ? pct(v) + '%' : ''}</div>`
+      : '');
+    const legend = (color, label, v) => `
+      <div style="display:flex;align-items:center;gap:7px">
+        <span style="width:11px;height:11px;border-radius:3px;background:${color};flex:none"></span>
+        <span style="font-size:11.5px;color:#41506a"><b style="color:var(--navy)">${nn(v)}</b> ${label} <span class="muted">· ${pct(v)}%</span></span>
+      </div>`;
+    const compCard = `<div class="card">${sub('Workforce composition')}
+      <div style="display:flex;height:26px;border-radius:8px;overflow:hidden;margin-bottom:12px">
+        ${seg(nat.f, '#2f7de1', 'Foreign')}${seg(nat.o, '#36b37e', 'Other Nepali')}${seg(nat.n, '#f5a623', 'Local Nepali')}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${legend('#2f7de1', 'Foreign / expatriate', nat.f)}
+        ${legend('#36b37e', 'Other Nepali', nat.o)}
+        ${legend('#f5a623', 'Local Nepali (project-affected)', nat.n)}
+      </div>
+      <div style="display:flex;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+        <div style="flex:1;text-align:center"><div style="font-size:18px;font-weight:800;color:#15764e">${nn(mob.total)}</div><div style="font-size:9px;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);font-weight:700;margin-top:2px">Mobilized</div></div>
+        <div style="flex:1;text-align:center"><div style="font-size:18px;font-weight:800;color:${idl.total > 0 ? '#9a6b00' : 'var(--muted)'}">${nn(idl.total)}</div><div style="font-size:9px;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);font-weight:700;margin-top:2px">Idle</div></div>
+        <div style="flex:1;text-align:center"><div style="font-size:18px;font-weight:800;color:#1f3b66">${mob.total ? Math.round((mob.total / (mob.total + idl.total)) * 100) : 0}%</div><div style="font-size:9px;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);font-weight:700;margin-top:2px">Utilization</div></div>
+      </div></div>`;
+
+    // ---------- Idle detail ----------
+    const idleRows = (mp.idle || []).filter((r) => r.total > 0).sort((a, b) => b.total - a.total);
+    const idleCard = `<div class="card">${sub('Idle manpower — by role')}
+      ${idleRows.length ? `<table class="tbl">
+        <thead><tr><th>Role</th><th>Foreign</th><th>Nepali</th><th>Total</th></tr></thead>
+        <tbody>${idleRows.map((r) => `<tr class="warn"><td>${r.category}</td><td>${r.foreigner || '–'}</td><td>${(r.otherNepali || 0) + (r.localNepali || 0) || '–'}</td><td>${r.total}</td></tr>`).join('')}
+          <tr class="total"><td>Total idle</td><td>${idl.foreigner || '–'}</td><td>${(idl.otherNepali || 0) + (idl.localNepali || 0) || '–'}</td><td>${idl.total}</td></tr></tbody>
+      </table>` : '<p class="muted">No idle manpower reported — full utilization.</p>'}</div>`;
+
     $('#mp-date').textContent = mp.date || '—';
-    if (mp.mobilized && mp.mobilized.length) {
-      $('#mp-mobilized').innerHTML = table(mp.mobilized, mp.mobilizedTotal);
-    }
-    if (mp.idle) {
-      $('#mp-idle').innerHTML = mp.idle.length
-        ? table(mp.idle, mp.idleTotal, 'warn')
-        : '<p class="muted">No idle manpower reported.</p>';
+    const panel = $('#mp-panel');
+    if (panel) {
+      panel.innerHTML = hero
+        + `<div class="grid row-2" style="align-items:start">${locCard}${catCard}</div>`
+        + `<div class="grid row-2" style="align-items:start;margin-top:16px">${compCard}${idleCard}</div>`;
+      requestAnimationFrame(() => panel.querySelectorAll('i.mp-bar').forEach((b) => { b.style.width = b.dataset.w + '%'; }));
     }
 
-    // Compact status table on the Executive Summary.
+    // ---------- Executive-summary compact block ----------
     $('#mp-exec-date').textContent = mp.date || '—';
-    if (mp.mobilizedTotal) {
-      const status = (label, t, cls) => rowHtml({ category: label, ...t }, cls);
-      $('#mp-exec').innerHTML = `
-        <table class="tbl">
-          <thead><tr><th></th><th>Expatriate</th><th>Native</th><th>Total</th></tr></thead>
-          <tbody>
-            ${status('Mobilized', mp.mobilizedTotal, 'ok')}
-            ${mp.idleTotal ? status('Idle', mp.idleTotal, 'warn') : ''}
-          </tbody>
-        </table>`;
+    const exec = $('#mp-exec');
+    if (exec && (onSite || mob.total)) {
+      const eLocMax = Math.max(1, ...locs.map((l) => l.total));
+      const eTile = (val, label, color, grad) => `<div style="background:${grad};border-radius:10px;padding:9px 6px;text-align:center">
+        <div style="font-size:18px;font-weight:800;color:${color};line-height:1">${nn(val)}</div>
+        <div style="font-size:8px;text-transform:uppercase;letter-spacing:.3px;color:${color}bb;font-weight:700;margin-top:3px">${label}</div></div>`;
+      const eLoc = locs.map((l, i) => `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="font-size:11px;color:#41506a;width:118px;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.name}</span>
+          <span style="flex:1;height:7px;background:#eef2f7;border-radius:5px;overflow:hidden"><i class="mp-bar" data-w="${Math.max(3, Math.round((l.total / eLocMax) * 100))}" style="display:block;height:100%;width:0;border-radius:5px;background:linear-gradient(90deg,${MP_COLORS[i % MP_COLORS.length]},${MP_COLORS[i % MP_COLORS.length]}bb);transition:width 1s cubic-bezier(.2,.8,.2,1)"></i></span>
+          <span style="font-size:11.5px;font-weight:800;color:var(--navy);width:32px;text-align:right;flex:none">${nn(l.total)}</span>
+        </div>`).join('');
+      exec.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
+          ${eTile(onSite, 'On site', '#1f3b66', 'linear-gradient(135deg,#eaf1fb,#dfeaf8)')}
+          ${eTile(mob.total, 'Mobilized', '#15764e', 'linear-gradient(135deg,#e8f6ee,#dcefe4)')}
+          ${eTile(idl.total, 'Idle', idl.total > 0 ? '#9a6b00' : '#5b7c6c', 'linear-gradient(135deg,#fdf4e2,#f9ecd4)')}
+        </div>
+        ${locs.length ? `<div class="section-title" style="margin:0 0 9px;font-size:11px">By location</div>${eLoc}` : ''}
+        <div style="font-size:10.5px;color:var(--muted);margin-top:8px">Composition · ${nn(nat.f)} foreign · ${nn(nat.o + nat.n)} Nepali</div>`;
+      requestAnimationFrame(() => exec.querySelectorAll('i.mp-bar').forEach((b) => { b.style.width = b.dataset.w + '%'; }));
     }
   }
 

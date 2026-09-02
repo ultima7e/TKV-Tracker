@@ -295,7 +295,7 @@ function assemble(buffers, xerText, delayXerText, source, claimsBuffer, explosiv
     finance,
     manpower: {
       date: manpower.date, mobilized: manpower.mobilized, mobilizedTotal: manpower.mobilizedTotal,
-      idle: manpower.idle, idleTotal: manpower.idleTotal,
+      idle: manpower.idle, idleTotal: manpower.idleTotal, locations: manpower.locations,
     },
     ipc: { rows: ipc.rows, total: ipc.total },
     financeDetail,
