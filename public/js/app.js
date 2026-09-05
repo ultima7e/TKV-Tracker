@@ -9,7 +9,7 @@
   const TOKEN_KEY = 'tkv_token';
   const SECTION_LABELS = { exec: 'Executive Summary', fin: 'Financial', sched: 'Schedule & Progress',
     tunnel: 'Tunnel', claims: 'Claims & Variations', inv: 'Inventory & Explosives', ins: 'Insurance & Claims',
-    man: 'Manpower', rsm: 'Service & Maintenance', equip: 'Equipment', safety: 'Safety' };
+    man: 'Manpower', rsm: "Employer's Facilities", equip: 'Equipment', safety: 'Safety' };
   const ALL_SECTIONS = Object.keys(SECTION_LABELS);
   // Same-origin (hosted) uses the session cookie; the standalone file adds a Bearer token.
   function authFetch(url, opts = {}) {
@@ -500,7 +500,7 @@
     const dateEl = $('#rsm-date');
     if (!r || r.missing || !r.months || !r.months.length) {
       if (dateEl) dateEl.textContent = '—';
-      panel.innerHTML = '<p class="muted">Awaiting Regular Service &amp; Maintenance cost data.</p>';
+      panel.innerHTML = '<p class="muted">Awaiting Employer\'s Facilities cost data.</p>';
       return;
     }
     if (dateEl) dateEl.textContent = r.latest || '—';
