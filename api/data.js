@@ -8,7 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const { workbookToBoth, workbookSheets } = require('../lib/workbook');
-const { parseTunnel, parseKpis, parseSCurve, parseFinance, parseManpower, parseIpc, parseFinanceDetail, parseClaims, parseExplosives, parseInsurance, parseFuel, parseClaimsRegister, parseTunnelExcavation } = require('../lib/parsers');
+const { parseTunnel, parseKpis, parseSCurve, parseFinance, parseManpower, parseIpc, parseFinanceDetail, parseClaims, parseExplosives, parseInsurance, parseFuel, parseClaimsRegister, parseTunnelExcavation, parseRsm } = require('../lib/parsers');
 const { parseXer } = require('../lib/xer');
 // Baked-in manpower snapshot (not fetched live). Optional — falls back gracefully.
 let manpowerData = null;
@@ -106,6 +106,10 @@ const CLAIMS_REGISTER_XLSX_PATH = 'Shared Folder/Claims & Variation/claim and va
 // Fuel consumption workbook — hosted on Dropbox, fetched live and parsed in
 // ISOLATION (only 'Appended_Table') so its 10k rows never merge into finance.
 const FUEL_DBX_URL = 'https://www.dropbox.com/scl/fi/sd47gb80i8857yeq2n8j2/Fuel_Consumption_EN_Categorized.xlsx?rlkey=wx53urwmerfralt5dwhj4mz4f&dl=1';
+// B.5 Regular Service & Maintenance cost workbook — hosted on Dropbox, fetched
+// live and parsed in ISOLATION (only its 'Pivot Table' sheet) so its 20 mixed
+// sheets never merge into the finance/generic bag.
+const RSM_DBX_URL = 'https://www.dropbox.com/scl/fi/ieqasqonv7h2nnq2616a0/Subactivity-Percentage-Completion-Calculation_B.5-Regular-Service-Maintenance.xlsx?rlkey=s7mfrx59y9htxvxlq610yvixh&dl=1';
 const encPath = (p) => p.replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
 
 // Module-level caches survive across requests on a warm serverless instance.
@@ -238,6 +242,16 @@ function fuelFromBuffer(buffer) {
   }
 }
 
+function rsmFromBuffer(buffer) {
+  if (!buffer) return { missing: true, warnings: ['RSM cost workbook not available'] };
+  try {
+    const { matrices } = workbookSheets(buffer, ['Pivot Table']);
+    return parseRsm(matrices);
+  } catch (e) {
+    return { missing: true, warnings: ['RSM parse failed: ' + String(e.message || e)] };
+  }
+}
+
 function claimsRegisterFromBuffer(buffer) {
   if (!buffer) return { missing: true, warnings: ['Claims register workbook not available'] };
   try {
@@ -261,7 +275,7 @@ function tunnelExcFromBuffer(buffer) {
 }
 
 // Parse buffers + XER into the API payload (no generatedAt — added fresh each send).
-function assemble(buffers, xerText, delayXerText, source, claimsBuffer, explosivesBuffer, insuranceBuffer, fuelBuffer, claimsRegBuffer, tunnelExcBuffer) {
+function assemble(buffers, xerText, delayXerText, source, claimsBuffer, explosivesBuffer, insuranceBuffer, fuelBuffer, claimsRegBuffer, tunnelExcBuffer, rsmBuffer) {
   const sheets = {}, matrices = {};
   const skipWarnings = [];
   for (const buffer of buffers) {
@@ -311,6 +325,7 @@ function assemble(buffers, xerText, delayXerText, source, claimsBuffer, explosiv
     insurance: insuranceFromBuffer(insuranceBuffer),
     claimsRegister: claimsRegisterFromBuffer(claimsRegBuffer),
     fuel: fuelFromBuffer(fuelBuffer),
+    rsm: rsmFromBuffer(rsmBuffer),
     tunnelExc: tunnelExcFromBuffer(tunnelExcBuffer),
     schedule: { activities: schedule.activities, relationships: schedule.relationships, wbs: schedule.wbs },
     delaySchedule: { activities: delaySchedule.activities, relationships: delaySchedule.relationships, wbs: delaySchedule.wbs },
@@ -333,7 +348,7 @@ async function buildPayload() {
 
     // Nutstore folder PROPFIND + both XER PROPFINDs + claims PROPFIND + Dropbox
     // fetches + the small schedule-override version marker, all parallel.
-    const [listing, xerInfo, delayXerInfo, claimsInfo, explInfo, insInfo, dbx, schedVer, baseVer, fuelDbx, cvInfo, schedCleared, tunExcInfo] = await Promise.all([
+    const [listing, xerInfo, delayXerInfo, claimsInfo, explInfo, insInfo, dbx, schedVer, baseVer, fuelDbx, cvInfo, schedCleared, tunExcInfo, rsmDbx] = await Promise.all([
       propfind(DAV_BASE + encPath(dir) + '/', headers, 1),
       propfind(DAV_BASE + encPath(xerPath), headers, 0),
       propfind(DAV_BASE + encPath(delayXerPath), headers, 0),
@@ -347,6 +362,7 @@ async function buildPayload() {
       propfind(DAV_BASE + encPath(CLAIMS_REGISTER_XLSX_PATH), headers, 0).catch(() => []),
       kvGet('tkv:schedule_cleared').catch(() => null),
       propfind(DAV_BASE + encPath(TUNNEL_EXC_DIR) + '/', headers, 1).catch(() => []),
+      dbxFetch(RSM_DBX_URL).catch(() => null),
     ]);
     const claimsMtime = (claimsInfo[0] && claimsInfo[0].mtime) || '';
     // Newest xlsx in the Explosive Record folder that matches the workbook name.
@@ -385,6 +401,7 @@ async function buildPayload() {
       fuel: fuelDbx ? fuelDbx.etag : '',
       cvreg: CLAIMS_REGISTER_XLSX_PATH + '|' + cvMtime,
       tunexc: tunExcPath + '|' + tunExcMtime,
+      rsm: rsmDbx ? rsmDbx.etag : '',
     });
     if (payloadCache && payloadCache.sig === sig) { // nothing changed — reuse parsed payload
       payloadCache.ts = Date.now();
@@ -402,7 +419,7 @@ async function buildPayload() {
       tunExcFile ? getBuffer(tunExcPath, tunExcMtime, headers).catch(() => null) : Promise.resolve(null),
     ]);
     const buffers = [...nutBuffers, ...dbx.filter((d) => d.buffer).map((d) => d.buffer)];
-    const payload = assemble(buffers, xerText, delayXerText, 'nutstore', claimsBuffer, explosivesBuffer, insuranceBuffer, fuelDbx && fuelDbx.buffer, claimsRegBuffer, tunnelExcBuffer);
+    const payload = assemble(buffers, xerText, delayXerText, 'nutstore', claimsBuffer, explosivesBuffer, insuranceBuffer, fuelDbx && fuelDbx.buffer, claimsRegBuffer, tunnelExcBuffer, rsmDbx && rsmDbx.buffer);
     payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
     const applied = await applyScheduleOverride(payload);
     if (!applied && schedCleared) payload.schedule = { activities: [], relationships: [], wbs: {}, cleared: true };
@@ -416,6 +433,7 @@ async function buildPayload() {
   const files = fs.readdirSync(dir).filter((f) => (f.endsWith('.xlsx') || f.endsWith('.xer')) && !f.startsWith('~$')).sort();
   const dbx = await fetchDropbox();
   const fuelDbx = await dbxFetch(FUEL_DBX_URL).catch(() => null);
+  const rsmDbx = await dbxFetch(RSM_DBX_URL).catch(() => null);
   const schedVer = await kvGet('tkv:schedule_ver').catch(() => null);
   const baseVer = await kvGet('tkv:baseline_ver').catch(() => null);
   const schedCleared = await kvGet('tkv:schedule_cleared').catch(() => null);
@@ -426,6 +444,7 @@ async function buildPayload() {
     cleared: schedCleared || '',
     dbx: dbx.map((d) => d.name + '|' + d.etag),
     fuel: fuelDbx ? fuelDbx.etag : '',
+    rsm: rsmDbx ? rsmDbx.etag : '',
   });
   if (payloadCache && payloadCache.sig === sig) return stamp(payloadCache.payload);
   const localBuffers = files.filter((f) => f.endsWith('.xlsx') && !DBX_NAMEKEYS.has(normName(f))
@@ -450,7 +469,7 @@ async function buildPayload() {
   const claimsRegBuffer = cvFile ? fs.readFileSync(path.join(dir, cvFile)) : null;
   const tunExcFile = files.find((f) => /tunnel construction progress.*\.xlsx$/i.test(f));
   const tunnelExcBuffer = tunExcFile ? fs.readFileSync(path.join(dir, tunExcFile)) : null;
-  const payload = assemble(buffers, readXer(baselineXf), readXer(delayXf), 'local-file', claimsBuffer, explosivesBuffer, insuranceBuffer, fuelDbx && fuelDbx.buffer, claimsRegBuffer, tunnelExcBuffer);
+  const payload = assemble(buffers, readXer(baselineXf), readXer(delayXf), 'local-file', claimsBuffer, explosivesBuffer, insuranceBuffer, fuelDbx && fuelDbx.buffer, claimsRegBuffer, tunnelExcBuffer, rsmDbx && rsmDbx.buffer);
   payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
   const applied = await applyScheduleOverride(payload);
   if (!applied && schedCleared) payload.schedule = { activities: [], relationships: [], wbs: {}, cleared: true };

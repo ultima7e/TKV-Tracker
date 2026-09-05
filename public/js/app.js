@@ -9,7 +9,7 @@
   const TOKEN_KEY = 'tkv_token';
   const SECTION_LABELS = { exec: 'Executive Summary', fin: 'Financial', sched: 'Schedule & Progress',
     tunnel: 'Tunnel', claims: 'Claims & Variations', inv: 'Inventory & Explosives', ins: 'Insurance & Claims',
-    man: 'Manpower', equip: 'Equipment', safety: 'Safety' };
+    man: 'Manpower', rsm: 'Service & Maintenance', equip: 'Equipment', safety: 'Safety' };
   const ALL_SECTIONS = Object.keys(SECTION_LABELS);
   // Same-origin (hosted) uses the session cookie; the standalone file adds a Bearer token.
   function authFetch(url, opts = {}) {
@@ -488,6 +488,137 @@
         ${locs.length ? `<div class="section-title" style="margin:0 0 9px;font-size:11px">By location</div>${eLoc}` : ''}
         <div style="font-size:10.5px;color:var(--muted);margin-top:8px">Composition · ${nn(nat.f)} foreign · ${nn(nat.o + nat.n)} Nepali</div>`;
       requestAnimationFrame(() => exec.querySelectorAll('i.mp-bar').forEach((b) => { b.style.width = b.dataset.w + '%'; }));
+    }
+  }
+
+  // ---------- Regular Service & Maintenance (B.5) — monthly cost ----------
+  let rsmSel = null; // selected month key
+  let rsmRO = null;  // ResizeObserver so the trend chart fills once its pane is visible
+  function renderRsm() {
+    const r = data.rsm;
+    const panel = $('#rsm-panel'); if (!panel) return;
+    const dateEl = $('#rsm-date');
+    if (!r || r.missing || !r.months || !r.months.length) {
+      if (dateEl) dateEl.textContent = '—';
+      panel.innerHTML = '<p class="muted">Awaiting Regular Service &amp; Maintenance cost data.</p>';
+      return;
+    }
+    if (dateEl) dateEl.textContent = r.latest || '—';
+    if (!rsmSel || !r.byMonth[rsmSel]) rsmSel = r.latestKey;
+
+    const nn = (v) => Math.round(Number(v || 0)).toLocaleString('en-US');
+    const money = (v) => 'Rs ' + nn(v);
+    const moneyC = (v) => { v = Number(v || 0); return v >= 1e6 ? 'Rs ' + (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? 'Rs ' + Math.round(v / 1e3) + 'K' : 'Rs ' + Math.round(v); };
+    const C = MP_COLORS;
+
+    const selMonth = r.months.find((m) => m.key === rsmSel) || { label: rsmSel, total: 0 };
+    const rows = (r.byMonth[rsmSel] || []).slice();
+    const selTotal = selMonth.total || rows.reduce((s, x) => s + x.amount, 0);
+    const curYear = Math.max(...r.months.map((m) => m.year));
+    const ytd = r.months.filter((m) => m.year === curYear && !m.lump).reduce((s, m) => s + m.total, 0);
+    const realMonths = r.months.filter((m) => !m.lump);
+    const avg = realMonths.length ? realMonths.reduce((s, m) => s + m.total, 0) / realMonths.length : 0;
+    // Colour each category consistently across months (by all-time rank).
+    const catColor = {}; r.totals.forEach((t, i) => { catColor[t.category] = C[i % C.length]; });
+
+    const tile = (val, label, color, grad) => `
+      <div style="background:${grad};border-radius:12px;padding:12px 14px">
+        <div style="font-size:21px;font-weight:800;color:${color};letter-spacing:-.5px;line-height:1.05">${moneyC(val)}</div>
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:${color}bb;font-weight:700;margin-top:5px">${label}</div>
+      </div>`;
+    const sub = (t, extra) => `<div class="section-title" style="margin:0 0 12px;display:flex;justify-content:space-between;align-items:baseline"><span>${t}</span>${extra || ''}</div>`;
+    const bar = (name, value, max, color, right) => `
+      <div style="margin-bottom:11px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px">
+          <span style="font-size:12px;font-weight:600;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
+          <span style="font-size:12px;font-weight:800;color:${color};white-space:nowrap">${right}</span>
+        </div>
+        <div style="height:9px;background:#eef2f7;border-radius:6px;overflow:hidden">
+          <i class="rsm-bar" data-w="${max ? Math.max(2, Math.round((value / max) * 100)) : 0}"
+             style="display:block;height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,${color},${color}bb);transition:width 1.1s cubic-bezier(.2,.8,.2,1)"></i>
+        </div>
+      </div>`;
+
+    // ---------- Hero tiles ----------
+    const hero = `
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+        ${tile(selTotal, selMonth.label + ' — cost', '#1f3b66', 'linear-gradient(135deg,#eaf1fb,#dfeaf8)')}
+        ${tile(ytd, curYear + ' to date', '#15764e', 'linear-gradient(135deg,#e8f6ee,#dcefe4)')}
+        ${tile(avg, 'Avg / month', '#8250c4', 'linear-gradient(135deg,#f1ebfb,#e7dcf7)')}
+        ${tile(r.grandTotal, 'All-time total', '#b5502a', 'linear-gradient(135deg,#fbefe8,#f6e4d9)')}
+      </div>`;
+
+    // ---------- Month selector ----------
+    const opts = r.months.slice().reverse().map((m) =>
+      `<option value="${m.key}"${m.key === rsmSel ? ' selected' : ''}>${m.label}${m.lump ? ' (full year)' : ''} — ${money(m.total)}</option>`).join('');
+    const selector = `
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Month</span>
+        <select id="rsm-month" style="padding:7px 11px;border:1px solid var(--line);border-radius:9px;font-size:13px;font-weight:700;color:var(--navy);background:#fff;cursor:pointer;min-width:230px">${opts}</select>
+        <span style="font-size:12px;color:var(--muted)">${rows.length} cost heads · <b style="color:var(--navy)">${money(selTotal)}</b></span>
+      </div>`;
+
+    // ---------- Selected-month breakdown ----------
+    const selMax = Math.max(1, ...rows.map((x) => x.amount));
+    const selBars = rows.map((x) => bar(x.category, x.amount, selMax, catColor[x.category] || C[0],
+      `${money(x.amount)} <span style="font-size:9.5px;color:var(--muted);font-weight:600">${Math.round((x.amount / (selTotal || 1)) * 100)}%</span>`)).join('');
+    const breakCard = `<div class="card">${sub('Cost breakdown — ' + selMonth.label)}
+      ${rows.length ? selBars : '<p class="muted">No cost recorded for this month.</p>'}</div>`;
+
+    // ---------- All-time category ranking ----------
+    const tMax = Math.max(1, ...r.totals.map((t) => t.amount));
+    const totalBars = r.totals.map((t) => bar(t.category, t.amount, tMax, catColor[t.category],
+      `${money(t.amount)} <span style="font-size:9.5px;color:var(--muted);font-weight:600">${Math.round((t.amount / (r.grandTotal || 1)) * 100)}%</span>`)).join('');
+    const rankCard = `<div class="card">${sub('Cost by category', '<span class="muted" style="font-weight:600">all-time</span>')}
+      <div style="max-height:430px;overflow-y:auto;padding-right:4px">${totalBars}</div></div>`;
+
+    // ---------- Layout ----------
+    panel.innerHTML = hero
+      + `<div class="card" style="margin-bottom:16px">${selector}</div>`
+      + `<div class="card" style="margin-bottom:16px">${sub('Monthly cost trend', '<span class="muted" style="font-weight:600">click a bar to inspect a month</span>')}<div id="rsm-chart" style="height:300px"></div></div>`
+      + `<div class="grid row-2" style="align-items:start">${breakCard}${rankCard}</div>`;
+    requestAnimationFrame(() => panel.querySelectorAll('i.rsm-bar').forEach((b) => { b.style.width = b.dataset.w + '%'; }));
+
+    // Month dropdown → reselect.
+    const sel = $('#rsm-month');
+    if (sel) sel.addEventListener('change', (e) => { rsmSel = e.target.value; renderRsm(); });
+
+    // ---------- Monthly trend chart ----------
+    const ch = makeChart('rsm-chart');
+    ch.setOption({
+      tooltip: {
+        trigger: 'axis', axisPointer: { type: 'shadow' }, confine: true, enterable: true,
+        extraCssText: 'max-height:320px;overflow-y:auto',
+        formatter: (ps) => {
+          const key = r.months[ps[0].dataIndex].key;
+          const br = (r.byMonth[key] || []).slice(0, 8);
+          const tot = r.months[ps[0].dataIndex].total;
+          return `<b>${ps[0].axisValue}</b><br/>` + br.map((x) => `${x.category}: <b>${money(x.amount)}</b>`).join('<br/>')
+            + ((r.byMonth[key] || []).length > 8 ? '<br/>…' : '')
+            + `<hr style="border:0;border-top:1px solid #e3e9f2;margin:5px 0"/>Total: <b>${money(tot)}</b>`;
+        },
+      },
+      grid: { left: 62, right: 16, top: 12, bottom: 52 },
+      xAxis: { type: 'category', data: r.months.map((m) => m.label),
+        axisLabel: { fontSize: 10, color: COL.muted, rotate: 42, interval: 0 }, axisLine: { lineStyle: { color: '#cfd8e6' } } },
+      yAxis: { type: 'value', name: 'NRs', nameTextStyle: { fontSize: 10, color: COL.muted },
+        splitLine: { lineStyle: { color: COL.grid } },
+        axisLabel: { fontSize: 10, color: COL.muted, formatter: (v) => (v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? Math.round(v / 1e3) + 'K' : v) } },
+      series: [{
+        type: 'bar', data: r.months.map((m) => ({ value: Math.round(m.total),
+          itemStyle: { color: m.key === rsmSel ? '#e2681f' : '#2f7de1', borderRadius: [4, 4, 0, 0] } })),
+        barMaxWidth: 34,
+      }],
+    }, true);
+    ch.off('click');
+    ch.on('click', (p) => { const m = r.months[p.dataIndex]; if (m) { rsmSel = m.key; renderRsm(); } });
+    // The chart may init while its panel is hidden (0-width). Resize now, and again
+    // whenever the container gains size (i.e. when the section becomes visible).
+    setTimeout(() => { const c = charts['rsm-chart']; if (c) c.resize(); }, 80);
+    if (rsmRO) rsmRO.disconnect();
+    if (typeof ResizeObserver !== 'undefined') {
+      rsmRO = new ResizeObserver(() => { const c = charts['rsm-chart']; if (c) c.resize(); });
+      rsmRO.observe(document.getElementById('rsm-chart'));
     }
   }
 
@@ -2514,6 +2645,7 @@
     renderTunnelBars();
     overlayTunnelExc(); renderTunnel3D(); // pull live section % from the file
     renderManpower();
+    renderRsm();
     renderIpc();
     $('#data-source').textContent = data.source === 'nutstore' ? 'Nutstore' : 'Local sample';
     $('#last-refresh').textContent = 'Last refresh: ' + new Date(data.generatedAt).toLocaleTimeString();
