@@ -1787,6 +1787,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 
   // ---------- Regular Service & Maintenance (B.5) — monthly cost ----------
   let rsmSel = null; // selected month key
+  let rsmExp = null; // Set of expanded years in the trend chart (pivot-style collapse)
   let rsmRO = null;  // ResizeObserver so the trend chart fills once its pane is visible
   function renderRsm() {
     const r = data.rsm;
@@ -1813,6 +1814,34 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const realMonths = r.months.filter((m) => !m.lump);
     const avg = realMonths.length ? realMonths.reduce((s, m) => s + m.total, 0) / realMonths.length : 0;
     const catColor = {}; r.totals.forEach((t, i) => { catColor[t.category] = C[i % C.length]; });
+
+    // ---------- Year grouping for the trend chart (collapsible like the pivot) ----------
+    const yearsAll = [...new Set(r.months.map((m) => m.year))].sort((a, b) => a - b);
+    const monthsByYear = {}, yearHasMonths = {}, yearTotal = {};
+    yearsAll.forEach((y) => {
+      monthsByYear[y] = r.months.filter((m) => m.year === y);
+      yearHasMonths[y] = monthsByYear[y].some((m) => !m.lump);
+      yearTotal[y] = monthsByYear[y].reduce((s, m) => s + m.total, 0);
+    });
+    // First render: expand the latest year that has months; earlier years stay collapsed.
+    if (rsmExp === null) { const ry = yearsAll.filter((y) => yearHasMonths[y]); rsmExp = new Set(ry.length ? [ry[ry.length - 1]] : []); }
+    const yearCats = (y) => {
+      const agg = {}; for (const m of monthsByYear[y]) for (const x of (r.byMonth[m.key] || [])) agg[x.category] = (agg[x.category] || 0) + x.amount;
+      return Object.entries(agg).map(([category, amount]) => ({ category, amount })).sort((a, b) => b.amount - a.amount);
+    };
+    // Flatten years into chart items — a collapsed year is one bar; an expanded one shows its months.
+    const items = [];
+    for (const y of yearsAll) {
+      if (!yearHasMonths[y]) { items.push({ kind: 'yearlump', year: y, label: String(y), total: yearTotal[y] }); continue; }
+      if (rsmExp.has(y)) monthsByYear[y].filter((m) => !m.lump).forEach((m) => items.push({ kind: 'month', key: m.key, label: m.label, total: m.total, year: y }));
+      else items.push({ kind: 'year', year: y, label: String(y), total: yearTotal[y] });
+    }
+    // Clickable year toggles (▸ collapsed / ▾ expanded), mirroring the pivot's +/-.
+    const yrChips = yearsAll.map((y) => {
+      const can = yearHasMonths[y], on = rsmExp.has(y);
+      return `<span class="rsm-yr" data-y="${y}" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;margin-left:6px;border:1px solid ${on ? '#2f7de1' : 'var(--line)'};color:${on ? '#2f7de1' : 'var(--muted)'};background:${on ? '#eaf1fb' : '#fff'};cursor:${can ? 'pointer' : 'default'};${can ? '' : 'opacity:.55'}">${can ? (on ? '▾' : '▸') + ' ' : ''}${y}</span>`;
+    }).join('');
+    const trendExtra = `<span style="display:flex;align-items:center;font-weight:600"><span class="muted" style="font-size:10.5px">expand year</span>${yrChips}</span>`;
 
     const tile = (val, label, color, grad) => `
       <div style="background:${grad};border-radius:12px;padding:12px 14px">
@@ -1863,12 +1892,17 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 
     panel.innerHTML = hero
       + `<div class="card" style="margin-bottom:16px">${selector}</div>`
-      + `<div class="card" style="margin-bottom:16px">${sub('Monthly cost trend', '<span class="muted" style="font-weight:600">click a bar to inspect a month</span>')}<div id="rsm-chart" style="height:300px"></div></div>`
+      + `<div class="card" style="margin-bottom:16px">${sub('Monthly cost trend', trendExtra)}<div id="rsm-chart" style="height:300px"></div></div>`
       + `<div class="grid row-2" style="align-items:start">${breakCard}${rankCard}</div>`;
     requestAnimationFrame(() => panel.querySelectorAll('i.rsm-bar').forEach((b) => { b.style.width = b.dataset.w + '%'; }));
 
     const sel = $('#rsm-month');
     if (sel) sel.addEventListener('change', (e) => { rsmSel = e.target.value; renderRsm(); });
+    // Year expand/collapse chips (mirror the pivot's +/-).
+    panel.querySelectorAll('.rsm-yr').forEach((el) => el.addEventListener('click', () => {
+      const y = Number(el.dataset.y); if (!yearHasMonths[y]) return;
+      if (rsmExp.has(y)) rsmExp.delete(y); else rsmExp.add(y); renderRsm();
+    }));
 
     const ch = makeChart('rsm-chart');
     ch.setOption({
@@ -1876,28 +1910,35 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
         trigger: 'axis', axisPointer: { type: 'shadow' }, confine: true, enterable: true,
         extraCssText: 'max-height:320px;overflow-y:auto',
         formatter: (ps) => {
-          const key = r.months[ps[0].dataIndex].key;
-          const br = (r.byMonth[key] || []).slice(0, 8);
-          const tot = r.months[ps[0].dataIndex].total;
-          return `<b>${ps[0].axisValue}</b><br/>` + br.map((x) => `${x.category}: <b>${money(x.amount)}</b>`).join('<br/>')
-            + ((r.byMonth[key] || []).length > 8 ? '<br/>…' : '')
-            + `<hr style="border:0;border-top:1px solid #e3e9f2;margin:5px 0"/>Total: <b>${money(tot)}</b>`;
+          const it = items[ps[0].dataIndex]; if (!it) return '';
+          const cats = it.kind === 'month' ? (r.byMonth[it.key] || []) : yearCats(it.year);
+          const hint = it.kind === 'year' ? '<div style="color:#2f7de1;font-size:10.5px;margin:2px 0 3px">click to expand months →</div>' : '';
+          return `<b>${it.label}${it.kind !== 'month' ? ' · year' : ''}</b><br/>` + hint
+            + cats.slice(0, 8).map((x) => `${x.category}: <b>${money(x.amount)}</b>`).join('<br/>')
+            + (cats.length > 8 ? '<br/>…' : '')
+            + `<hr style="border:0;border-top:1px solid #e3e9f2;margin:5px 0"/>Total: <b>${money(it.total)}</b>`;
         },
       },
       grid: { left: 62, right: 16, top: 12, bottom: 52 },
-      xAxis: { type: 'category', data: r.months.map((m) => m.label),
-        axisLabel: { fontSize: 10, color: COL.muted, rotate: 42, interval: 0 }, axisLine: { lineStyle: { color: '#cfd8e6' } } },
+      xAxis: { type: 'category', data: items.map((it) => it.label),
+        axisLabel: { fontSize: 10, color: COL.muted, rotate: 42, interval: 0,
+          formatter: (v, i) => (items[i] && items[i].kind === 'year' ? '▸ ' + v : v) },
+        axisLine: { lineStyle: { color: '#cfd8e6' } } },
       yAxis: { type: 'value', name: 'NRs', nameTextStyle: { fontSize: 10, color: COL.muted },
         splitLine: { lineStyle: { color: COL.grid } },
         axisLabel: { fontSize: 10, color: COL.muted, formatter: (v) => (v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? Math.round(v / 1e3) + 'K' : v) } },
       series: [{
-        type: 'bar', data: r.months.map((m) => ({ value: Math.round(m.total),
-          itemStyle: { color: m.key === rsmSel ? '#e2681f' : '#2f7de1', borderRadius: [4, 4, 0, 0] } })),
-        barMaxWidth: 34,
+        type: 'bar', data: items.map((it) => ({ value: Math.round(it.total),
+          itemStyle: { color: it.kind === 'month' ? (it.key === rsmSel ? '#e2681f' : '#2f7de1') : '#1f3b66', borderRadius: [4, 4, 0, 0] } })),
+        barMaxWidth: 40,
       }],
     }, true);
     ch.off('click');
-    ch.on('click', (p) => { const m = r.months[p.dataIndex]; if (m) { rsmSel = m.key; renderRsm(); } });
+    ch.on('click', (p) => {
+      const it = items[p.dataIndex]; if (!it) return;
+      if (it.kind === 'year') { rsmExp.add(it.year); renderRsm(); }
+      else if (it.kind === 'month') { rsmSel = it.key; renderRsm(); }
+    });
     setTimeout(() => { const c = charts['rsm-chart']; if (c) c.resize(); }, 80);
     if (rsmRO) rsmRO.disconnect();
     if (typeof ResizeObserver !== 'undefined') {
