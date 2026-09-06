@@ -49,6 +49,12 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .btn-refresh:hover{filter:brightness(1.08);transform:translateY(-1px)}
 .btn-refresh.spin .ic{animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+/* Mobile-only logout: the sidebar footer (with its Log out) is hidden on phones,
+   so surface a compact logout button in the top bar instead. */
+.btn-logout-m{display:none;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);
+  color:#fff;border-radius:7px;padding:7px 9px;cursor:pointer;align-items:center;justify-content:center}
+.btn-logout-m svg{width:17px;height:17px;display:block}
+.btn-logout-m:active{background:rgba(255,255,255,.22)}
 
 .content{flex:1;overflow-y:auto;padding:20px 22px}
 .view{display:none;animation:fade .45s ease}
@@ -430,6 +436,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   .topbar h1{font-size:12px;letter-spacing:.2px}
   .topbar .right{gap:10px}
   .btn-refresh{padding:7px 13px}
+  .btn-logout-m{display:inline-flex}
   .content{padding:14px}
   /* Render code sets inline grid-template-columns (repeat(6,1fr) etc.), which beats
      a plain CSS rule — so force multi-column grids down to 2 with !important. */

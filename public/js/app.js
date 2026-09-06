@@ -47,11 +47,12 @@
       } catch (ex) { err.textContent = ex.message; }
       finally { btn.disabled = false; btn.textContent = 'Sign in'; }
     });
-    const lo = document.getElementById('logout');
-    if (lo) lo.addEventListener('click', async () => {
+    const doLogout = async () => {
       try { await authFetch('/api/logout', { method: 'POST' }); } catch (e) { /* ignore */ }
       localStorage.removeItem(TOKEN_KEY); location.reload();
-    });
+    };
+    // #logout lives in the sidebar footer (desktop); #logout-m is the topbar button (mobile).
+    ['logout', 'logout-m'].forEach((id) => { const b = document.getElementById(id); if (b) b.addEventListener('click', doLogout); });
   }
   function startApp() {
     const ls = document.getElementById('login-screen'); if (ls) ls.style.display = 'none';
