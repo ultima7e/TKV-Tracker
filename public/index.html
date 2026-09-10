@@ -233,6 +233,7 @@
         <div class="sched-tabs">
           <button class="sched-tab on" data-invtab="expl">Explosives</button>
           <button class="sched-tab" data-invtab="fuel">Fuel</button>
+          <button class="sched-tab" data-invtab="elec">Electricity</button>
         </div>
         <div class="stab-pane" id="invtab-expl">
         <div class="card" style="margin-bottom:16px">
@@ -279,6 +280,13 @@
             </div>
             <div id="fuel-chart" class="chart" style="height:360px"></div>
           </div>
+        </div>
+        <div class="stab-pane" id="invtab-elec" hidden>
+          <div class="card" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+            <h3 style="margin:0">Electricity Cost <span class="muted" style="font-weight:600">· NEA billing · monthly by connection</span></h3>
+            <span class="badge neu" style="font-size:11px">NEA · monthly bills</span>
+          </div>
+          <div id="elec-panel"><p class="muted">Awaiting electricity data.</p></div>
         </div>
       </section>
       <section class="view" id="ins">

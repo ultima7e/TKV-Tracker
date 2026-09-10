@@ -761,6 +761,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
         <div class="sched-tabs">
           <button class="sched-tab on" data-invtab="expl">Explosives</button>
           <button class="sched-tab" data-invtab="fuel">Fuel</button>
+          <button class="sched-tab" data-invtab="elec">Electricity</button>
         </div>
         <div class="stab-pane" id="invtab-expl">
         <div class="card" style="margin-bottom:16px">
@@ -807,6 +808,13 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
             </div>
             <div id="fuel-chart" class="chart" style="height:360px"></div>
           </div>
+        </div>
+        <div class="stab-pane" id="invtab-elec" hidden>
+          <div class="card" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+            <h3 style="margin:0">Electricity Cost <span class="muted" style="font-weight:600">· NEA billing · monthly by connection</span></h3>
+            <span class="badge neu" style="font-size:11px">NEA · monthly bills</span>
+          </div>
+          <div id="elec-panel"><p class="muted">Awaiting electricity data.</p></div>
         </div>
       </section>
       <section class="view" id="ins">
@@ -1976,6 +1984,148 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     if (typeof ResizeObserver !== 'undefined') {
       rsmRO = new ResizeObserver(() => { const c = charts['rsm-chart']; if (c) c.resize(); });
       rsmRO.observe(document.getElementById('rsm-chart'));
+    }
+  }
+
+  // ---------- Electricity (NEA billing) — monthly cost by connection ----------
+  let elecSel = null; // selected month key
+  let elecExp = null; // Set of expanded years in the trend chart
+  let elecRO = null;  // ResizeObserver so the trend chart fills once its pane is visible
+  function renderElec() {
+    const e = data.electricity;
+    const panel = $('#elec-panel'); if (!panel) return;
+    if (!e || e.missing || !e.months || !e.months.length) {
+      panel.innerHTML = '<p class="muted">Awaiting electricity data.</p>';
+      return;
+    }
+    if (!elecSel || !e.byMonth[elecSel]) elecSel = e.latestKey;
+
+    const nn = (v) => Math.round(Number(v || 0)).toLocaleString('en-US');
+    const money = (v) => 'Rs ' + nn(v);
+    const moneyC = (v) => { v = Number(v || 0); return v >= 1e6 ? 'Rs ' + (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? 'Rs ' + Math.round(v / 1e3) + 'K' : 'Rs ' + Math.round(v); };
+    const C = MP_COLORS;
+
+    const selMonth = e.months.find((m) => m.key === elecSel) || { label: elecSel, total: 0, units: 0 };
+    const rows = (e.byMonth[elecSel] || []).slice();
+    const selTotal = selMonth.total || rows.reduce((s, x) => s + x.amount, 0);
+    const curYear = Math.max(...e.months.map((m) => m.year));
+    const ytd = e.months.filter((m) => m.year === curYear).reduce((s, m) => s + m.total, 0);
+    const avg = e.months.length ? e.months.reduce((s, m) => s + m.total, 0) / e.months.length : 0;
+    // consistent colour per connection by all-time rank
+    const locColor = {}; e.locations.forEach((t, i) => { locColor[t.location] = C[i % C.length]; });
+
+    const tile = (val, label, color, grad, sub) => `
+      <div style="background:${grad};border-radius:12px;padding:12px 14px">
+        <div style="font-size:21px;font-weight:800;color:${color};letter-spacing:-.5px;line-height:1.05">${moneyC(val)}</div>
+        <div style="font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:${color}bb;font-weight:700;margin-top:5px">${label}${sub ? ` <span style="text-transform:none;letter-spacing:0">· ${sub}</span>` : ''}</div>
+      </div>`;
+    const sub = (t, extra) => `<div class="section-title" style="margin:0 0 12px;display:flex;justify-content:space-between;align-items:baseline"><span>${t}</span>${extra || ''}</div>`;
+    const bar = (name, value, max, color, right) => `
+      <div style="margin-bottom:11px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px">
+          <span style="font-size:12px;font-weight:600;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>
+          <span style="font-size:12px;font-weight:800;color:${color};white-space:nowrap">${right}</span>
+        </div>
+        <div style="height:9px;background:#eef2f7;border-radius:6px;overflow:hidden">
+          <i class="elec-bar" data-w="${max ? Math.max(2, Math.round((value / max) * 100)) : 0}"
+             style="display:block;height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,${color},${color}bb);transition:width 1.1s cubic-bezier(.2,.8,.2,1)"></i>
+        </div>
+      </div>`;
+
+    const hero = `
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+        ${tile(selTotal, selMonth.label, '#1f3b66', 'linear-gradient(135deg,#eaf1fb,#dfeaf8)', (selMonth.units || 0).toLocaleString() + ' kWh')}
+        ${tile(ytd, curYear + ' to date', '#15764e', 'linear-gradient(135deg,#e8f6ee,#dcefe4)')}
+        ${tile(avg, 'Avg / month', '#8250c4', 'linear-gradient(135deg,#f1ebfb,#e7dcf7)')}
+        ${tile(e.grandTotal, 'All-time total', '#b5502a', 'linear-gradient(135deg,#fbefe8,#f6e4d9)', e.meterCount + ' meters')}
+      </div>`;
+
+    // Year grouping for the trend chart (collapsible like the RSM panel).
+    const yearsAll = [...new Set(e.months.map((m) => m.year))].sort((a, b) => a - b);
+    const monthsByYear = {}, yearTotal = {};
+    yearsAll.forEach((y) => { monthsByYear[y] = e.months.filter((m) => m.year === y); yearTotal[y] = monthsByYear[y].reduce((s, m) => s + m.total, 0); });
+    if (elecExp === null) elecExp = new Set(yearsAll.length ? [yearsAll[yearsAll.length - 1]] : []);
+    const yearLocs = (y) => { const agg = {}; for (const m of monthsByYear[y]) for (const x of (e.byMonth[m.key] || [])) agg[x.location] = (agg[x.location] || 0) + x.amount; return Object.entries(agg).map(([location, amount]) => ({ location, amount })).sort((a, b) => b.amount - a.amount); };
+    const items = [];
+    for (const y of yearsAll) {
+      if (elecExp.has(y)) monthsByYear[y].forEach((m) => items.push({ kind: 'month', key: m.key, label: m.label, total: m.total, year: y }));
+      else items.push({ kind: 'year', year: y, label: String(y), total: yearTotal[y] });
+    }
+    const yrChips = yearsAll.map((y) => {
+      const on = elecExp.has(y);
+      return `<span class="elec-yr" data-y="${y}" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;margin-left:6px;border:1px solid ${on ? '#2f7de1' : 'var(--line)'};color:${on ? '#2f7de1' : 'var(--muted)'};background:${on ? '#eaf1fb' : '#fff'};cursor:pointer">${(on ? '▾' : '▸') + ' '}${y}</span>`;
+    }).join('');
+    const trendExtra = `<span style="display:flex;align-items:center;font-weight:600"><span class="muted" style="font-size:10.5px">expand year</span>${yrChips}</span>`;
+
+    const opts = e.months.slice().reverse().map((m) =>
+      `<option value="${m.key}"${m.key === elecSel ? ' selected' : ''}>${m.label} — ${money(m.total)}</option>`).join('');
+    const selector = `
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Month</span>
+        <select id="elec-month" style="padding:7px 11px;border:1px solid var(--line);border-radius:9px;font-size:13px;font-weight:700;color:var(--navy);background:#fff;cursor:pointer;min-width:210px">${opts}</select>
+        <span style="font-size:12px;color:var(--muted)">${rows.length} connections · <b style="color:var(--navy)">${money(selTotal)}</b></span>
+      </div>`;
+
+    const selMax = Math.max(1, ...rows.map((x) => x.amount));
+    const selBars = rows.map((x) => bar(x.location, x.amount, selMax, locColor[x.location] || C[0],
+      `${money(x.amount)} <span style="font-size:9.5px;color:var(--muted);font-weight:600">${Math.round((x.amount / (selTotal || 1)) * 100)}%</span>`)).join('');
+    const breakCard = `<div class="card">${sub('Cost by connection — ' + selMonth.label)}
+      ${rows.length ? selBars : '<p class="muted">No billing recorded for this month.</p>'}</div>`;
+
+    const tMax = Math.max(1, ...e.locations.map((t) => t.amount));
+    const totalBars = e.locations.map((t) => bar(t.location, t.amount, tMax, locColor[t.location],
+      `${money(t.amount)} <span style="font-size:9.5px;color:var(--muted);font-weight:600">${Math.round((t.amount / (e.grandTotal || 1)) * 100)}%</span>`)).join('');
+    const rankCard = `<div class="card">${sub('Cost by connection', '<span class="muted" style="font-weight:600">all-time</span>')}
+      <div style="max-height:430px;overflow-y:auto;padding-right:4px">${totalBars}</div></div>`;
+
+    panel.innerHTML = hero
+      + `<div class="card" style="margin-bottom:16px">${selector}</div>`
+      + `<div class="card" style="margin-bottom:16px">${sub('Monthly electricity cost', trendExtra)}<div id="elec-chart" style="height:300px"></div></div>`
+      + `<div class="grid row-2" style="align-items:start">${breakCard}${rankCard}</div>`;
+    requestAnimationFrame(() => panel.querySelectorAll('i.elec-bar').forEach((b) => { b.style.width = b.dataset.w + '%'; }));
+
+    const selEl = $('#elec-month');
+    if (selEl) selEl.addEventListener('change', (ev) => { elecSel = ev.target.value; renderElec(); });
+    panel.querySelectorAll('.elec-yr').forEach((el) => el.addEventListener('click', () => {
+      const y = Number(el.dataset.y); if (elecExp.has(y)) elecExp.delete(y); else elecExp.add(y); renderElec();
+    }));
+
+    const ch = makeChart('elec-chart');
+    ch.setOption({
+      tooltip: {
+        trigger: 'axis', axisPointer: { type: 'shadow' }, confine: true, enterable: true,
+        extraCssText: 'max-height:320px;overflow-y:auto',
+        formatter: (ps) => {
+          const it = items[ps[0].dataIndex]; if (!it) return '';
+          const locs = it.kind === 'month' ? (e.byMonth[it.key] || []) : yearLocs(it.year);
+          const hint = it.kind === 'year' ? '<div style="color:#2f7de1;font-size:10.5px;margin:2px 0 3px">click to expand months →</div>' : '';
+          return `<b>${it.label}${it.kind !== 'month' ? ' · year' : ''}</b><br/>` + hint
+            + locs.slice(0, 8).map((x) => `${x.location}: <b>${money(x.amount)}</b>`).join('<br/>')
+            + (locs.length > 8 ? '<br/>…' : '')
+            + `<hr style="border:0;border-top:1px solid #e3e9f2;margin:5px 0"/>Total: <b>${money(it.total)}</b>`;
+        },
+      },
+      grid: { left: 62, right: 16, top: 12, bottom: 52 },
+      xAxis: { type: 'category', data: items.map((it) => it.label),
+        axisLabel: { fontSize: 10, color: COL.muted, rotate: 42, interval: 0,
+          formatter: (v, i) => (items[i] && items[i].kind === 'year' ? '▸ ' + v : v) },
+        axisLine: { lineStyle: { color: '#cfd8e6' } } },
+      yAxis: { type: 'value', name: 'NRs', nameTextStyle: { fontSize: 10, color: COL.muted },
+        splitLine: { lineStyle: { color: COL.grid } },
+        axisLabel: { fontSize: 10, color: COL.muted, formatter: (v) => (v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? Math.round(v / 1e3) + 'K' : v) } },
+      series: [{
+        type: 'bar', data: items.map((it) => ({ value: Math.round(it.total),
+          itemStyle: { color: it.kind === 'month' ? (it.key === elecSel ? '#e2681f' : '#e0a52e') : '#1f3b66', borderRadius: [4, 4, 0, 0] } })),
+        barMaxWidth: 40,
+      }],
+    }, true);
+    ch.off('click');
+    ch.on('click', (p) => { const it = items[p.dataIndex]; if (!it) return; if (it.kind === 'year') { elecExp.add(it.year); renderElec(); } else if (it.kind === 'month') { elecSel = it.key; renderElec(); } });
+    setTimeout(() => { const c = charts['elec-chart']; if (c) c.resize(); }, 80);
+    if (elecRO) elecRO.disconnect();
+    if (typeof ResizeObserver !== 'undefined') {
+      elecRO = new ResizeObserver(() => { const c = charts['elec-chart']; if (c) c.resize(); });
+      elecRO.observe(document.getElementById('elec-chart'));
     }
   }
 
@@ -3497,15 +3647,20 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       document.querySelectorAll('#inv .sched-tab[data-invtab]').forEach((btn) => btn.addEventListener('click', () => {
         const which = btn.dataset.invtab;
         document.querySelectorAll('#inv .sched-tab[data-invtab]').forEach((b) => b.classList.toggle('on', b === btn));
-        const ep = document.getElementById('invtab-expl'), fp = document.getElementById('invtab-fuel');
+        const ep = document.getElementById('invtab-expl'), fp = document.getElementById('invtab-fuel'), lp = document.getElementById('invtab-elec');
         if (ep) ep.hidden = which !== 'expl';
         if (fp) fp.hidden = which !== 'fuel';
+        if (lp) lp.hidden = which !== 'elec';
         // (Re)draw now that the pane is visible, then resize — the chart was
         // init'd while its pane was hidden (0-width), so it must re-measure the
         // now-visible container or the bars stay crammed into a narrow strip.
         if (which === 'fuel') {
           renderFuel();
           setTimeout(() => { if (charts['fuel-chart']) charts['fuel-chart'].resize(); }, 80);
+        }
+        if (which === 'elec') {
+          renderElec();
+          setTimeout(() => { if (charts['elec-chart']) charts['elec-chart'].resize(); }, 80);
         }
       }));
     }
@@ -3515,6 +3670,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     overlayTunnelExc(); renderTunnel3D(); // pull live section % from the file
     renderManpower();
     renderRsm();
+    renderElec();
     renderIpc();
     $('#data-source').textContent = data.source === 'nutstore' ? 'Nutstore' : 'Local sample';
     $('#last-refresh').textContent = 'Last refresh: ' + new Date(data.generatedAt).toLocaleTimeString();
