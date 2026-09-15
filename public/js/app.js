@@ -872,10 +872,12 @@
     if (/settl|complete|paid/.test(t)) return 'Settled';
     if (/partial/.test(t)) return 'Partial';
     if (/remain/.test(t)) return 'Remaining';
+    if (/submit/.test(t)) return 'Submitted';
     return 'Under Review';
   }
-  // Badge colour per status: Settled green, Partial amber, Remaining/Rejected red.
-  const ipcStatusClass = (label) => (label === 'Settled' ? 'ok' : label === 'Rejected' || label === 'Remaining' ? 'bad' : 'warn');
+  // Badge colour per status: Settled green, Partial amber, Remaining/Rejected red,
+  // Submitted neutral (awaiting certification).
+  const ipcStatusClass = (label) => (label === 'Settled' ? 'ok' : label === 'Rejected' || label === 'Remaining' ? 'bad' : label === 'Submitted' ? 'neu' : 'warn');
 
   function renderIpc() {
     // Interim Payment Certificates only — the Advance Payment is a separate
@@ -1392,9 +1394,28 @@
         : '<div class="muted" style="font-size:11px">No per-activity breakdown recorded for this certificate.</div>'}
       </div>`;
     };
-    // Reverse chronological — newest IPC first (Advance Payment, the oldest, last).
-    const ipcsDesc = ipcs.slice().sort((a, b) => (b.certifiedDate || '').localeCompare(a.certifiedDate || ''));
-    document.getElementById('f-ipclist').innerHTML = ipcsDesc.map((i, idx) => `
+    // Newest IPC first (by number); Advance Payment last. This keeps a just-
+    // submitted IPC (no certified date) at the top instead of sinking to the end.
+    const ipcNum = (i) => { if (i.isAdvance) return -1; const m = String(i.ipc).match(/\d+/); return m ? +m[0] : 0; };
+    const ipcsDesc = ipcs.slice().sort((a, b) => ipcNum(b) - ipcNum(a));
+    // "Certified" once it has a certified value/date. Just-submitted IPCs show a
+    // compact row with no activity breakdown until they're certified.
+    const isCertified = (i) => i.isAdvance || !!i.certifiedDate || (i.netNPR || 0) > 0 || (i.netUSD || 0) > 0;
+    document.getElementById('f-ipclist').innerHTML = ipcsDesc.map((i, idx) => {
+      if (!isCertified(i)) {
+        const sub = (i.detail && (i.detail.ipsDate || i.detail.certLetter)) ? ('submitted' + (i.detail.ipsDate ? ' · ' + i.detail.ipsDate : '')) : 'just submitted';
+        return `
+      <div class="ipc ipc-submitted" data-i="${idx}">
+        <div class="ipc-head" style="cursor:default">
+          <span class="ipc-name">${i.ipc}</span>
+          <span class="ipc-date">${sub}</span>
+          <span class="ipc-amt muted" style="grid-column:3 / 5">Awaiting certification — activity appears once certified</span>
+          ${statusBadge(i.status)}
+          <span class="ipc-caret" style="visibility:hidden">▸</span>
+        </div>
+      </div>`;
+      }
+      return `
       <div class="ipc" data-i="${idx}">
         <div class="ipc-head">
           <span class="ipc-name">${i.ipc}</span>
@@ -1409,8 +1430,9 @@
           ${i.items.length ? '<div class="ipc-sub">Work Items (' + i.items.length + ')</div>' + itemsTable(i.items) : ''}
           ${detailPanel(i)}
         </div>
-      </div>`).join('');
-    document.querySelectorAll('#f-ipclist .ipc-head').forEach((h) =>
+      </div>`;
+    }).join('');
+    document.querySelectorAll('#f-ipclist .ipc:not(.ipc-submitted) .ipc-head').forEach((h) =>
       h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
     document.querySelectorAll('#f-ipclist .ipc-details-btn').forEach((b) =>
       b.addEventListener('click', (e) => {
