@@ -96,7 +96,9 @@ const EXPLOSIVES_XLSX_PATH = 'Shared Folder/Explosive Record/Daily Explosive Con
 // Daily Tunnel Construction Progress Chart Summary — per-workfront excavation.
 // The file name carries a date that changes as it's re-saved, so resolve it by
 // scanning the folder for the newest matching workbook (rename-proof).
-const TUNNEL_EXC_DIR = 'Progress Review Meetings';
+// Live tunnel workbook the team updates weekly (This Week Progress column). Kept
+// in the ProgressTracker folder alongside ForScurve; newest matching file wins.
+const TUNNEL_EXC_DIR = 'Shared Folder/ProgressTracker';
 const TUNNEL_EXC_RE = /tunnel construction progress.*\.xlsx$/i;
 // NEA electricity billing summary — its own Nutstore file (rename-proof folder scan).
 const ELEC_DIR = 'Miscellaneous/Electricity';

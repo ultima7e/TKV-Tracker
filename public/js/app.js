@@ -278,19 +278,30 @@
   }
 
   function renderAdvanceChart(id) {
-    const rows = (data.tunnel && data.tunnel.monthlyAdvance) || [];
+    // Weekly advance per workfront (this-week metres) from the tunnel workbook's
+    // "This Week Progress" column — busiest at the top.
+    const te = data.tunnelExc || {};
+    const rows = (te.weekly || []).slice().sort((a, b) => a.advance - b.advance); // asc → biggest on top in a horizontal bar
+    const dateEl = document.getElementById('tun-week-date');
+    if (dateEl) dateEl.textContent = te.weekDate ? ('week of ' + te.weekDate) : '';
+    if (!rows.length) {
+      makeChart(id).setOption({ title: { text: 'No advance recorded this week', left: 'center', top: 'middle', textStyle: { color: COL.muted, fontSize: 12, fontWeight: 400 } }, xAxis: { show: false }, yAxis: { show: false }, series: [] }, true);
+      return;
+    }
     makeChart(id).setOption({
-      grid: { left: 38, right: 12, top: 18, bottom: 24 },
-      tooltip: { trigger: 'axis' },
-      xAxis: { type: 'category', data: rows.map((r) => r.month),
-        axisLabel: { fontSize: 10, color: COL.muted }, axisLine: { lineStyle: { color: '#cfd8e6' } } },
-      yAxis: { type: 'value', splitLine: { lineStyle: { color: COL.grid } },
+      grid: { left: 8, right: 44, top: 10, bottom: 20, containLabel: true },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' },
+        formatter: (ps) => `${ps[0].name}<br/><b>+${ps[0].value} m</b> this week` },
+      xAxis: { type: 'value', splitLine: { lineStyle: { color: COL.grid } },
         axisLabel: { fontSize: 10, color: COL.muted } },
-      series: [{ type: 'bar', data: rows.map((r) => r.advanceM), barWidth: '52%',
-        itemStyle: { borderRadius: [4, 4, 0, 0],
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1,
+      yAxis: { type: 'category', data: rows.map((r) => r.loc.replace(/ Tunnel$/, '')),
+        axisLabel: { fontSize: 10, color: COL.muted }, axisLine: { lineStyle: { color: '#cfd8e6' } } },
+      series: [{ type: 'bar', data: rows.map((r) => r.advance), barWidth: '58%',
+        label: { show: true, position: 'right', fontSize: 10, color: COL.muted, formatter: '{c} m' },
+        itemStyle: { borderRadius: [0, 4, 4, 0],
+          color: new echarts.graphic.LinearGradient(0, 0, 1, 0,
             [{ offset: 0, color: COL.accent }, { offset: 1, color: COL.accent2 }]) } }],
-    });
+    }, true);
   }
 
   function renderSCurve(id) {
@@ -353,12 +364,23 @@
 
   function renderTunnelBars() {
     const wrap = $('#tunnel-bars');
-    const tunnels = (data.tunnel && data.tunnel.tunnels) || [];
+    const te = data.tunnelExc;
+    // Active (in-progress) workfronts from the live tunnel workbook, most-advanced
+    // first. Falls back to the legacy summary if the workbook isn't available.
+    let tunnels;
+    if (te && te.areas && te.areas.length) {
+      tunnels = te.areas.flatMap((a) => a.workfronts)
+        .filter((w) => w.status === 'In Progress')
+        .sort((a, b) => b.pct - a.pct)
+        .map((w) => ({ name: w.loc, completedM: w.excavated, lengthM: w.design, progressPct: w.pct }));
+    } else {
+      tunnels = (data.tunnel && data.tunnel.tunnels) || [];
+    }
     wrap.innerHTML = tunnels.map((t) => `
       <div class="pbar">
-        <div class="lab"><span>${t.name} <span class="muted">(${t.completedM.toLocaleString()} / ${t.lengthM.toLocaleString()} m)</span></span><span>${t.progressPct}%</span></div>
+        <div class="lab"><span>${t.name} <span class="muted">(${(t.completedM || 0).toLocaleString()} / ${(t.lengthM || 0).toLocaleString()} m)</span></span><span>${t.progressPct}%</span></div>
         <div class="track"><i data-w="${t.progressPct}"></i></div>
-      </div>`).join('');
+      </div>`).join('') || '<p class="muted">No active tunnel faces.</p>';
     requestAnimationFrame(() => {
       wrap.querySelectorAll('.track > i').forEach((b) => { b.style.width = b.dataset.w + '%'; });
     });
@@ -936,7 +958,7 @@
     'Connecting Tunnel': ['U/S Connecting Tunnel (UTK-TKV)', 'D/S Connecting Tunnel (UTK-TKV)'],
     'Headpond Layer 1~4': ['Headpond 1st Layer', 'Headpond 2nd Layer', 'Headpond 3rd Layer', 'Headpond 4th Layer'],
     'HRT-F1': ['HRT Face-1 Tunnel'],
-    'Headrace Tunnel (F1~F7)': ['HRT Face-1 Tunnel', 'HRT Face-2 Tunnel', 'HRT Face-3 Tunnel'],
+    'Headrace Tunnel (F1~F7)': ['HRT Face-1 Tunnel', 'HRT Face-2 Tunnel', 'HRT Face-3 Tunnel', 'HRT Face-4 Tunnel', 'HRT Face-5 Tunnel', 'HRT Face-6 Tunnel', 'HRT Face-7 Tunnel'],
     'BusDuct Gallery 1~3': ['Bus Duct Gallery-1', 'Bus Duct Gallery-2', 'Bus Duct Gallery-3'],
     'Access to HPT': ['Access To Horizontal Pressure Tunnel'],
     'HPT & U/S Manifold (1~4)': ['Horizontal Pressure Tunnel', 'U/S Manifold Branch-1,2,3&4'],
@@ -953,15 +975,20 @@
     for (const area of TUNNEL_AREAS) {
       for (const s of area.sections) {
         const names = TUN_SRC[s.name] || [s.name];
-        let d = 0, e = 0, uom = 'm', found = 0;
-        for (const nm of names) { const w = wf[tunNorm(nm)]; if (w) { d += w.design || 0; e += w.excavated || 0; uom = w.uom; found++; } }
+        let d = 0, e = 0, wk = 0, uom = 'm', found = 0, allDone = true;
+        for (const nm of names) { const w = wf[tunNorm(nm)]; if (w) { d += w.design || 0; e += w.excavated || 0; wk += w.weekAdvance || 0; uom = w.uom; found++; if (w.status !== 'Complete') allDone = false; } }
         if (found) {
-          s.pct = d ? Math.round((e / d) * 1000) / 10 : 0;
+          const done = allDone || (d && e >= d * 0.9995);
+          s.pct = done ? 100 : (d ? Math.round((e / d) * 1000) / 10 : 0);
           s.excavated = (Math.round(e * 100) / 100).toLocaleString() + ' ' + uom;
           s.design = (Math.round(d * 100) / 100).toLocaleString() + ' ' + uom;
+          s.status = done ? 'Complete' : s.pct > 0 ? 'In Progress' : 'Not Started';
+          s.weekAdvance = Math.round(wk * 100) / 100;
         }
       }
-      if (te.sheet) area.dataDate = te.sheet;
+      // Data date = the workbook's "This Week Progress" date (the team updates it).
+      if (te.weekDate) area.dataDate = te.weekDate;
+      else if (te.sheet) area.dataDate = te.sheet;
     }
   }
   let t3dArea = TUNNEL_AREAS[0];
@@ -1014,13 +1041,17 @@
       const col = t3dColor(s.pct);
       wrap.querySelectorAll('.t3d-dot').forEach((d, j) => d.classList.toggle('active', j === i));
       legend.querySelectorAll('li').forEach((li, j) => li.classList.toggle('active', j === i));
+      const statusTxt = s.status === 'Complete'
+        ? '<span style="color:#1c7a52;font-weight:800">✓ Complete</span>'
+        : (s.status || (s.pct == null ? 'Not started / in design' : 'In Progress'));
       detail.innerHTML =
         '<div class="dn">' + s.name + '</div>' +
-        '<div class="dbig" style="color:' + col + '">' + pctTxt(s.pct) + '</div>' +
+        '<div class="dbig" style="color:' + (s.status === 'Complete' ? '#1c7a52' : col) + '">' + (s.status === 'Complete' ? '100%' : pctTxt(s.pct)) + '</div>' +
         '<div class="pbar"><div class="track"><i style="width:' + (s.pct || 0) + '%;background:' + col + '"></i></div></div>' +
+        '<div class="drow"><span>Status</span><span>' + statusTxt + '</span></div>' +
         '<div class="drow"><span>Design</span><span>' + s.design + '</span></div>' +
         (s.excavated ? '<div class="drow"><span>Excavated</span><span>' + s.excavated + '</span></div>' : '') +
-        (s.pct == null ? '<div class="drow"><span>Status</span><span>Not started / in design</span></div>' : '') +
+        (s.weekAdvance ? '<div class="drow"><span>This week</span><span>+' + s.weekAdvance + ' m</span></div>' : '') +
         '<div class="drow"><span>Data date</span><span>' + t3dArea.dataDate + '</span></div>';
     };
 
@@ -1043,7 +1074,10 @@
       legend.innerHTML = area.sections.map((s, i) =>
         '<li data-i="' + i + '"><span class="ld" style="background:' + t3dColor(s.pct) + '"></span>' +
         '<span class="nm">' + s.name + '</span>' +
-        '<span class="pc" style="color:' + t3dColor(s.pct) + '">' + pctTxt(s.pct) + '</span></li>').join('');
+        (s.status === 'Complete'
+          ? '<span class="pc" style="color:#1c7a52">✓ Complete</span>'
+          : '<span class="pc" style="color:' + t3dColor(s.pct) + '">' + pctTxt(s.pct) + '</span>') +
+        '</li>').join('');
       legend.querySelectorAll('li').forEach((li) =>
         li.addEventListener('click', () => selectSection(+li.dataset.i)));
       detail.innerHTML = '<p class="muted">Select a tunnel section to see its progress.</p>';
