@@ -3330,6 +3330,12 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   const cvChip = (cat) => `<span class="cv-chip" style="background:${(CV_BASISCOL[cat] || '#8a8f98') + '22'};color:${CV_BASISCOL[cat] || '#556'}">${cat}</span>`;
   const CV_PREFIX = { claim: 'SoC-', variation: 'VAR-', pclaim: 'PC-', pvariation: 'PV-' };
   const cvItemLabel = (r) => (CV_PREFIX[r.kind] || '') + r.ref; // unique within a tab; also the row key
+  // Headline count = the highest ref number reached (so a skipped number — e.g. a
+  // missing SoC-9 — still reads as 11), never fewer than the actual rows.
+  const cvRaised = (rows) => {
+    const maxRef = (rows || []).reduce((m, r) => { const n = parseInt((String(r.ref).match(/\d+/) || [0])[0], 10) || 0; return n > m ? n : m; }, 0);
+    return Math.max(maxRef, (rows || []).length);
+  };
   const cvKindChip = (kind) => { const v = kind === 'pvariation' || kind === 'variation'; return `<span class="cv-chip" style="background:${v ? '#e0a52e22' : '#2f6fd022'};color:${v ? '#b9772a' : '#2f6fd0'}">${v ? 'Variation' : 'Claim'}</span>`; };
 
   const CV = {
@@ -3405,10 +3411,10 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const v = cvValueSplit(rows);
     const totalLetters = rows.reduce((s, r) => s + r.letters.length, 0);
     const kpiCards = cfg.merge
-      ? `${cvKpiCard('Potential Claims', (cv.pclaims || []).length, 'no value yet', 'target', '#c2557a')}
-         ${cvKpiCard('Potential Variations', (cv.pvariations || []).length, cvUsd(v.total), 'edit', '#7a6ad0')}
+      ? `${cvKpiCard('Potential Claims', cvRaised(cv.pclaims || []), 'no value yet', 'target', '#c2557a')}
+         ${cvKpiCard('Potential Variations', cvRaised(cv.pvariations || []), cvUsd(v.total), 'edit', '#7a6ad0')}
          ${cvKpiCard('Correspondence', totalLetters, 'letters logged', 'clock', '#2f6fd0')}`
-      : `${cvKpiCard(cfg.title + ' Raised', rows.length, cvUsd(v.total), 'scales', '#6b46c9')}
+      : `${cvKpiCard(cfg.title + ' Raised', cvRaised(rows), cvUsd(v.total), 'scales', '#6b46c9')}
          ${cvKpiCard('Submitted Value', cvUsdShort(v.total), '', 'doc', '#1d8a63')}
          ${cvKpiCard('Approved Value', cvUsdShort(v.approved), '', 'check', '#2f6fd0')}
          ${cvKpiCard('Pending Value', cvUsdShort(v.pending), '', 'clock', '#e0952e')}`;
@@ -3490,13 +3496,13 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const av = cvValueSplit([...cv.claims, ...cv.variations]);
     el.innerHTML =
       `<div class="cv-kpis">
-        ${cvKpiCard('Total Claims', k.claimsCount, cvUsd(k.claimsValue), 'doc', '#2f6fd0')}
-        ${cvKpiCard('Variations', k.variationsCount, cvUsd(k.variationsValue), 'edit', '#6b46c9')}
+        ${cvKpiCard('Total Claims', cvRaised(cv.claims), cvUsd(k.claimsValue), 'doc', '#2f6fd0')}
+        ${cvKpiCard('Variations', cvRaised(cv.variations), cvUsd(k.variationsValue), 'edit', '#6b46c9')}
         ${cvKpiCard('Total Exposure', cvUsdShort(k.totalValue), cvUsd(k.totalValue), 'scales', '#1d8a63')}
         ${cvKpiCard('Approved Value', cvUsdShort(av.approved), 'determined / approved', 'check', '#1a9aa8')}
         ${cvKpiCard('Pending Value', cvUsdShort(av.pending), 'awaiting outcome', 'clock', '#e0952e')}
-        ${cvKpiCard('Potential Claims', k.pClaimsCount == null ? '–' : k.pClaimsCount, 'in pipeline', 'target', '#c2557a')}
-        ${cvKpiCard('Potential Variations', k.pVariationsCount == null ? '–' : k.pVariationsCount, cvUsd(k.pVariationsValue), 'edit', '#7a6ad0')}
+        ${cvKpiCard('Potential Claims', cv.pclaims ? cvRaised(cv.pclaims) : '–', 'in pipeline', 'target', '#c2557a')}
+        ${cvKpiCard('Potential Variations', cv.pvariations ? cvRaised(cv.pvariations) : '–', cvUsd(k.pVariationsValue), 'edit', '#7a6ad0')}
        </div>
        <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
          <div class="card"><h3>Value by Contractual Basis <span class="muted" style="font-weight:600">· click a slice</span></h3><div id="cv-donut" class="chart" style="height:260px"></div>
@@ -3679,28 +3685,39 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     }
   }
 
-  async function load() {
+  let lastPayloadSig = null;
+  async function load(opts) {
+    const silent = !!(opts && opts.silent); // auto-refresh: no spinner, re-render only if data changed
     const btn = $('#refresh');
-    btn.classList.add('spin');
+    if (!silent) btn.classList.add('spin');
     try {
       const res = await authFetch('/api/data');
-      if (res.status === 401) { showLogin('Your session has expired — please sign in again.'); return; }
+      if (res.status === 401) { if (!silent) showLogin('Your session has expired — please sign in again.'); return; }
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+      // generatedAt changes every response; compare everything else so a silent
+      // auto-refresh only repaints (and re-animates) when something actually changed.
+      const { generatedAt, ...rest } = json;
+      const sig = JSON.stringify(rest);
+      const changed = sig !== lastPayloadSig; lastPayloadSig = sig;
       data = json;
       hideBanner();
-      renderAll();
+      if (!silent || changed) renderAll();
+      else $('#last-refresh').textContent = 'Last refresh: ' + new Date(json.generatedAt).toLocaleTimeString();
     } catch (err) {
-      showBanner(
+      if (!silent) showBanner(
         data
           ? "Couldn't refresh from data source — showing last loaded data. (" + err.message + ')'
           : "Couldn't load data: " + err.message,
         false
       );
     } finally {
-      btn.classList.remove('spin');
+      if (!silent) btn.classList.remove('spin');
     }
   }
+  // Auto-refresh so newly-added claims/variations/etc. appear without a manual
+  // Refresh. Silent, repaints only on change, and pauses while the tab is hidden.
+  setInterval(() => { if (me && document.visibilityState === 'visible') load({ silent: true }); }, 180000);
 
   document.getElementById('nav').addEventListener('click', (e) => {
     const item = e.target.closest('.nav-item');
