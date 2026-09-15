@@ -1381,6 +1381,7 @@
         ['Certified letter', i.certifiedLetter || dt.certLetter],
         ['IPS submission', dt.ipsDate], ['Certified date', i.certifiedDate || dt.certDate],
         ['Due date', i.dueDate || dt.dueDate], ['Exchange rate', i.exchangeRate || dt.exchangeRate],
+        ['Received (USD)', dt.receivedUSD ? fUSD(dt.receivedUSD) : (i.receivedUSD ? fUSD(i.receivedUSD) : null)],
         ['Received (NPR)', dt.receivedNPR ? fNPR(dt.receivedNPR) : (i.receivedNPR ? fNPR(i.receivedNPR) : null)],
         ['Remaining (NPR)', dt.remainingNPR ? fNPR(dt.remainingNPR) : null],
       ].filter(([, v]) => v != null && v !== '').map(([k, v]) => `<div class="ipc-di"><span>${k}</span><b>${v}</b></div>`).join('');
@@ -1421,7 +1422,7 @@
           <span class="ipc-name">${i.ipc}</span>
           <span class="ipc-date">${i.certifiedDate || ''}</span>
           <span class="ipc-amt">Net <b>$${usdM(i.netUSD)}M</b> / <b>NPR ${nprM(i.netNPR)}M</b></span>
-          <span class="ipc-amt">Recv <b>NPR ${nprM(i.receivedNPR)}M</b></span>
+          <span class="ipc-amt">Recv <b>$${usdM(i.receivedUSD)}M</b> / <b>NPR ${nprM(i.receivedNPR)}M</b></span>
           ${statusBadge(i.status)}
           <span class="ipc-caret">▸</span>
         </div>
