@@ -3293,81 +3293,50 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     chart.resize();
   }
 
-  // Weekly Progress snapshot — summarised from the Weekly Technical Progress
-  // Review PPT shown to the OE (Meeting No. 28, data date 26-Jun-2026).
-  const WEEKLY = {
-    meeting: 'No. 29', dataDate: '03 Jul 2026',
-    overall: { plan: 72.13, actual: 21.01, varc: -51.12, wk: 0.30 },
-    tunnels: [
-      { name: 'HRT F-1', pct: 34.84, week: 20.90, plan: 30 },
-      { name: 'HRT F-2', pct: 7.20, week: 25.42, plan: 30 },
-      { name: 'HRT F-3', pct: 3.05, week: 3.19, plan: 18 },
-      { name: 'Adit #3', pct: 97.72, week: 26.59, plan: 21.84 },
-      { name: 'Adit #4', pct: 95.74, week: 19.65, plan: 15 },
-      { name: 'Access to Valve Chamber', pct: 46.34, week: 9.68, plan: 15 },
-    ],
-    hse: { safeHrs: 2266209, safeHrsWk: 43428, recordable: 15, recordableWk: 0, lti: 1, nearMiss: 1, firstAid: 92, ch: 42, on: 100, ln: 376, mpWk: 50 },
-    explosives: [
-      { name: 'Explosives #32mm (kg)', week: 7239.7, stock: 103364.5 },
-      { name: 'Detonating Cord (m)', week: 2424.49, stock: 78724 },
-      { name: 'Electric Detonator (pcs)', week: 74, stock: 3634 },
-      { name: 'Non-Electric Detonator (pcs)', week: 6939, stock: 310702 },
-    ],
-    qc: { ncrTotal: 29, ncrOpen: 11, ncrClosed: 16, ncrWk: 2, rfiTotal: 1749, rfiApproved: 1511, rfiRejected: 238, rfiWk: 40 },
-  };
+  // Tunnel Progress summary (Exec Summary) — LIVE from the tunnel workbook
+  // (data.tunnelExc): overall excavation, faces complete / in-progress, this-week
+  // advance, an active-faces table and per-face weekly advance. Replaces the old
+  // hardcoded "Weekly Progress" (Meeting-29) snapshot.
   function renderWeekly() {
     const el = document.getElementById('weekly');
     if (!el) return;
-    const w = WEEKLY;
-    const n = (v) => Number(v).toLocaleString('en-US');
+    const te = data.tunnelExc;
+    if (!te || te.missing || !te.areas || !te.areas.length) {
+      el.innerHTML = '<div class="card" style="margin-bottom:16px"><h3>Tunnel Progress</h3><p class="muted">Awaiting tunnel data.</p></div>';
+      return;
+    }
+    const all = te.areas.flatMap((a) => a.workfronts);
+    const totDesign = all.reduce((s, w) => s + (w.design || 0), 0);
+    const totExc = all.reduce((s, w) => s + (w.excavated || 0), 0);
+    const overallPct = totDesign ? Math.round((totExc / totDesign) * 1000) / 10 : 0;
+    const active = all.filter((w) => w.status === 'In Progress')
+      .sort((a, b) => (b.weekAdvance || 0) - (a.weekAdvance || 0) || b.pct - a.pct);
+    const wk = (te.weekly || []);
+    const c = te.counts || {};
     const sub = (t) => `<div class="ipc-sub" style="margin:0 0 6px">${t}</div>`;
-    const tun = w.tunnels.map((t) => `<tr><td style="text-align:left">${t.name}</td><td>${t.pct}%</td><td>${t.week.toFixed(2)}</td><td class="muted">${t.plan}</td></tr>`).join('');
-    const exp = w.explosives.map((e) => `<tr><td style="text-align:left">${e.name}</td><td>${n(e.week)}</td><td>${n(e.stock)}</td></tr>`).join('');
-    // HSE & safety — stat tiles (nicer than a table for these headline metrics).
-    const h = w.hse;
-    const mpTot = h.ch + h.on + h.ln;
-    const evTile = (val, label, color) => `<div style="background:#f4f7fb;border-radius:9px;padding:8px 4px;text-align:center">
-      <div style="font-size:16px;font-weight:800;color:${color};line-height:1">${val}</div>
-      <div style="font-size:8.5px;text-transform:uppercase;letter-spacing:.3px;color:#8595aa;font-weight:700;margin-top:3px">${label}</div></div>`;
-    const hseCard = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div style="background:linear-gradient(135deg,#edf7f1,#e2f1e9);border-radius:11px;padding:10px 12px">
-          <div style="font-size:19px;font-weight:800;color:#15764e;letter-spacing:-.5px;line-height:1">${n(h.safeHrs)}</div>
-          <div style="font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#5b7c6c;font-weight:700;margin-top:4px">Safe man-hours</div>
-          <div style="font-size:10.5px;color:#1c9c66;font-weight:700;margin-top:3px">▲ ${n(h.safeHrsWk)} this week</div>
-        </div>
-        <div style="background:linear-gradient(135deg,#fbf3ee,#f7e9e0);border-radius:11px;padding:10px 12px">
-          <div style="font-size:19px;font-weight:800;color:#b5502a;letter-spacing:-.5px;line-height:1">${h.recordable}</div>
-          <div style="font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#9a6f5c;font-weight:700;margin-top:4px">Recordable incidents</div>
-          <div style="font-size:10.5px;color:#9a6f5c;font-weight:700;margin-top:3px">${h.recordableWk > 0 ? '+' + h.recordableWk + ' this week' : 'no change this week'}</div>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px">
-        ${evTile(h.lti, 'LTI', h.lti > 0 ? '#c0392b' : '#1f3b66')}
-        ${evTile(h.nearMiss, 'Near miss', h.nearMiss > 0 ? '#b5802a' : '#1f3b66')}
-        ${evTile(h.firstAid, 'First aid', '#1f3b66')}
-      </div>
-      <div style="background:#eef2fb;border-radius:11px;padding:9px 13px;margin-top:8px;display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <div style="font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#7b8aa0;font-weight:700">Manpower on site</div>
-          <div style="font-size:11px;color:#51637e;font-weight:600;margin-top:3px">CH ${h.ch} · ON ${h.on} · LN ${h.ln}</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:20px;font-weight:800;color:#1f3b66;letter-spacing:-.5px;line-height:1">${mpTot}</div>
-          <div style="font-size:10px;color:#1c9c66;font-weight:700;margin-top:2px">▲ +${h.mpWk} this week</div>
-        </div>
-      </div>`;
+    const tile = (val, label, color, grad) => `<div style="background:${grad};border-radius:11px;padding:10px 12px">
+      <div style="font-size:19px;font-weight:800;color:${color};letter-spacing:-.5px;line-height:1">${val}</div>
+      <div style="font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:${color}bb;font-weight:700;margin-top:4px">${label}</div></div>`;
+    const facesRows = active.map((w) => `<tr><td style="text-align:left">${w.loc.replace(/ Tunnel$/, '')}</td>
+      <td>${w.pct}%</td><td>${(w.weekAdvance || 0).toFixed(2)}</td></tr>`).join('')
+      || '<tr><td colspan="3" class="muted" style="text-align:center;padding:10px">No active faces this week.</td></tr>';
+    const wkMax = Math.max(1, ...wk.map((x) => x.advance));
+    const wkBars = wk.map((x) => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+      <span style="font-size:11px;color:#41506a;width:82px;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${x.loc.replace(/ Tunnel$/, '')}</span>
+      <span style="flex:1;height:8px;background:#eef2f7;border-radius:5px;overflow:hidden"><i style="display:block;height:100%;width:${Math.max(4, Math.round((x.advance / wkMax) * 100))}%;border-radius:5px;background:linear-gradient(90deg,#2f7de1,#e23744)"></i></span>
+      <span style="font-size:11.5px;font-weight:800;color:var(--navy);width:54px;text-align:right;flex:none">${x.advance.toFixed(1)} m</span></div>`).join('')
+      || '<p class="muted">No advance recorded this week.</p>';
     el.innerHTML = `<div class="card" style="margin-bottom:16px">
-      <h3>Weekly Progress <span class="muted" style="font-weight:600">· Meeting ${w.meeting} · data date ${w.dataDate}</span></h3>
-      <div style="font-size:12.5px;color:#41506a;margin:2px 0 14px">Overall progress (cost-based): Plan <b>${w.overall.plan}%</b> · Actual <b>${w.overall.actual}%</b> · <b style="color:var(--red)">Variance ${w.overall.varc}%</b> · this week <b>+${w.overall.wk}%</b></div>
-      <div class="grid" style="grid-template-columns:1fr 1fr;gap:14px 24px">
-        <div>${sub('Tunnel excavation — active faces')}<table class="tbl"><thead><tr><th style="text-align:left">Workface</th><th>Excav&nbsp;%</th><th>This&nbsp;wk&nbsp;(m)</th><th>Plan</th></tr></thead><tbody>${tun}</tbody></table></div>
-        <div>${sub('HSE &amp; safety')}${hseCard}</div>
-        <div>${sub('Explosives consumption')}<table class="tbl"><thead><tr><th style="text-align:left">Item</th><th>This&nbsp;wk</th><th>In&nbsp;stock</th></tr></thead><tbody>${exp}</tbody></table></div>
-        <div>${sub('QC — NCR &amp; RFI')}<table class="tbl"><tbody>
-          <tr><td style="text-align:left">NCR (total / open / closed)</td><td colspan="2">${w.qc.ncrTotal} / ${w.qc.ncrOpen} / ${w.qc.ncrClosed} <span class="muted">(+${w.qc.ncrWk} wk)</span></td></tr>
-          <tr><td style="text-align:left">RFI (total / approved / rejected)</td><td colspan="2">${n(w.qc.rfiTotal)} / ${n(w.qc.rfiApproved)} / ${w.qc.rfiRejected} <span class="muted">(+${w.qc.rfiWk} wk)</span></td></tr>
-        </tbody></table></div>
+      <h3>Tunnel Progress <span class="muted" style="font-weight:600">· excavation · week of ${te.weekDate || '—'}</span></h3>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:2px 0 14px">
+        ${tile(overallPct + '%', 'Overall excavated', '#1f3b66', 'linear-gradient(135deg,#eaf1fb,#dfeaf8)')}
+        ${tile(c.complete != null ? c.complete + ' / ' + c.total : '—', 'Faces complete', '#15764e', 'linear-gradient(135deg,#e8f6ee,#dcefe4)')}
+        ${tile(c.inProgress != null ? c.inProgress : '—', 'Faces active', '#8250c4', 'linear-gradient(135deg,#f1ebfb,#e7dcf7)')}
+        ${tile((te.weekAdvanceTotal || 0).toFixed(1) + ' m', 'Advanced this week', '#b5502a', 'linear-gradient(135deg,#fbefe8,#f6e4d9)')}
+      </div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:14px 24px;align-items:start">
+        <div>${sub('Active faces')}<table class="tbl"><thead><tr><th style="text-align:left">Workface</th><th>Excav&nbsp;%</th><th>This&nbsp;wk&nbsp;(m)</th></tr></thead><tbody>${facesRows}</tbody></table></div>
+        <div>${sub('Weekly advance (m)')}${wkBars}</div>
       </div>
     </div>`;
   }
