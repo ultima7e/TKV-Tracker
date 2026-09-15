@@ -883,11 +883,14 @@
     // Interim Payment Certificates only — the Advance Payment is a separate
     // instrument, never listed under IPCs. The Exec Summary shows just the
     // latest few; the full register lives in the Financial panel.
+    // Newest first by IPC number so a just-submitted IPC (no certified date) still
+    // leads the list instead of sinking to the bottom.
+    const ipcNum = (i) => { const m = String(i.ipc).match(/\d+/); return m ? +m[0] : 0; };
     const all = ((data.financeDetail && data.financeDetail.ipcs) || [])
       .filter((i) => !i.isAdvance)
       .slice()
-      .sort((a, b) => (b.certifiedDate || '').localeCompare(a.certifiedDate || ''));
-    const rows = all.slice(0, 4);
+      .sort((a, b) => ipcNum(b) - ipcNum(a));
+    const rows = all.slice(0, 5);
     $('#ipc-count').textContent = all.length ? `latest ${rows.length} of ${all.length}` : '—';
     if (!rows.length) return;
     const fmtDate = (iso) => {
