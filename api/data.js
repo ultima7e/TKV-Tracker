@@ -103,8 +103,10 @@ const TUNNEL_EXC_RE = /tunnel construction progress.*\.xlsx$/i;
 // NEA electricity billing summary — its own Nutstore file (rename-proof folder scan).
 const ELEC_DIR = 'Miscellaneous/Electricity';
 const ELEC_RE = /electric.*\.xlsx$/i;
-// Insurance register — its own Nutstore file (only the 'Summary' sheet is read).
-const INSURANCE_XLSX_PATH = 'Insurance and Bank Gurantee/Insurance/Insurance.xlsx';
+// Insurance register — its own Nutstore file. Repointed 2026-09-19 to the newer
+// maintained workbook (…/Insurance/Policy/insurance.xlsx); the old
+// …/Insurance/Insurance.xlsx was outdated (last touched Jul 2026).
+const INSURANCE_XLSX_PATH = 'Insurance and Bank Gurantee/Insurance/Policy/insurance.xlsx';
 // Claims & Variations register — its own Nutstore workbook (Claim + Variation
 // sheets), parsed in isolation. Host the register file at this path.
 const CLAIMS_REGISTER_XLSX_PATH = 'Shared Folder/Claims & Variation/claim and variation (details for presentation)(1).xlsx';
@@ -231,7 +233,7 @@ function explosivesFromBuffer(buffer) {
 function insuranceFromBuffer(buffer) {
   if (!buffer) return null;
   try {
-    const { matrices } = workbookSheets(buffer, ['Summary', 'CAR Policy', 'Professional Indemnity Insuranc', 'P&E(CPM)']);
+    const { matrices } = workbookSheets(buffer, ['Appr. insurace cost till end', 'Summary', '1.CAR Policy', '2. Professional Indemnity', '3. GPA', '4.P&E(CPM)', 'CAR Policy', 'Professional Indemnity Insuranc', 'P&E(CPM)']);
     const i = parseInsurance(matrices);
     return i && !i.missing ? i : null;
   } catch (e) { return null; }
