@@ -2480,32 +2480,43 @@
       .sort((a, b) => (b.weekAdvance || 0) - (a.weekAdvance || 0) || b.pct - a.pct);
     const wk = (te.weekly || []);
     const c = te.counts || {};
+    // The source file only carries weekly advance when it has a "This Week"
+    // column; when it doesn't, drop the (all-zero) weekly panel + tile and just
+    // show a tight top-faces list so the exec card stays a summary, not a dump.
+    const hasWeek = (te.weekAdvanceTotal || 0) > 0 || wk.length > 0;
+    const TOPN = 6;
+    const shown = active.slice(0, TOPN);
+    const moreN = active.length - shown.length;
     const sub = (t) => `<div class="ipc-sub" style="margin:0 0 6px">${t}</div>`;
     const tile = (val, label, color, grad) => `<div style="background:${grad};border-radius:11px;padding:10px 12px">
       <div style="font-size:19px;font-weight:800;color:${color};letter-spacing:-.5px;line-height:1">${val}</div>
       <div style="font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:${color}bb;font-weight:700;margin-top:4px">${label}</div></div>`;
-    const facesRows = active.map((w) => `<tr><td style="text-align:left">${w.loc.replace(/ Tunnel$/, '')}</td>
-      <td>${w.pct}%</td><td>${(w.weekAdvance || 0).toFixed(2)}</td></tr>`).join('')
-      || '<tr><td colspan="3" class="muted" style="text-align:center;padding:10px">No active faces this week.</td></tr>';
+    const bar = (p) => `<span style="display:inline-block;width:60px;height:6px;background:#eef2f7;border-radius:4px;vertical-align:middle;margin-right:8px;overflow:hidden"><i style="display:block;height:100%;width:${Math.min(100, p)}%;background:linear-gradient(90deg,#2f7de1,#e23744)"></i></span>`;
+    const facesRows = shown.map((w) => `<tr><td style="text-align:left">${w.loc.replace(/ Tunnel$/, '')}</td>
+      <td style="white-space:nowrap;text-align:right">${bar(w.pct)}<b style="font-size:12.5px;color:var(--navy)">${w.pct}%</b></td>
+      ${hasWeek ? `<td style="text-align:right">${(w.weekAdvance || 0).toFixed(2)}</td>` : ''}</tr>`).join('')
+      || `<tr><td colspan="${hasWeek ? 3 : 2}" class="muted" style="text-align:center;padding:10px">No active faces.</td></tr>`;
+    const moreRow = moreN > 0 ? `<div class="muted" style="font-size:11px;margin-top:8px">+ ${moreN} more active face${moreN > 1 ? 's' : ''} · see the Tunnel tab for the full list</div>` : '';
     const wkMax = Math.max(1, ...wk.map((x) => x.advance));
     const wkBars = wk.map((x) => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
       <span style="font-size:11px;color:#41506a;width:82px;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${x.loc.replace(/ Tunnel$/, '')}</span>
       <span style="flex:1;height:8px;background:#eef2f7;border-radius:5px;overflow:hidden"><i style="display:block;height:100%;width:${Math.max(4, Math.round((x.advance / wkMax) * 100))}%;border-radius:5px;background:linear-gradient(90deg,#2f7de1,#e23744)"></i></span>
-      <span style="font-size:11.5px;font-weight:800;color:var(--navy);width:54px;text-align:right;flex:none">${x.advance.toFixed(1)} m</span></div>`).join('')
-      || '<p class="muted">No advance recorded this week.</p>';
-    el.innerHTML = `<div class="card" style="margin-bottom:16px">
-      <h3>Tunnel Progress <span class="muted" style="font-weight:600">· excavation · week of ${te.weekDate || '—'}</span></h3>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:2px 0 14px">
+      <span style="font-size:11.5px;font-weight:800;color:var(--navy);width:54px;text-align:right;flex:none">${x.advance.toFixed(1)} m</span></div>`).join('');
+    const facesTable = `<table class="tbl"><thead><tr><th style="text-align:left">Workface</th><th style="text-align:right">Excavated</th>${hasWeek ? '<th>This&nbsp;wk&nbsp;(m)</th>' : ''}</tr></thead><tbody>${facesRows}</tbody></table>${moreRow}`;
+    const heading = `<h3>Tunnel Progress <span class="muted" style="font-weight:600">· excavation${hasWeek ? ' · week of ' + (te.weekDate || '—') : ''}</span></h3>`;
+    const tiles = `<div style="display:grid;grid-template-columns:repeat(${hasWeek ? 4 : 3},1fr);gap:8px;margin:2px 0 14px">
         ${tile(overallPct + '%', 'Overall excavated', '#1f3b66', 'linear-gradient(135deg,#eaf1fb,#dfeaf8)')}
         ${tile(c.complete != null ? c.complete + ' / ' + c.total : '—', 'Faces complete', '#15764e', 'linear-gradient(135deg,#e8f6ee,#dcefe4)')}
         ${tile(c.inProgress != null ? c.inProgress : '—', 'Faces active', '#8250c4', 'linear-gradient(135deg,#f1ebfb,#e7dcf7)')}
-        ${tile((te.weekAdvanceTotal || 0).toFixed(1) + ' m', 'Advanced this week', '#b5502a', 'linear-gradient(135deg,#fbefe8,#f6e4d9)')}
-      </div>
-      <div class="grid" style="grid-template-columns:1fr 1fr;gap:14px 24px;align-items:start">
-        <div>${sub('Active faces')}<table class="tbl"><thead><tr><th style="text-align:left">Workface</th><th>Excav&nbsp;%</th><th>This&nbsp;wk&nbsp;(m)</th></tr></thead><tbody>${facesRows}</tbody></table></div>
-        <div>${sub('Weekly advance (m)')}${wkBars}</div>
-      </div>
-    </div>`;
+        ${hasWeek ? tile((te.weekAdvanceTotal || 0).toFixed(1) + ' m', 'Advanced this week', '#b5502a', 'linear-gradient(135deg,#fbefe8,#f6e4d9)') : ''}
+      </div>`;
+    const body = hasWeek
+      ? `<div class="grid" style="grid-template-columns:1fr 1fr;gap:14px 24px;align-items:start">
+        <div>${sub('Top active faces')}${facesTable}</div>
+        <div>${sub('Weekly advance (m)')}${wkBars || '<p class="muted">No advance recorded this week.</p>'}</div>
+      </div>`
+      : `<div style="max-width:560px">${sub('Top active faces')}${facesTable}</div>`;
+    el.innerHTML = `<div class="card" style="margin-bottom:16px">${heading}${tiles}${body}</div>`;
   }
 
   // Claims & Variations — curated snapshot of the Claim & Variation Log
