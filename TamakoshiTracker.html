@@ -651,7 +651,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
         </div>
         <div class="grid row-2" style="margin-bottom:16px">
           <div class="card"><h3>Tunnel Progress (% complete)</h3><div id="tunnel-bars"></div></div>
-          <div class="card"><h3>Weekly Advance (m) <span class="muted" id="tun-week-date" style="font-weight:600;text-transform:none;letter-spacing:0"></span></h3><div id="ch-tunnel-advance" class="chart"></div></div>
+          <div class="card"><h3><span id="tun-week-hdr">Monthly Advance (m)</span> <span class="muted" id="tun-week-date" style="font-weight:600;text-transform:none;letter-spacing:0"></span></h3><div id="ch-tunnel-advance" class="chart"></div></div>
         </div>
       </section>
 
@@ -1614,20 +1614,27 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   }
 
   function renderAdvanceChart(id) {
-    // Weekly advance per workfront (this-week metres) from the tunnel workbook's
-    // "This Week Progress" column — busiest at the top.
+    // Advance per workfront from the tunnel workbook — the latest month's
+    // "Total in <month>" progress (falling back to the weekly "This Week"
+    // column if the file carries one) — busiest at the top.
     const te = data.tunnelExc || {};
-    const rows = (te.weekly || []).slice().sort((a, b) => a.advance - b.advance); // asc → biggest on top in a horizontal bar
+    const hasMonth = (te.monthAdvanceTotal || 0) > 0 || (te.monthly || []).length > 0;
+    const src = hasMonth ? (te.monthly || []) : (te.weekly || []);
+    const pWord = hasMonth ? 'month' : 'week';
+    const pLabel = hasMonth ? (te.monthLabel || '') : (te.weekDate || '');
+    const rows = src.slice().sort((a, b) => a.advance - b.advance); // asc → biggest on top in a horizontal bar
+    const hdrEl = document.getElementById('tun-week-hdr');
+    if (hdrEl) hdrEl.textContent = (hasMonth ? 'Monthly' : 'Weekly') + ' Advance (m)';
     const dateEl = document.getElementById('tun-week-date');
-    if (dateEl) dateEl.textContent = te.weekDate ? ('week of ' + te.weekDate) : '';
+    if (dateEl) dateEl.textContent = pLabel ? (pWord + ' of ' + pLabel) : '';
     if (!rows.length) {
-      makeChart(id).setOption({ title: { text: 'No advance recorded this week', left: 'center', top: 'middle', textStyle: { color: COL.muted, fontSize: 12, fontWeight: 400 } }, xAxis: { show: false }, yAxis: { show: false }, series: [] }, true);
+      makeChart(id).setOption({ title: { text: 'No advance recorded this ' + pWord, left: 'center', top: 'middle', textStyle: { color: COL.muted, fontSize: 12, fontWeight: 400 } }, xAxis: { show: false }, yAxis: { show: false }, series: [] }, true);
       return;
     }
     makeChart(id).setOption({
       grid: { left: 8, right: 44, top: 10, bottom: 20, containLabel: true },
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' },
-        formatter: (ps) => `${ps[0].name}<br/><b>+${ps[0].value} m</b> this week` },
+        formatter: (ps) => `${ps[0].name}<br/><b>+${ps[0].value} m</b> this ${pWord}` },
       xAxis: { type: 'value', splitLine: { lineStyle: { color: COL.grid } },
         axisLabel: { fontSize: 10, color: COL.muted } },
       yAxis: { type: 'category', data: rows.map((r) => r.loc.replace(/ Tunnel$/, '')),
@@ -3312,14 +3319,20 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const totDesign = all.reduce((s, w) => s + (w.design || 0), 0);
     const totExc = all.reduce((s, w) => s + (w.excavated || 0), 0);
     const overallPct = totDesign ? Math.round((totExc / totDesign) * 1000) / 10 : 0;
-    const active = all.filter((w) => w.status === 'In Progress')
-      .sort((a, b) => (b.weekAdvance || 0) - (a.weekAdvance || 0) || b.pct - a.pct);
-    const wk = (te.weekly || []);
     const c = te.counts || {};
-    // The source file only carries weekly advance when it has a "This Week"
-    // column; when it doesn't, drop the (all-zero) weekly panel + tile and just
-    // show a tight top-faces list so the exec card stays a summary, not a dump.
-    const hasWeek = (te.weekAdvanceTotal || 0) > 0 || wk.length > 0;
+    // Advance panel: prefer the latest-month progress ("Total in <month>"); fall
+    // back to weekly if the file ever carries a "This Week" column. Whichever is
+    // present drives the advance table column, tile and bars.
+    const hasMonth = (te.monthAdvanceTotal || 0) > 0 || (te.monthly || []).length > 0;
+    const advKey = hasMonth ? 'monthAdvance' : 'weekAdvance';
+    const wk = hasMonth ? (te.monthly || []) : (te.weekly || []);
+    const has = hasMonth || (te.weekAdvanceTotal || 0) > 0 || wk.length > 0;
+    const advTotal = hasMonth ? (te.monthAdvanceTotal || 0) : (te.weekAdvanceTotal || 0);
+    const pWord = hasMonth ? 'month' : 'week';
+    const pCap = hasMonth ? 'Monthly' : 'Weekly';
+    const pLabel = hasMonth ? (te.monthLabel || '—') : (te.weekDate || '—');
+    const active = all.filter((w) => w.status === 'In Progress')
+      .sort((a, b) => (b[advKey] || 0) - (a[advKey] || 0) || b.pct - a.pct);
     const TOPN = 6;
     const shown = active.slice(0, TOPN);
     const moreN = active.length - shown.length;
@@ -3330,26 +3343,26 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const bar = (p) => `<span style="display:inline-block;width:60px;height:6px;background:#eef2f7;border-radius:4px;vertical-align:middle;margin-right:8px;overflow:hidden"><i style="display:block;height:100%;width:${Math.min(100, p)}%;background:linear-gradient(90deg,#2f7de1,#e23744)"></i></span>`;
     const facesRows = shown.map((w) => `<tr><td style="text-align:left">${w.loc.replace(/ Tunnel$/, '')}</td>
       <td style="white-space:nowrap;text-align:right">${bar(w.pct)}<b style="font-size:12.5px;color:var(--navy)">${w.pct}%</b></td>
-      ${hasWeek ? `<td style="text-align:right">${(w.weekAdvance || 0).toFixed(2)}</td>` : ''}</tr>`).join('')
-      || `<tr><td colspan="${hasWeek ? 3 : 2}" class="muted" style="text-align:center;padding:10px">No active faces.</td></tr>`;
+      ${has ? `<td style="text-align:right">${(w[advKey] || 0).toFixed(2)}</td>` : ''}</tr>`).join('')
+      || `<tr><td colspan="${has ? 3 : 2}" class="muted" style="text-align:center;padding:10px">No active faces.</td></tr>`;
     const moreRow = moreN > 0 ? `<div class="muted" style="font-size:11px;margin-top:8px">+ ${moreN} more active face${moreN > 1 ? 's' : ''} · see the Tunnel tab for the full list</div>` : '';
     const wkMax = Math.max(1, ...wk.map((x) => x.advance));
-    const wkBars = wk.map((x) => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+    const wkBars = wk.slice(0, 8).map((x) => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
       <span style="font-size:11px;color:#41506a;width:82px;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${x.loc.replace(/ Tunnel$/, '')}</span>
       <span style="flex:1;height:8px;background:#eef2f7;border-radius:5px;overflow:hidden"><i style="display:block;height:100%;width:${Math.max(4, Math.round((x.advance / wkMax) * 100))}%;border-radius:5px;background:linear-gradient(90deg,#2f7de1,#e23744)"></i></span>
       <span style="font-size:11.5px;font-weight:800;color:var(--navy);width:54px;text-align:right;flex:none">${x.advance.toFixed(1)} m</span></div>`).join('');
-    const facesTable = `<table class="tbl"><thead><tr><th style="text-align:left">Workface</th><th style="text-align:right">Excavated</th>${hasWeek ? '<th>This&nbsp;wk&nbsp;(m)</th>' : ''}</tr></thead><tbody>${facesRows}</tbody></table>${moreRow}`;
-    const heading = `<h3>Tunnel Progress <span class="muted" style="font-weight:600">· excavation${hasWeek ? ' · week of ' + (te.weekDate || '—') : ''}</span></h3>`;
-    const tiles = `<div style="display:grid;grid-template-columns:repeat(${hasWeek ? 4 : 3},1fr);gap:8px;margin:2px 0 14px">
+    const facesTable = `<table class="tbl"><thead><tr><th style="text-align:left">Workface</th><th style="text-align:right">Excavated</th>${has ? `<th>This&nbsp;${pWord}&nbsp;(m)</th>` : ''}</tr></thead><tbody>${facesRows}</tbody></table>${moreRow}`;
+    const heading = `<h3>Tunnel Progress <span class="muted" style="font-weight:600">· excavation${has ? ' · ' + pWord + ' of ' + pLabel : ''}</span></h3>`;
+    const tiles = `<div style="display:grid;grid-template-columns:repeat(${has ? 4 : 3},1fr);gap:8px;margin:2px 0 14px">
         ${tile(overallPct + '%', 'Overall excavated', '#1f3b66', 'linear-gradient(135deg,#eaf1fb,#dfeaf8)')}
         ${tile(c.complete != null ? c.complete + ' / ' + c.total : '—', 'Faces complete', '#15764e', 'linear-gradient(135deg,#e8f6ee,#dcefe4)')}
         ${tile(c.inProgress != null ? c.inProgress : '—', 'Faces active', '#8250c4', 'linear-gradient(135deg,#f1ebfb,#e7dcf7)')}
-        ${hasWeek ? tile((te.weekAdvanceTotal || 0).toFixed(1) + ' m', 'Advanced this week', '#b5502a', 'linear-gradient(135deg,#fbefe8,#f6e4d9)') : ''}
+        ${has ? tile(advTotal.toFixed(1) + ' m', 'Advanced this ' + pWord, '#b5502a', 'linear-gradient(135deg,#fbefe8,#f6e4d9)') : ''}
       </div>`;
-    const body = hasWeek
+    const body = has
       ? `<div class="grid" style="grid-template-columns:1fr 1fr;gap:14px 24px;align-items:start">
         <div>${sub('Top active faces')}${facesTable}</div>
-        <div>${sub('Weekly advance (m)')}${wkBars || '<p class="muted">No advance recorded this week.</p>'}</div>
+        <div>${sub(pCap + ' advance (m)')}${wkBars || `<p class="muted">No advance recorded this ${pWord}.</p>`}</div>
       </div>`
       : `<div style="max-width:560px">${sub('Top active faces')}${facesTable}</div>`;
     el.innerHTML = `<div class="card" style="margin-bottom:16px">${heading}${tiles}${body}</div>`;
