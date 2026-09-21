@@ -2966,8 +2966,10 @@
           : r.status === 401 ? 'Your session has expired — sign in again.'
             : 'The report could not be loaded (' + r.status + ').');
       }
-      // Stream it so a 10 MB download shows real progress instead of hanging.
-      const total = +(r.headers.get('content-length') || 0);
+      // Stream it so a 10 MB download shows real progress instead of hanging. The
+      // response is gzipped and fetch() inflates it transparently, so Content-Length
+      // would undercount — the server sends the real size separately.
+      const total = +(r.headers.get('x-uncompressed-length') || r.headers.get('content-length') || 0);
       let blob;
       if (r.body && r.body.getReader && total) {
         const reader = r.body.getReader(); const parts = []; let got = 0;
