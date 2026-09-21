@@ -9,7 +9,8 @@
   const TOKEN_KEY = 'tkv_token';
   const SECTION_LABELS = { exec: 'Executive Summary', fin: 'Financial', sched: 'Schedule & Progress',
     tunnel: 'Tunnel', claims: 'Claims & Variations', inv: 'Inventory & Explosives', ins: 'Insurance & Claims',
-    man: 'Manpower', rsm: "Employer's Facilities", equip: 'Equipment', safety: 'Safety' };
+    man: 'Manpower', rsm: "Employer's Facilities", equip: 'Equipment', safety: 'Safety',
+    dpr: 'Project Report' };
   const ALL_SECTIONS = Object.keys(SECTION_LABELS);
   // Same-origin (hosted) uses the session cookie; the standalone file adds a Bearer token.
   function authFetch(url, opts = {}) {
@@ -68,6 +69,7 @@
     if (first) {
       const nEl = document.querySelector('.nav-item[data-v="' + first + '"]'); if (nEl) nEl.classList.add('active');
       const vEl = document.getElementById(first); if (vEl) vEl.classList.add('active');
+      if (first === 'dpr') openDpr();   // an account granted only the report lands here
     } else {
       document.getElementById('denied').classList.add('active');
     }
@@ -2937,6 +2939,95 @@
   // Refresh. Silent, repaints only on change, and pauses while the tab is hidden.
   setInterval(() => { if (me && document.visibilityState === 'visible') load({ silent: true }); }, 180000);
 
+  // ---------- Project Report (Detailed Design Report) ----------
+  // The report is ~10 MB, so it is fetched only when the section is first opened,
+  // and always through authFetch: the hosted app authenticates with its session
+  // cookie, but the standalone file carries a Bearer token that a plain
+  // <iframe src="/api/report"> could never send. The bytes become a blob: URL so
+  // the report gets its own iframe viewport — it is a whole self-contained
+  // document with its own dark theme, fixed sidebar and 100vh rules.
+  let dprState = 'idle';          // idle | loading | ready | error
+  let dprUrl = null, dprPh = '';
+  const dprBtn = (id) => document.getElementById(id);
+
+  async function loadDpr() {
+    if (dprState === 'loading' || dprState === 'ready') return;
+    const stage = dprBtn('dpr-stage'); if (!stage) return;
+    if (!dprPh) dprPh = stage.innerHTML;          // keep the placeholder for Reload
+    dprState = 'loading';
+    const msg = dprBtn('dpr-msg'), bar = dprBtn('dpr-bar'), go = dprBtn('dpr-load');
+    if (go) go.style.display = 'none';
+    if (bar) bar.style.display = '';
+    if (msg) msg.textContent = 'Loading the report…';
+    try {
+      const r = await authFetch('/api/report');
+      if (!r.ok) {
+        throw new Error(r.status === 403 ? 'You do not have access to the project report.'
+          : r.status === 401 ? 'Your session has expired — sign in again.'
+            : 'The report could not be loaded (' + r.status + ').');
+      }
+      // Stream it so a 10 MB download shows real progress instead of hanging.
+      const total = +(r.headers.get('content-length') || 0);
+      let blob;
+      if (r.body && r.body.getReader && total) {
+        const reader = r.body.getReader(); const parts = []; let got = 0;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          parts.push(value); got += value.length;
+          const pct = Math.min(100, Math.round((got / total) * 100));
+          if (bar && bar.firstElementChild) bar.firstElementChild.style.width = pct + '%';
+          if (msg) msg.textContent = 'Loading the report… ' + pct + '%';
+        }
+        blob = new Blob(parts, { type: 'text/html' });
+      } else {
+        blob = await r.blob();
+      }
+      if (dprUrl) URL.revokeObjectURL(dprUrl);
+      dprUrl = URL.createObjectURL(blob);
+      const f = document.createElement('iframe');
+      f.title = 'Tamakoshi V — Detailed Design Report';
+      f.setAttribute('allow', 'fullscreen');   // the report has its own 3D tour + fullscreen
+      f.allowFullscreen = true;
+      f.src = dprUrl;
+      stage.innerHTML = '';
+      stage.appendChild(f);
+      dprState = 'ready';
+      ['dpr-full', 'dpr-reload'].forEach((id) => { const b = dprBtn(id); if (b) b.disabled = false; });
+    } catch (e) {
+      dprState = 'error';
+      if (bar) bar.style.display = 'none';
+      if (msg) msg.textContent = String(e.message || e);
+      if (go) { go.style.display = ''; go.textContent = 'Try again'; }
+    }
+  }
+  // Opening the section triggers the load — but not on a phone, where 10 MB over
+  // mobile data should be an explicit choice.
+  function openDpr() {
+    if (dprState !== 'idle') return;
+    if (window.innerWidth <= 880) {
+      const go = dprBtn('dpr-load'); if (go) go.style.display = '';
+      const msg = dprBtn('dpr-msg');
+      if (msg) msg.textContent = 'Interactive explorer of the design report. About 10 MB — tap to load.';
+      return;
+    }
+    loadDpr();
+  }
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest && e.target.closest('#dpr-load, #dpr-full, #dpr-reload');
+    if (!t) return;
+    if (t.id === 'dpr-load') return loadDpr();
+    if (t.id === 'dpr-full') { if (dprUrl) window.open(dprUrl, '_blank', 'noopener'); return; }
+    if (t.id === 'dpr-reload') {                 // re-pull, e.g. after the file is updated
+      const stage = dprBtn('dpr-stage');
+      if (stage && dprPh) stage.innerHTML = dprPh;
+      if (dprUrl) { URL.revokeObjectURL(dprUrl); dprUrl = null; }
+      ['dpr-full', 'dpr-reload'].forEach((id) => { const b = dprBtn(id); if (b) b.disabled = true; });
+      dprState = 'idle';
+      loadDpr();
+    }
+  });
+
   // ---------- nav ----------
   document.getElementById('nav').addEventListener('click', (e) => {
     const item = e.target.closest('.nav-item');
@@ -2954,6 +3045,7 @@
     }
     if (!canSee(v)) { document.getElementById('denied').classList.add('active'); return; }
     document.getElementById(v).classList.add('active');
+    if (v === 'dpr') openDpr();   // fetch the report the first time it is opened
     if (data) renderAll(); // re-trigger animations on the newly visible view
     setTimeout(() => Object.values(charts).forEach((c) => c.resize()), 60);
   });

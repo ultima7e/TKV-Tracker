@@ -30,3 +30,8 @@ data/.tkv_*.json
 
 # local sample claims data — never commit (public repo)
 data/Claims & Variations Register.xlsx
+
+# The Detailed Design Report explorer is CONFIDENTIAL and this repo is public.
+# It is served from Nutstore via the auth-gated /api/report route — never commit it.
+Tamakoshi-V-Explorer.html
+public/dpr*.html
