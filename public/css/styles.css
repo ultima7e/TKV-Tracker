@@ -618,33 +618,6 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 @media(max-width:880px){ #dpr.active{height:auto} .dpr-stage{height:72vh;min-height:420px} }
 
 /* ---- Material Approvals ----
-   Six approval states need six readable tones; the base .badge set has four, so two
-   more: "Approved as noted" (conditional — blue, still usable on site) and "RFC"
-   (returned to the Contractor — orange, action needed). */
+   Two extra badge tones so "Approved as noted" and "RFC" read differently. */
 .badge.cond{background:#e6effc;color:#2356a8} .badge.act{background:#fdece2;color:#a2461f}
-.mat-note{display:flex;gap:10px;align-items:flex-start;background:#fff8ec;border:1px solid #f3dfb5;
-  border-radius:12px;padding:11px 14px;margin-bottom:14px;font-size:12px;color:#6b4b10;line-height:1.55}
-.mat-note svg{width:17px;height:17px;flex:0 0 auto;margin-top:1px;color:#b5781a}
-.mat-note b{color:#4a3208}
-.mat-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
-.mat-chip{border:1px solid var(--line);background:#fff;border-radius:20px;padding:5px 11px;font-size:11px;
-  font-weight:700;color:#51637e;cursor:pointer}
-.mat-chip:hover{background:#f3f6fb}
-.mat-chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
-.mat-chip .n{opacity:.65;margin-left:4px;font-weight:600}
-.mat-search{margin-left:auto;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px;
-  min-width:200px;font-family:inherit}
-.mat-scroll{overflow-x:auto}
-.mat-tbl td{vertical-align:top}
-.mat-tbl .src{color:var(--muted);font-size:11px;margin-top:2px}
-.mat-tbl .ref{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10.5px;color:#41506a;white-space:nowrap}
-.mat-tbl .rem{font-size:11px;color:#5b6b82;max-width:320px}
-.mat-tbl .dim{color:#a3b0c2}
-.mat-ticks{display:flex;gap:4px;flex-wrap:wrap}
-.mat-tick{font-size:9.5px;font-weight:800;padding:2px 6px;border-radius:5px;background:#eef2f7;color:#9aa7b8}
-.mat-tick.y{background:#e4f5ee;color:#1c7a52}
-.mat-sub{font-size:10.5px;color:var(--muted);margin-top:3px;line-height:1.5}
-.mat-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin:2px 0 10px}
-.mat-legend b{color:var(--navy);font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
-.mat-mixgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:14px}
-@media(max-width:560px){ .mat-search{min-width:0;width:100%;margin-left:0} .mat-mixgrid{grid-template-columns:1fr} }
+.mat-ref{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;color:#41506a;white-space:nowrap}
