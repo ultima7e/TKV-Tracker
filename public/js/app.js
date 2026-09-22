@@ -8,7 +8,7 @@
   let me = null; // { username, isAdmin, sections }
   const TOKEN_KEY = 'tkv_token';
   const SECTION_LABELS = { exec: 'Executive Summary', fin: 'Financial', sched: 'Schedule & Progress',
-    tunnel: 'Tunnel', claims: 'Claims & Variations', inv: 'Inventory & Explosives', ins: 'Insurance & Claims',
+    tunnel: 'Tunnel', claims: 'Claims & Variations', inv: 'Inventory & Explosives', mat: 'Material Approvals', ins: 'Insurance & Claims',
     man: 'Manpower', rsm: "Employer's Facilities", equip: 'Equipment', safety: 'Safety',
     dpr: 'Project Report' };
   const ALL_SECTIONS = Object.keys(SECTION_LABELS);
@@ -2846,6 +2846,221 @@
     });
   }
 
+  // ================= Material Approvals =================
+  // Live from the "Summary of Material Approval List" workbook in Nutstore. Four tabs:
+  // the material register (and who is holding each approval), approved mix designs,
+  // the transmittal trail, and test-instrument calibration.
+  const MAT_STATE = {
+    'Approved': 'ok', 'Approved as noted': 'cond', 'With Engineer': 'warn',
+    'RFC': 'act', 'Not submitted': 'neu', 'Rejected': 'bad', 'For information': 'neu',
+  };
+  const MAT_ORDER = ['Approved', 'Approved as noted', 'With Engineer', 'RFC', 'Not submitted', 'Rejected'];
+  const matEsc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const matDash = '<span class="dim">—</span>';
+  // The raw spelling rides along as a tooltip ("Submitted for appproval", "AN", …).
+  const matBadge = (state, raw) => {
+    if (!state) return matDash;
+    const t = raw && raw !== state ? ` title="${matEsc(raw)}"` : '';
+    return `<span class="badge ${MAT_STATE[state] || 'neu'}"${t}>${matEsc(state)}</span>`;
+  };
+  const matDate = (d) => {
+    const t = d ? Date.parse(d + 'T00:00:00Z') : NaN;
+    if (isNaN(t)) return '';
+    const x = new Date(t); return x.getUTCDate() + ' ' + CV_MON[x.getUTCMonth()] + ' ' + x.getUTCFullYear();
+  };
+  const matDaysTo = (d) => {
+    const t = d ? Date.parse(d + 'T00:00:00Z') : NaN;
+    if (isNaN(t)) return null;
+    const n = new Date(); return Math.round((t - Date.UTC(n.getFullYear(), n.getMonth(), n.getDate())) / 86400000);
+  };
+  const matSel = { state: 'all', q: '' };
+  const MAT_PANES = ['register', 'mixes', 'subs', 'calib'];
+  let matWired = false;
+  Object.assign(CV_ICON, {
+    inbox: '<path d="M3 13h4l2 3h6l2-3h4"/><path d="M5.5 5h13l2.5 8v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5z"/>',
+    undo: '<path d="M3 8h11a5.5 5.5 0 0 1 0 11h-6"/><path d="m7 4-4 4 4 4"/>',
+    alert: '<path d="M12 3 2.5 20h19z"/><line x1="12" y1="10" x2="12" y2="14"/><circle cx="12" cy="17" r=".6"/>',
+  });
+
+  function renderMaterials() {
+    const head = document.getElementById('mat-head'); if (!head) return;
+    const md = data && data.materials;
+    if (!md || md.missing) {
+      const why = md && md.warnings && md.warnings.length ? ' (' + matEsc(md.warnings[0]) + ')' : '';
+      head.innerHTML = `<div class="card" style="margin-bottom:14px"><div class="muted" style="font-size:12px">Material approval data is not available yet${why}.</div></div>`;
+      MAT_PANES.forEach((k) => { const el = document.getElementById('mattab-' + k); if (el) el.innerHTML = ''; });
+      return;
+    }
+    const c = md.counts || {};
+    const pct = c.materials ? Math.round((c.approved / c.materials) * 100) : 0;
+    // The register and the workflow sheet are kept separately and can disagree —
+    // say so plainly rather than silently trusting one of them.
+    const cf = md.conflicts || [];
+    const conflictNote = cf.length ? `<div class="mat-note">${cvSecIcon('alert')}<div><b>The two sheets disagree on ${cf.length === 1 ? 'one item' : cf.length + ' items'}.</b> ${
+      cf.map((x) => `${matEsc(x.name)} (${matEsc(x.type)}) is <b>${matEsc(x.register)}</b> in the material register but <b>${matEsc(x.workflow)}</b> on the Status of Material sheet${x.remarks ? ` — “${matEsc(x.remarks)}”` : ''}.`).join(' ')
+    } The tiles count the material register.</div></div>` : '';
+    head.innerHTML = `<div class="cv-kpis">
+        ${cvKpiCard('Materials', c.materials, `${c.types} material types`, 'list', '#2f6fd0')}
+        ${cvKpiCard('Approved', c.approved, `${pct}% of register · ${c.asNoted} as noted`, 'check', '#1d8a63')}
+        ${cvKpiCard('With the Engineer', c.withEngineer, 'submitted, awaiting review', 'inbox', '#c99a1e')}
+        ${cvKpiCard('Action on Contractor', c.actionContractor, `${c.rfc} returned (RFC) · ${c.notSubmitted} not yet sent`, 'undo', '#b5502a')}
+        ${cvKpiCard('Rejected', c.rejected, c.rejected ? 'resubmittal required' : 'none', 'target', c.rejected ? '#b3261e' : '#8a94a6')}
+      </div>${conflictNote}`;
+    const setLab = (k, t) => { const b = document.querySelector(`#mat .sched-tab[data-mattab="${k}"]`); if (b) b.textContent = t; };
+    setLab('mixes', `Mix Designs (${c.mixes})`);
+    setLab('subs', `Submissions (${(md.submissions || []).length})`);
+    setLab('calib', `Calibration (${c.instruments})`);
+    renderMatRegister(); renderMatMixes(); renderMatSubs(); renderMatCalib();
+
+    if (!matWired) {
+      matWired = true;
+      document.querySelectorAll('#mat .sched-tab[data-mattab]').forEach((btn) => btn.addEventListener('click', () => {
+        const which = btn.dataset.mattab;
+        document.querySelectorAll('#mat .sched-tab[data-mattab]').forEach((b) => b.classList.toggle('on', b === btn));
+        MAT_PANES.forEach((k) => { const p = document.getElementById('mattab-' + k); if (p) p.hidden = k !== which; });
+      }));
+      // Delegated, so the chips/search keep working after every re-render.
+      const reg = document.getElementById('mattab-register');
+      reg.addEventListener('click', (e) => {
+        const ch = e.target.closest('.mat-chip'); if (!ch) return;
+        matSel.state = ch.dataset.matstate;
+        reg.querySelectorAll('.mat-chip').forEach((b) => b.classList.toggle('on', b === ch));
+        renderMatRegisterBody();
+      });
+      reg.addEventListener('input', (e) => {
+        if (e.target.id !== 'mat-q') return;
+        matSel.q = e.target.value; renderMatRegisterBody();
+      });
+    }
+  }
+
+  function renderMatRegister() {
+    const el = document.getElementById('mattab-register'); if (!el) return;
+    const md = data.materials, items = (md.groups || []).flatMap((g) => g.items);
+    const n = (s) => items.filter((it) => it.state === s).length;
+    const chips = [['all', 'All', items.length], ...MAT_ORDER.filter((s) => n(s)).map((s) => [s, s, n(s)])]
+      .map(([k, lab, cnt]) => `<button class="mat-chip${matSel.state === k ? ' on' : ''}" type="button" data-matstate="${matEsc(k)}">${matEsc(lab)}<span class="n">${cnt}</span></button>`).join('');
+    el.innerHTML = `<div class="card">
+      <h3>Material Register · ${items.length} items across ${(md.groups || []).length} material types</h3>
+      <div class="mat-tools">${chips}<input class="mat-search" id="mat-q" type="search" placeholder="Search material, supplier, letter…" value="${matEsc(matSel.q)}"></div>
+      <div class="mat-scroll" id="mat-reg-body"></div></div>`;
+    renderMatRegisterBody();
+  }
+
+  function renderMatRegisterBody() {
+    const body = document.getElementById('mat-reg-body'); if (!body) return;
+    const md = data.materials, q = matSel.q.trim().toLowerCase();
+    const keep = (it, g) => (matSel.state === 'all' || it.state === matSel.state)
+      && (!q || [it.name, it.source, it.ref, it.remarks, it.test, it.status, g.type].join(' ').toLowerCase().includes(q));
+    let rows = '', shown = 0;
+    for (const g of md.groups || []) {
+      const its = g.items.filter((it) => keep(it, g)); if (!its.length) continue;
+      shown += its.length;
+      rows += `<tr class="tbl-grp"><td colspan="6">${matEsc(g.sn ? g.sn + '. ' : '')}${matEsc(g.type)} <span style="font-weight:600;color:var(--muted)">· ${its.length}</span></td></tr>`;
+      rows += its.map((it) => `<tr>
+        <td style="text-align:left"><b>${matEsc(it.name)}</b></td>
+        <td style="text-align:left">${it.source ? matEsc(it.source) : matDash}</td>
+        <td style="text-align:left">${it.test ? matEsc(it.test) : matDash}</td>
+        <td>${matBadge(it.state, it.status)}</td>
+        <td style="text-align:left">${it.ref ? `<span class="ref">${matEsc(it.ref)}</span>` : matDash}</td>
+        <td style="text-align:left" class="rem">${matEsc(it.remarks)}</td></tr>`).join('');
+    }
+    body.innerHTML = shown
+      ? `<table class="tbl mat-tbl"><thead><tr><th style="text-align:left">Material</th><th style="text-align:left">Source / supplier</th><th style="text-align:left">Tests</th><th>Status</th><th style="text-align:left">Approval letter</th><th style="text-align:left">Remarks</th></tr></thead><tbody>${rows}</tbody></table>`
+      : '<p class="muted" style="font-size:12px;padding:10px 2px">No materials match this filter.</p>';
+  }
+
+  function renderMatMixes() {
+    const el = document.getElementById('mattab-mixes'); if (!el) return;
+    const md = data.materials;
+    const brands = md.cementBrands || [];
+    const oneBrand = brands.length === 1;
+    // A single cement brand across every approved mix is a supply exposure worth
+    // stating outright — especially if the only alternative is not approved.
+    let note = '';
+    if (oneBrand) {
+      const cementGroup = (md.groups || []).find((g) => /^cement$/i.test(g.type));
+      const others = cementGroup ? cementGroup.items.filter((it) => !brands[0].toLowerCase().includes(it.name.toLowerCase().split(/\s+/)[0])) : [];
+      const approvedAlt = others.some((it) => /^Approved/.test(it.state));
+      const mixN = (md.concrete || []).length + (md.shotcrete || []).length;
+      note = `<div class="mat-note">${cvSecIcon('alert')}<div>All <b>${mixN}</b> concrete and shotcrete mix designs use <b>${matEsc(brands[0])}</b>.${
+        others.length ? ` The other cement in the register — ${others.map((it) => `${matEsc(it.name)} (${matEsc(it.status || '—')})`).join(', ')} — ${approvedAlt ? 'is approved' : 'is not approved, so there is no approved alternative supplier'}.` : ''}</div></div>`;
+    }
+    const mixTable = (title, rows) => {
+      const rem = rows.some((m) => m.remarks);
+      return `<div class="card"><h3>${title} · ${rows.length}</h3><div class="mat-scroll">
+      <table class="tbl mat-tbl"><thead><tr><th>S.N</th><th style="text-align:left">Grade</th><th style="text-align:left">Mix design code</th>${oneBrand ? '' : '<th style="text-align:left">Cement</th>'}<th style="text-align:left">Aggregate source</th><th style="text-align:left">Approval letter</th><th>Status</th>${rem ? '<th style="text-align:left">Remarks</th>' : ''}</tr></thead><tbody>
+      ${rows.map((m) => `<tr><td>${matEsc(m.sn)}</td><td style="text-align:left"><b>${matEsc(m.grade)}</b></td><td style="text-align:left"><span class="ref">${matEsc(m.code)}</span></td>${oneBrand ? '' : `<td style="text-align:left">${matEsc(m.cement)}</td>`}<td style="text-align:left">${matEsc(m.source)}</td><td style="text-align:left"><span class="ref">${matEsc(m.ref)}</span></td><td>${matBadge(m.state, m.status)}</td>${rem ? `<td style="text-align:left" class="rem">${matEsc(m.remarks)}</td>` : ''}</tr>`).join('')}
+      </tbody></table></div></div>`;
+    };
+    const grout = md.grout || [];
+    const groutTable = `<div class="card"><h3>Grout · ${grout.length}</h3><div class="mat-scroll">
+      <table class="tbl mat-tbl"><thead><tr><th>S.N</th><th>W/C ratio</th><th style="text-align:left">Mixing material</th><th style="text-align:left">Approval letter</th><th>Status</th></tr></thead><tbody>
+      ${grout.map((m) => `<tr><td>${matEsc(m.sn)}</td><td><b>${matEsc(m.ratio)}</b></td><td style="text-align:left">${matEsc(m.material)}</td><td style="text-align:left"><span class="ref">${matEsc(m.ref)}</span></td><td>${matBadge(m.state, m.status)}</td></tr>`).join('')}
+      </tbody></table></div></div>`;
+    el.innerHTML = `${note}<div class="mat-mixgrid">${mixTable('Concrete', md.concrete || [])}${mixTable('Shotcrete', md.shotcrete || [])}</div>
+      <div style="margin-top:14px">${groutTable}</div>`;
+  }
+
+  function renderMatSubs() {
+    const el = document.getElementById('mattab-subs'); if (!el) return;
+    const md = data.materials, subs = md.submissions || [];
+    const legend = (md.legend || []).map(([lab, code]) => `<span><b>${matEsc(code)}</b> ${matEsc(lab)}</span>`).join('');
+    const tick = (on, lab, full) => `<span class="mat-tick${on ? ' y' : ''}" title="${full}: ${on ? 'provided' : 'not ticked'}">${lab}</span>`;
+    const refCell = (no, d) => (no || d)
+      ? `${no ? `<span class="ref">${matEsc(no)}</span>` : ''}${d ? `<div class="mat-sub">${matDate(d)}</div>` : ''}` : matDash;
+    let rows = '', lastCat = null;
+    for (const s of subs) {
+      if (s.category !== lastCat) { lastCat = s.category; rows += `<tr class="tbl-grp"><td colspan="8">${matEsc(s.category || 'Other')}</td></tr>`; }
+      // Extra transmittals recorded on "* Physical / * Chemical Properties" rows.
+      const extra = (s.refs || []).map((r) => `<div class="mat-sub">${matEsc(r.label)}: ${
+        [r.dtNo && `<span class="ref">${matEsc(r.dtNo)}</span>`, r.submitted && matDate(r.submitted),
+          r.rnNo && `reply <span class="ref">${matEsc(r.rnNo)}</span>`, r.received && matDate(r.received)].filter(Boolean).join(' · ')}</div>`).join('');
+      const t = s.tests || {};
+      rows += `<tr>
+        <td>${matEsc(s.sn)}</td>
+        <td style="text-align:left"><b>${s.item ? matEsc(s.item) : matDash}</b>${s.source && s.source !== s.item ? `<div class="src">${matEsc(s.source)}</div>` : ''}${extra}</td>
+        <td><div class="mat-ticks">${tick(t.physical, 'Phy', 'Physical requirements')}${tick(t.chemical, 'Chem', 'Chemical requirements')}${tick(t.mtc, 'MTC', 'Mill test certificate')}${tick(t.manufacturer, 'Mfr', 'Manufacturer / supplier details')}</div></td>
+        <td style="text-align:left">${refCell(s.dtNo, s.submitted)}</td>
+        <td style="text-align:left">${refCell(s.rnNo, s.received)}</td>
+        <td>${matBadge(s.presentState, s.present)}</td>
+        <td>${matBadge(s.reviewState, s.review)}</td>
+        <td style="text-align:left" class="rem">${matEsc(s.remarks)}</td></tr>`;
+    }
+    el.innerHTML = `<div class="card"><h3>Submission Trail · Status of Material sheet</h3>
+      <div class="mat-legend">Review codes: ${legend}</div>
+      ${subs.length ? `<div class="mat-scroll"><table class="tbl mat-tbl"><thead><tr><th>S.N</th><th style="text-align:left">Material / supplier</th><th>Tests</th><th style="text-align:left">Transmittal (DT)</th><th style="text-align:left">OE reply (RN)</th><th>Present status</th><th>Review status</th><th style="text-align:left">Remarks</th></tr></thead><tbody>${rows}</tbody></table></div>`
+        : '<p class="muted" style="font-size:12px">No submissions recorded.</p>'}</div>`;
+  }
+
+  function renderMatCalib() {
+    const el = document.getElementById('mattab-calib'); if (!el) return;
+    const cal = (data.materials.calibration || []).slice()
+      .sort((a, b) => (a.next ? 0 : 1) - (b.next ? 0 : 1) || String(a.next).localeCompare(String(b.next)));
+    const due = (d) => {
+      if (d == null) return '<span class="badge neu">No schedule</span>';
+      if (d < 0) return `<span class="badge bad">Overdue ${-d} d</span>`;
+      if (d <= 30) return `<span class="badge act">Due in ${d} d</span>`;
+      if (d <= 90) return `<span class="badge warn">Due in ${d} d</span>`;
+      return `<span class="badge ok">${d} d left</span>`;
+    };
+    const dated = cal.filter((x) => x.next);
+    const overdue = dated.filter((x) => matDaysTo(x.next) < 0);
+    const nextUp = dated.find((x) => matDaysTo(x.next) >= 0);
+    const undated = cal.filter((x) => !x.next);
+    const summary = [
+      overdue.length ? `<b>${overdue.length}</b> instrument${overdue.length > 1 ? 's are' : ' is'} overdue for calibration.` : `All ${dated.length} scheduled instruments are within calibration.`,
+      nextUp ? `Next due: <b>${matEsc(nextUp.name)}</b> on ${matDate(nextUp.next)} (${matDaysTo(nextUp.next)} days).` : '',
+      undated.length ? `${undated.map((x) => `<b>${matEsc(x.name)}</b>`).join(', ')} ${undated.length > 1 ? 'have' : 'has'} no calibration date recorded.` : '',
+    ].filter(Boolean).join(' ');
+    el.innerHTML = `<div class="card"><h3>Test Instrument Calibration · ${cal.length}</h3>
+      <p class="muted" style="font-size:12px;margin:0 0 10px;line-height:1.6">${summary}</p>
+      <div class="mat-scroll"><table class="tbl mat-tbl"><thead><tr><th style="text-align:left">Instrument / machine</th><th style="text-align:left">Model</th><th style="text-align:left">Serial no.</th><th>Last calibrated</th><th>Next due</th><th>Status</th><th style="text-align:left">Remarks</th></tr></thead><tbody>
+      ${cal.map((x) => `<tr><td style="text-align:left"><b>${matEsc(x.name)}</b></td><td style="text-align:left">${x.model && x.model !== '-' ? matEsc(x.model) : matDash}</td><td style="text-align:left"><span class="ref">${matEsc(x.serial)}</span></td><td>${x.current ? matDate(x.current) : matDash}</td><td>${x.next ? matDate(x.next) : matEsc(x.rawNext || '—')}</td><td>${due(matDaysTo(x.next))}</td><td style="text-align:left" class="rem">${matEsc(x.remarks)}</td></tr>`).join('')}
+      </tbody></table></div></div>`;
+  }
+
   function renderAll() {
     renderKpis();
     renderFinancial();
@@ -2855,6 +3070,7 @@
     renderInsurance();
     renderWeekly();
     renderClaimsModule();
+    renderMaterials();
     renderSchedule();
     // Wire the Schedule/Delay sub-tabs once; render the delay view lazily on show.
     if (!schedTabsWired) {
