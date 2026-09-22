@@ -621,3 +621,6 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
    Two extra badge tones so "Approved as noted" and "RFC" read differently. */
 .badge.cond{background:#e6effc;color:#2356a8} .badge.act{background:#fdece2;color:#a2461f}
 .mat-ref{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;color:#41506a;white-space:nowrap}
+.mat-groups{flex-wrap:wrap;gap:6px;margin:4px 0 12px}
+.mat-groups .sched-tab{padding:7px 12px;font-size:12px}
+.mat-n{font-weight:600;opacity:.6;margin-left:2px}

@@ -8,7 +8,7 @@
   let me = null; // { username, isAdmin, sections }
   const TOKEN_KEY = 'tkv_token';
   const SECTION_LABELS = { exec: 'Executive Summary', fin: 'Financial', sched: 'Schedule & Progress',
-    tunnel: 'Tunnel', claims: 'Claims & Variations', inv: 'Inventory & Explosives', mat: 'Material Approvals', ins: 'Insurance & Claims',
+    tunnel: 'Tunnel', claims: 'Claims & Variations', inv: 'Inventory & Explosives', mat: 'Quality Control', ins: 'Insurance & Claims',
     man: 'Manpower', rsm: "Employer's Facilities", equip: 'Equipment', safety: 'Safety',
     dpr: 'Project Report' };
   const ALL_SECTIONS = Object.keys(SECTION_LABELS);
@@ -2846,9 +2846,10 @@
     });
   }
 
-  // ================= Material Approvals =================
-  // A plain list from the Material Approval workbook: each material, its
-  // correspondence (approval letter) number and its status, grouped by type.
+  // ================= Quality Control (material approvals) =================
+  // Material groups (Cement, Reinforcement Bar, Admixture/Accelerator, …) as tabs
+  // across the top; the selected group lists each material with its correspondence
+  // (approval letter) number and status.
   const MAT_LABEL = {
     'Approved': ['Approved', 'ok'], 'Approved as noted': ['Approved as noted', 'cond'],
     'With Engineer': ['Submitted for approval', 'warn'], 'RFC': ['RFC', 'act'],
@@ -2856,28 +2857,39 @@
   };
   const matEsc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  let matGroup = null;          // the selected group's name — survives data refreshes
+  let matWired = false;
 
   function renderMaterials() {
     const el = document.getElementById('mat-list'); if (!el) return;
     const md = data && data.materials;
-    if (!md || md.missing || !(md.groups || []).length) {
-      el.innerHTML = '<h3>Material Approvals</h3><p class="muted" style="font-size:12px">Material approval data is not available yet.</p>';
+    const groups = (md && !md.missing && md.groups) || [];
+    if (!groups.length) {
+      el.innerHTML = '<h3>Quality Control</h3><p class="muted" style="font-size:12px">Material approval data is not available yet.</p>';
       return;
     }
+    if (!groups.some((g) => g.type === matGroup)) matGroup = groups[0].type;
+    const tabs = groups.map((g) => `<button class="sched-tab${g.type === matGroup ? ' on' : ''}" type="button" data-matg="${matEsc(g.type)}">${matEsc(g.type)} <span class="mat-n">${g.items.length}</span></button>`).join('');
+    const g = groups.find((x) => x.type === matGroup);
     const dash = '<span style="color:#a3b0c2">—</span>';
-    let rows = '';
-    for (const g of md.groups) {
-      rows += `<tr class="tbl-grp"><td colspan="3">${matEsc(g.type)}</td></tr>`;
-      rows += g.items.map((it) => {
-        const [lab, cls] = MAT_LABEL[it.state] || [it.status || '', 'neu'];
-        return `<tr><td style="text-align:left">${matEsc(it.name)}</td>
-          <td style="text-align:left" class="mat-ref">${it.ref ? matEsc(it.ref) : dash}</td>
-          <td>${lab ? `<span class="badge ${cls}">${matEsc(lab)}</span>` : dash}</td></tr>`;
-      }).join('');
-    }
-    el.innerHTML = `<h3>Material Approvals</h3><div style="overflow-x:auto"><table class="tbl">
+    const rows = g.items.map((it) => {
+      const [lab, cls] = MAT_LABEL[it.state] || [it.status || '', 'neu'];
+      return `<tr><td style="text-align:left">${matEsc(it.name)}</td>
+        <td style="text-align:left" class="mat-ref">${it.ref ? matEsc(it.ref) : dash}</td>
+        <td>${lab ? `<span class="badge ${cls}">${matEsc(lab)}</span>` : dash}</td></tr>`;
+    }).join('');
+    el.innerHTML = `<h3>Quality Control · Material Approvals</h3>
+      <div class="sched-tabs mat-groups">${tabs}</div>
+      <div style="overflow-x:auto"><table class="tbl">
       <thead><tr><th style="text-align:left">Material</th><th style="text-align:left">Correspondence No.</th><th>Status</th></tr></thead>
       <tbody>${rows}</tbody></table></div>`;
+    if (!matWired) {
+      matWired = true;
+      el.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-matg]'); if (!b) return;
+        matGroup = b.dataset.matg; renderMaterials();
+      });
+    }
   }
 
   function renderAll() {

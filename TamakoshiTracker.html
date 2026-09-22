@@ -567,6 +567,9 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
    Two extra badge tones so "Approved as noted" and "RFC" read differently. */
 .badge.cond{background:#e6effc;color:#2356a8} .badge.act{background:#fdece2;color:#a2461f}
 .mat-ref{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;color:#41506a;white-space:nowrap}
+.mat-groups{flex-wrap:wrap;gap:6px;margin:4px 0 12px}
+.mat-groups .sched-tab{padding:7px 12px;font-size:12px}
+.mat-n{font-weight:600;opacity:.6;margin-left:2px}
 </style>
 </head>
 <body>
@@ -593,7 +596,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       <div class="nav-item" data-v="tunnel"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V11a9 9 0 0 1 18 0v10"/><path d="M9 21v-8a3 3 0 0 1 6 0v8"/></svg></span>Tunnel</div>
       <div class="nav-item" data-v="claims"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg></span>Claims &amp; Variations</div>
       <div class="nav-item" data-v="inv"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8.5 12 3 3 8.5v7L12 21l9-5.5z"/><path d="M3 8.5 12 14l9-5.5"/><line x1="12" y1="14" x2="12" y2="21"/></svg></span>Inventory &amp; Explosives</div>
-      <div class="nav-item" data-v="mat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2"/><rect x="9" y="2.5" width="6" height="3.2" rx="1"/><path d="m8.8 13.2 2.2 2.2 4.2-4.6"/></svg></span>Material Approvals</div>
+      <div class="nav-item" data-v="mat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2"/><rect x="9" y="2.5" width="6" height="3.2" rx="1"/><path d="m8.8 13.2 2.2 2.2 4.2-4.6"/></svg></span>Quality Control</div>
       <div class="nav-item" data-v="ins"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5 20 6v5.5c0 5-3.4 8.4-8 9.5-4.6-1.1-8-4.5-8-9.5V6z"/><path d="M9.2 11.8l2 2 3.6-3.8"/></svg></span>Insurance &amp; Claims</div>
       <div class="nav-item" data-v="man"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0"/><path d="M16 5.2a3 3 0 0 1 0 5.6"/><path d="M18.5 19.5a5.5 5.5 0 0 0-2.8-4.8"/></svg></span>Manpower</div>
       <div class="nav-item" data-v="rsm"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a3.8 3.8 0 0 0-5 5L4 17l3 3 5.7-5.7a3.8 3.8 0 0 0 5-5l-2.5 2.5-2.4-.6-.6-2.4z"/></svg></span>Employer's Facilities</div>
@@ -952,7 +955,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   let me = null; // { username, isAdmin, sections }
   const TOKEN_KEY = 'tkv_token';
   const SECTION_LABELS = { exec: 'Executive Summary', fin: 'Financial', sched: 'Schedule & Progress',
-    tunnel: 'Tunnel', claims: 'Claims & Variations', inv: 'Inventory & Explosives', mat: 'Material Approvals', ins: 'Insurance & Claims',
+    tunnel: 'Tunnel', claims: 'Claims & Variations', inv: 'Inventory & Explosives', mat: 'Quality Control', ins: 'Insurance & Claims',
     man: 'Manpower', rsm: "Employer's Facilities", equip: 'Equipment', safety: 'Safety',
     dpr: 'Project Report' };
   const ALL_SECTIONS = Object.keys(SECTION_LABELS);
@@ -3737,9 +3740,10 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   }
 
 
-  // ================= Material Approvals =================
-  // A plain list from the Material Approval workbook: each material, its
-  // correspondence (approval letter) number and its status, grouped by type.
+  // ================= Quality Control (material approvals) =================
+  // Material groups (Cement, Reinforcement Bar, Admixture/Accelerator, …) as tabs
+  // across the top; the selected group lists each material with its correspondence
+  // (approval letter) number and status.
   const MAT_LABEL = {
     'Approved': ['Approved', 'ok'], 'Approved as noted': ['Approved as noted', 'cond'],
     'With Engineer': ['Submitted for approval', 'warn'], 'RFC': ['RFC', 'act'],
@@ -3747,28 +3751,39 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   };
   const matEsc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  let matGroup = null;          // the selected group's name — survives data refreshes
+  let matWired = false;
 
   function renderMaterials() {
     const el = document.getElementById('mat-list'); if (!el) return;
     const md = data && data.materials;
-    if (!md || md.missing || !(md.groups || []).length) {
-      el.innerHTML = '<h3>Material Approvals</h3><p class="muted" style="font-size:12px">Material approval data is not available yet.</p>';
+    const groups = (md && !md.missing && md.groups) || [];
+    if (!groups.length) {
+      el.innerHTML = '<h3>Quality Control</h3><p class="muted" style="font-size:12px">Material approval data is not available yet.</p>';
       return;
     }
+    if (!groups.some((g) => g.type === matGroup)) matGroup = groups[0].type;
+    const tabs = groups.map((g) => `<button class="sched-tab${g.type === matGroup ? ' on' : ''}" type="button" data-matg="${matEsc(g.type)}">${matEsc(g.type)} <span class="mat-n">${g.items.length}</span></button>`).join('');
+    const g = groups.find((x) => x.type === matGroup);
     const dash = '<span style="color:#a3b0c2">—</span>';
-    let rows = '';
-    for (const g of md.groups) {
-      rows += `<tr class="tbl-grp"><td colspan="3">${matEsc(g.type)}</td></tr>`;
-      rows += g.items.map((it) => {
-        const [lab, cls] = MAT_LABEL[it.state] || [it.status || '', 'neu'];
-        return `<tr><td style="text-align:left">${matEsc(it.name)}</td>
-          <td style="text-align:left" class="mat-ref">${it.ref ? matEsc(it.ref) : dash}</td>
-          <td>${lab ? `<span class="badge ${cls}">${matEsc(lab)}</span>` : dash}</td></tr>`;
-      }).join('');
-    }
-    el.innerHTML = `<h3>Material Approvals</h3><div style="overflow-x:auto"><table class="tbl">
+    const rows = g.items.map((it) => {
+      const [lab, cls] = MAT_LABEL[it.state] || [it.status || '', 'neu'];
+      return `<tr><td style="text-align:left">${matEsc(it.name)}</td>
+        <td style="text-align:left" class="mat-ref">${it.ref ? matEsc(it.ref) : dash}</td>
+        <td>${lab ? `<span class="badge ${cls}">${matEsc(lab)}</span>` : dash}</td></tr>`;
+    }).join('');
+    el.innerHTML = `<h3>Quality Control · Material Approvals</h3>
+      <div class="sched-tabs mat-groups">${tabs}</div>
+      <div style="overflow-x:auto"><table class="tbl">
       <thead><tr><th style="text-align:left">Material</th><th style="text-align:left">Correspondence No.</th><th>Status</th></tr></thead>
       <tbody>${rows}</tbody></table></div>`;
+    if (!matWired) {
+      matWired = true;
+      el.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-matg]'); if (!b) return;
+        matGroup = b.dataset.matg; renderMaterials();
+      });
+    }
   }
 
   function renderAll() {
