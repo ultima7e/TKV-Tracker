@@ -570,6 +570,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .mat-groups{flex-wrap:wrap;gap:6px;margin:4px 0 12px}
 .mat-groups .sched-tab{padding:7px 12px;font-size:12px}
 .mat-n{font-weight:600;opacity:.6;margin-left:2px}
+.mat-date{white-space:nowrap;color:#51637e;font-size:11.5px}
 </style>
 </head>
 <body>
@@ -856,8 +857,14 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
           <div id="elec-panel"><p class="muted">Awaiting electricity data.</p></div>
         </div>
       </section>
-      <section class="view" id="mat"><div class="card" id="mat-list"></div>
-        <div class="card" id="ncr-list" style="margin-top:14px"></div></section>
+      <section class="view" id="mat">
+        <div class="sched-tabs">
+          <button class="sched-tab on" type="button" data-qctab="mat">Material Approvals</button>
+          <button class="sched-tab" type="button" data-qctab="ncr">NCR</button>
+        </div>
+        <div id="qc-mat"><div class="card" id="mat-list"></div></div>
+        <div id="qc-ncr" hidden><div class="card" id="ncr-list"></div></div>
+      </section>
       <section class="view" id="ins">
         <div class="sched-tabs">
           <button class="sched-tab on" data-itab="summary">Insurance Summary</button>
@@ -3741,10 +3748,10 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   }
 
 
-  // ================= Quality Control (material approvals + NCRs) =================
-  // Material groups (Cement, Reinforcement Bar, Admixture/Accelerator, …) as tabs
-  // across the top; the selected group lists each material with its correspondence
-  // (approval letter) number and status. Below it, the NCR register.
+  // ================= Quality Control =================
+  // Two panels behind top-level tabs: Material Approvals (material groups as their
+  // own tab row, each listing material / correspondence no. / status) and the NCR
+  // register (number / date / description / status).
   const MAT_LABEL = {
     'Approved': ['Approved', 'ok'], 'Approved as noted': ['Approved as noted', 'cond'],
     'With Engineer': ['Submitted for approval', 'warn'], 'RFC': ['RFC', 'act'],
@@ -3757,18 +3764,31 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   const matEsc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const matDash = '<span style="color:#a3b0c2">—</span>';
-  let matGroup = null;          // the selected group's name — survives data refreshes
+  const matDate = (d) => {
+    const t = d ? Date.parse(d + 'T00:00:00Z') : NaN;
+    if (isNaN(t)) return '';
+    const x = new Date(t); return x.getUTCDate() + ' ' + CV_MON[x.getUTCMonth()] + ' ' + x.getUTCFullYear();
+  };
+  let matGroup = null;          // selected material group — survives data refreshes
+  let qcTab = 'mat';            // selected top-level panel
   let matWired = false;
 
   function renderMaterials() {
     renderMatList();
     renderNcrList();
+    const show = () => {
+      document.querySelectorAll('#mat .sched-tab[data-qctab]').forEach((b) => b.classList.toggle('on', b.dataset.qctab === qcTab));
+      ['mat', 'ncr'].forEach((k) => { const p = document.getElementById('qc-' + k); if (p) p.hidden = k !== qcTab; });
+    };
+    show();
     if (!matWired) {
       matWired = true;
-      const host = document.getElementById('mat-list');
-      if (host) host.addEventListener('click', (e) => {
-        const b = e.target.closest('[data-matg]'); if (!b) return;
-        matGroup = b.dataset.matg; renderMatList();
+      const view = document.getElementById('mat');
+      if (view) view.addEventListener('click', (e) => {
+        const top = e.target.closest('[data-qctab]');
+        if (top) { qcTab = top.dataset.qctab; show(); return; }
+        const g = e.target.closest('[data-matg]');
+        if (g) { matGroup = g.dataset.matg; renderMatList(); }
       });
     }
   }
@@ -3778,7 +3798,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const md = data && data.materials;
     const groups = (md && !md.missing && md.groups) || [];
     if (!groups.length) {
-      el.innerHTML = '<h3>Quality Control · Material Approvals</h3><p class="muted" style="font-size:12px">Material approval data is not available yet.</p>';
+      el.innerHTML = '<h3>Material Approvals</h3><p class="muted" style="font-size:12px">Material approval data is not available yet.</p>';
       return;
     }
     if (!groups.some((g) => g.type === matGroup)) matGroup = groups[0].type;
@@ -3790,7 +3810,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
         <td style="text-align:left" class="mat-ref">${it.ref ? matEsc(it.ref) : matDash}</td>
         <td>${lab ? `<span class="badge ${cls}">${matEsc(lab)}</span>` : matDash}</td></tr>`;
     }).join('');
-    el.innerHTML = `<h3>Quality Control · Material Approvals</h3>
+    el.innerHTML = `<h3>Material Approvals <span class="mat-n" style="text-transform:none;letter-spacing:0">${groups.reduce((s, x) => s + x.items.length, 0)} materials in ${groups.length} groups</span></h3>
       <div class="sched-tabs mat-groups">${tabs}</div>
       <div style="overflow-x:auto"><table class="tbl">
       <thead><tr><th style="text-align:left">Material</th><th style="text-align:left">Correspondence No.</th><th>Status</th></tr></thead>
@@ -3809,12 +3829,13 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const body = rows.map((r) => {
       const [lab, cls] = NCR_LABEL[r.state] || [r.status || '', 'neu'];
       return `<tr><td>${matEsc(r.no)}</td>
+        <td class="mat-date">${r.date ? matDate(r.date) : matDash}</td>
         <td style="text-align:left">${matEsc(r.subject)}</td>
         <td>${lab ? `<span class="badge ${cls}">${matEsc(lab)}</span>` : matDash}</td></tr>`;
     }).join('');
-    el.innerHTML = `<h3>NCR Status <span class="mat-n" style="text-transform:none;letter-spacing:0">${c.total} total · ${c.open} open · ${c.closed} closed</span></h3>
+    el.innerHTML = `<h3>NCR Status <span class="mat-n" style="text-transform:none;letter-spacing:0">${c.total} total · ${c.open} open · ${c.submitted} submitted to close · ${c.closed} closed</span></h3>
       <div style="overflow-x:auto"><table class="tbl">
-      <thead><tr><th style="width:64px">NCR No.</th><th style="text-align:left">Description</th><th style="width:150px">Status</th></tr></thead>
+      <thead><tr><th style="width:62px">NCR No.</th><th style="width:100px">Date</th><th style="text-align:left">Description</th><th style="width:150px">Status</th></tr></thead>
       <tbody>${body}</tbody></table></div>`;
   }
 

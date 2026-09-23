@@ -291,8 +291,14 @@
           <div id="elec-panel"><p class="muted">Awaiting electricity data.</p></div>
         </div>
       </section>
-      <section class="view" id="mat"><div class="card" id="mat-list"></div>
-        <div class="card" id="ncr-list" style="margin-top:14px"></div></section>
+      <section class="view" id="mat">
+        <div class="sched-tabs">
+          <button class="sched-tab on" type="button" data-qctab="mat">Material Approvals</button>
+          <button class="sched-tab" type="button" data-qctab="ncr">NCR</button>
+        </div>
+        <div id="qc-mat"><div class="card" id="mat-list"></div></div>
+        <div id="qc-ncr" hidden><div class="card" id="ncr-list"></div></div>
+      </section>
       <section class="view" id="ins">
         <div class="sched-tabs">
           <button class="sched-tab on" data-itab="summary">Insurance Summary</button>
