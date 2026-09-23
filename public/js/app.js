@@ -10,7 +10,7 @@
   const SECTION_LABELS = { exec: 'Executive Summary', fin: 'Financial', sched: 'Schedule & Progress',
     tunnel: 'Tunnel', claims: 'Claims & Variations', inv: 'Inventory & Explosives', mat: 'Quality Control', ins: 'Insurance & Claims',
     man: 'Manpower', rsm: "Employer's Facilities", equip: 'Equipment', safety: 'Safety',
-    dpr: 'Project Report' };
+    dpr: 'Project Overview' };
   const ALL_SECTIONS = Object.keys(SECTION_LABELS);
   // Same-origin (hosted) uses the session cookie; the standalone file adds a Bearer token.
   function authFetch(url, opts = {}) {
@@ -69,7 +69,6 @@
     if (first) {
       const nEl = document.querySelector('.nav-item[data-v="' + first + '"]'); if (nEl) nEl.classList.add('active');
       const vEl = document.getElementById(first); if (vEl) vEl.classList.add('active');
-      if (first === 'dpr') openDpr();   // an account granted only the report lands here
     } else {
       document.getElementById('denied').classList.add('active');
     }
@@ -3035,36 +3034,41 @@
   // Refresh. Silent, repaints only on change, and pauses while the tab is hidden.
   setInterval(() => { if (me && document.visibilityState === 'visible') load({ silent: true }); }, 180000);
 
-  // ---------- Project Report (Detailed Design Report) ----------
-  // The report is ~10 MB, so it is fetched only when the section is first opened,
-  // and always through authFetch: the hosted app authenticates with its session
-  // cookie, but the standalone file carries a Bearer token that a plain
-  // <iframe src="/api/report"> could never send. The bytes become a blob: URL so
-  // the report gets its own iframe viewport — it is a whole self-contained
-  // document with its own dark theme, fixed sidebar and 100vh rules.
-  let dprState = 'idle';          // idle | loading | ready | error
-  let dprUrl = null, dprPh = '';
-  const dprBtn = (id) => document.getElementById(id);
+  // ---------- Project Overview (Detailed Design Report) ----------
+  // The report is a whole self-contained ~10 MB document with its own chrome, so it
+  // opens in its own browser tab rather than inside the dashboard. The tab is opened
+  // SYNCHRONOUSLY on the click — opening it after an await would be treated as a
+  // popup and blocked — then pointed at the blob once the bytes arrive. authFetch is
+  // required because the standalone file authenticates with a Bearer token that a
+  // plain URL in a new tab could never carry.
+  let dprUrl = null;
+  const DPR_WAIT = '<!doctype html><meta charset="utf-8"><title>Project Overview</title>'
+    + '<body style="margin:0;display:flex;align-items:center;justify-content:center;'
+    + 'height:100vh;background:#060C15;color:#9fb0c6;font:14px system-ui">'
+    + '<div id="m">Loading the project overview…</div>';
 
-  async function loadDpr() {
-    if (dprState === 'loading' || dprState === 'ready') return;
-    const stage = dprBtn('dpr-stage'); if (!stage) return;
-    if (!dprPh) dprPh = stage.innerHTML;          // keep the placeholder for Reload
-    dprState = 'loading';
-    const msg = dprBtn('dpr-msg'), bar = dprBtn('dpr-bar'), go = dprBtn('dpr-load');
-    if (go) go.style.display = 'none';
-    if (bar) bar.style.display = '';
-    if (msg) msg.textContent = 'Loading the report…';
+  async function openDprTab() {
+    const tab = window.open('', '_blank');
+    if (tab) { try { tab.document.write(DPR_WAIT); tab.document.close(); } catch (e) { /* ignore */ } }
+    const say = (t) => { try { const el = tab && tab.document.getElementById('m'); if (el) el.textContent = t; } catch (e) { /* navigated away */ } };
+    const hand = (url) => {
+      if (tab) { tab.location = url; return; }
+      // The synchronous open was blocked. The bytes are cached now, so a second
+      // click opens instantly once pop-ups are allowed.
+      if (!window.open(url, '_blank', 'noopener')) {
+        alert('Your browser blocked the pop-up for the Project Overview. Allow pop-ups for this site, then click Project Overview again \u2014 it is already downloaded, so it will open straight away.');
+      }
+    };
     try {
+      if (dprUrl) { hand(dprUrl); return; }           // already downloaded this session
       const r = await authFetch('/api/report');
       if (!r.ok) {
-        throw new Error(r.status === 403 ? 'You do not have access to the project report.'
+        throw new Error(r.status === 403 ? 'You do not have access to the project overview.'
           : r.status === 401 ? 'Your session has expired — sign in again.'
-            : 'The report could not be loaded (' + r.status + ').');
+            : 'The project overview could not be loaded (' + r.status + ').');
       }
-      // Stream it so a 10 MB download shows real progress instead of hanging. The
-      // response is gzipped and fetch() inflates it transparently, so Content-Length
-      // would undercount — the server sends the real size separately.
+      // Stream it so the waiting tab shows real progress. The response is gzipped and
+      // fetch() inflates it transparently, so Content-Length would undercount.
       const total = +(r.headers.get('x-uncompressed-length') || r.headers.get('content-length') || 0);
       let blob;
       if (r.body && r.body.getReader && total) {
@@ -3073,57 +3077,22 @@
           const { done, value } = await reader.read();
           if (done) break;
           parts.push(value); got += value.length;
-          const pct = Math.min(100, Math.round((got / total) * 100));
-          if (bar && bar.firstElementChild) bar.firstElementChild.style.width = pct + '%';
-          if (msg) msg.textContent = 'Loading the report… ' + pct + '%';
+          say('Loading the project overview… ' + Math.min(100, Math.round((got / total) * 100)) + '%');
         }
         blob = new Blob(parts, { type: 'text/html' });
       } else {
         blob = await r.blob();
       }
-      if (dprUrl) URL.revokeObjectURL(dprUrl);
       dprUrl = URL.createObjectURL(blob);
-      const f = document.createElement('iframe');
-      f.title = 'Tamakoshi V — Detailed Design Report';
-      f.setAttribute('allow', 'fullscreen');   // the report has its own 3D tour + fullscreen
-      f.allowFullscreen = true;
-      f.src = dprUrl;
-      stage.innerHTML = '';
-      stage.appendChild(f);
-      dprState = 'ready';
-      ['dpr-full', 'dpr-reload'].forEach((id) => { const b = dprBtn(id); if (b) b.disabled = false; });
-    } catch (e) {
-      dprState = 'error';
-      if (bar) bar.style.display = 'none';
-      if (msg) msg.textContent = String(e.message || e);
-      if (go) { go.style.display = ''; go.textContent = 'Try again'; }
+      hand(dprUrl);
+    } catch (err) {
+      const m = String(err.message || err);
+      say(m);
+      if (!tab) alert(m);
     }
-  }
-  // Opening the section triggers the load — but not on a phone, where 10 MB over
-  // mobile data should be an explicit choice.
-  function openDpr() {
-    if (dprState !== 'idle') return;
-    if (window.innerWidth <= 880) {
-      const go = dprBtn('dpr-load'); if (go) go.style.display = '';
-      const msg = dprBtn('dpr-msg');
-      if (msg) msg.textContent = 'Interactive explorer of the design report. About 10 MB — tap to load.';
-      return;
-    }
-    loadDpr();
   }
   document.addEventListener('click', (e) => {
-    const t = e.target.closest && e.target.closest('#dpr-load, #dpr-full, #dpr-reload');
-    if (!t) return;
-    if (t.id === 'dpr-load') return loadDpr();
-    if (t.id === 'dpr-full') { if (dprUrl) window.open(dprUrl, '_blank', 'noopener'); return; }
-    if (t.id === 'dpr-reload') {                 // re-pull, e.g. after the file is updated
-      const stage = dprBtn('dpr-stage');
-      if (stage && dprPh) stage.innerHTML = dprPh;
-      if (dprUrl) { URL.revokeObjectURL(dprUrl); dprUrl = null; }
-      ['dpr-full', 'dpr-reload'].forEach((id) => { const b = dprBtn(id); if (b) b.disabled = true; });
-      dprState = 'idle';
-      loadDpr();
-    }
+    if (e.target.closest && e.target.closest('#dpr-open')) openDprTab();
   });
 
   // ---------- nav ----------
@@ -3131,6 +3100,8 @@
     const item = e.target.closest('.nav-item');
     if (!item) return;
     const v = item.dataset.v;
+    // The project overview lives in its own tab; leave the current section alone.
+    if (v === 'dpr' && canSee(v)) { openDprTab(); return; }
     document.querySelectorAll('.nav-item').forEach((n) => n.classList.remove('active'));
     item.classList.add('active');
     document.querySelectorAll('.view').forEach((s) => s.classList.remove('active'));
@@ -3143,7 +3114,6 @@
     }
     if (!canSee(v)) { document.getElementById('denied').classList.add('active'); return; }
     document.getElementById(v).classList.add('active');
-    if (v === 'dpr') openDpr();   // fetch the report the first time it is opened
     if (data) renderAll(); // re-trigger animations on the newly visible view
     setTimeout(() => Object.values(charts).forEach((c) => c.resize()), 60);
   });

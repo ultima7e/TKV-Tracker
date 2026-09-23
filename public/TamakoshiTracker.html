@@ -534,34 +534,12 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .cv-scatter-leg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
 .cv-chip{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10.5px;font-weight:700;background:#eef2f7;color:#51637e}
 
-/* ---- Project Report (Detailed Design Report explorer) ----
-   The report is a whole self-contained dark-themed document with its own fixed
-   sidebar and 100vh rules, so it is embedded in an iframe (which gives it its own
-   viewport) rather than inlined, and the stage fills the content area. */
-#dpr.active{display:flex;flex-direction:column;height:100%}
-.dpr-card{display:flex;flex-direction:column;flex:1;min-height:0}
-.dpr-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
-.dpr-head h3{margin-bottom:0}
-.dpr-head .sub{text-transform:none;letter-spacing:0;font-weight:600;color:var(--muted)}
-.dpr-actions{display:flex;gap:8px}
-.dpr-btn{border:1px solid var(--line);border-radius:8px;padding:7px 13px;font-weight:700;font-size:11.5px;
+/* ---- Project Overview ----
+   The report opens in its own tab, so only the launch button is styled here. */
+.dpr-btn{border:1px solid var(--line);border-radius:8px;padding:9px 16px;font-weight:700;font-size:12.5px;
   cursor:pointer;background:#f3f6fb;color:var(--navy);display:inline-flex;align-items:center;gap:6px}
 .dpr-btn:hover{background:#e9eff8}
-.dpr-btn[disabled]{opacity:.5;cursor:default}
 .dpr-btn.primary{border:0;background:linear-gradient(135deg,#0891B2,#7C5CD6);color:#fff}
-.dpr-stage{flex:1;min-height:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;
-  background:#060C15;position:relative}
-.dpr-stage iframe{width:100%;height:100%;border:0;display:block}
-.dpr-ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:13px;text-align:center;padding:26px;color:#9fb0c6}
-.dpr-ph h4{margin:0;font-size:15px;color:#fff;font-weight:700;letter-spacing:.2px}
-.dpr-ph p{margin:0;font-size:12.5px;max-width:430px;line-height:1.65}
-.dpr-bar{width:min(300px,78%);height:6px;border-radius:4px;background:rgba(255,255,255,.13);overflow:hidden}
-.dpr-bar i{display:block;height:100%;width:0;border-radius:4px;background:linear-gradient(90deg,#0891B2,#7C5CD6);
-  transition:width .25s ease}
-/* On a phone the content area has no tall parent to fill, so give the stage a
-   usable height of its own; the 10 MB report also waits for an explicit tap. */
-@media(max-width:880px){ #dpr.active{height:auto} .dpr-stage{height:72vh;min-height:420px} }
 
 /* ---- Material Approvals ----
    Two extra badge tones so "Approved as noted" and "RFC" read differently. */
@@ -603,7 +581,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       <div class="nav-item" data-v="rsm"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a3.8 3.8 0 0 0-5 5L4 17l3 3 5.7-5.7a3.8 3.8 0 0 0 5-5l-2.5 2.5-2.4-.6-.6-2.4z"/></svg></span>Employer's Facilities</div>
       <div class="nav-item" data-v="equip"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2.1 2.1M16.9 16.9 19 19M19 5l-2.1 2.1M7.1 16.9 5 19"/></svg></span>Equipment</div>
       <div class="nav-item" data-v="safety"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 20 6v6c0 5-3.5 7.8-8 9-4.5-1.2-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></span>Safety</div>
-      <div class="nav-item" data-v="dpr"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H19v3H6.5A2.5 2.5 0 0 1 4 20.5z"/><line x1="8" y1="7.5" x2="15" y2="7.5"/><line x1="8" y1="11" x2="13" y2="11"/></svg></span>Project Report</div>
+      <div class="nav-item" data-v="dpr"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H19v3H6.5A2.5 2.5 0 0 1 4 20.5z"/><line x1="8" y1="7.5" x2="15" y2="7.5"/><line x1="8" y1="11" x2="13" y2="11"/></svg></span>Project Overview</div>
       <div class="nav-item" data-v="admin" id="nav-admin" style="display:none"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/><path d="M18.5 4.5l1.2 1.2M20.5 8h-1.7"/></svg></span>Admin</div>
     </nav>
     <div class="nav-foot">
@@ -907,22 +885,10 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       </section>
       <section class="view" id="equip"><div class="card"><h3>Equipment</h3><p class="muted">Awaiting equipment data sheet (Phase 2).</p></div></section>
       <section class="view" id="safety"><div class="card"><h3>Safety</h3><p class="muted">Awaiting safety data sheet (Phase 2).</p></div></section>
-      <section class="view" id="dpr"><div class="card dpr-card">
-        <div class="dpr-head">
-          <h3>Project Report <span class="sub">· Detailed Design Report · Tractebel Engineering · July 2019</span></h3>
-          <div class="dpr-actions">
-            <button class="dpr-btn" id="dpr-reload" type="button" disabled>Reload</button>
-            <button class="dpr-btn primary" id="dpr-full" type="button" disabled>Open full screen</button>
-          </div>
-        </div>
-        <div class="dpr-stage" id="dpr-stage">
-          <div class="dpr-ph" id="dpr-ph">
-            <h4>Tamakoshi V — Detailed Design Report</h4>
-            <p id="dpr-msg">Interactive explorer of the design report: the scheme, structures, machines, hydrology, geology, hydraulic design and costs. About 10&nbsp;MB.</p>
-            <div class="dpr-bar" id="dpr-bar" style="display:none"><i></i></div>
-            <button class="dpr-btn primary" id="dpr-load" type="button" style="display:none">Open report</button>
-          </div>
-        </div>
+      <section class="view" id="dpr"><div class="card">
+        <h3>Project Overview <span class="sub">· Detailed Design Report · Tractebel Engineering · July 2019</span></h3>
+        <p class="muted" style="font-size:12.5px;line-height:1.65;max-width:560px;margin-bottom:12px">The interactive project overview — the scheme, structures, machines, hydrology, geology, hydraulic design and costs — opens in its own browser tab.</p>
+        <button class="dpr-btn primary" id="dpr-open" type="button">Open Project Overview</button>
       </div></section>
       <section class="view" id="denied"><div class="card"><div class="denied-wrap">
         <div class="lock"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
@@ -965,7 +931,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   const SECTION_LABELS = { exec: 'Executive Summary', fin: 'Financial', sched: 'Schedule & Progress',
     tunnel: 'Tunnel', claims: 'Claims & Variations', inv: 'Inventory & Explosives', mat: 'Quality Control', ins: 'Insurance & Claims',
     man: 'Manpower', rsm: "Employer's Facilities", equip: 'Equipment', safety: 'Safety',
-    dpr: 'Project Report' };
+    dpr: 'Project Overview' };
   const ALL_SECTIONS = Object.keys(SECTION_LABELS);
   // Cross-origin from a local file: use a Bearer token (cookies won't apply).
   function authFetch(url, opts = {}) {
@@ -1023,7 +989,6 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     if (first) {
       const nEl = document.querySelector('.nav-item[data-v="' + first + '"]'); if (nEl) nEl.classList.add('active');
       const vEl = document.getElementById(first); if (vEl) vEl.classList.add('active');
-      if (first === 'dpr') openDpr();   // an account granted only the report lands here
     } else {
       document.getElementById('denied').classList.add('active');
     }
@@ -3935,36 +3900,41 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   // Refresh. Silent, repaints only on change, and pauses while the tab is hidden.
   setInterval(() => { if (me && document.visibilityState === 'visible') load({ silent: true }); }, 180000);
 
-  // ---------- Project Report (Detailed Design Report) ----------
-  // The report is ~10 MB, so it is fetched only when the section is first opened,
-  // and always through authFetch: the hosted app authenticates with its session
-  // cookie, but the standalone file carries a Bearer token that a plain
-  // <iframe src="/api/report"> could never send. The bytes become a blob: URL so
-  // the report gets its own iframe viewport — it is a whole self-contained
-  // document with its own dark theme, fixed sidebar and 100vh rules.
-  let dprState = 'idle';          // idle | loading | ready | error
-  let dprUrl = null, dprPh = '';
-  const dprBtn = (id) => document.getElementById(id);
+  // ---------- Project Overview (Detailed Design Report) ----------
+  // The report is a whole self-contained ~10 MB document with its own chrome, so it
+  // opens in its own browser tab rather than inside the dashboard. The tab is opened
+  // SYNCHRONOUSLY on the click — opening it after an await would be treated as a
+  // popup and blocked — then pointed at the blob once the bytes arrive. authFetch is
+  // required because the standalone file authenticates with a Bearer token that a
+  // plain URL in a new tab could never carry.
+  let dprUrl = null;
+  const DPR_WAIT = '<!doctype html><meta charset="utf-8"><title>Project Overview</title>'
+    + '<body style="margin:0;display:flex;align-items:center;justify-content:center;'
+    + 'height:100vh;background:#060C15;color:#9fb0c6;font:14px system-ui">'
+    + '<div id="m">Loading the project overview…</div>';
 
-  async function loadDpr() {
-    if (dprState === 'loading' || dprState === 'ready') return;
-    const stage = dprBtn('dpr-stage'); if (!stage) return;
-    if (!dprPh) dprPh = stage.innerHTML;          // keep the placeholder for Reload
-    dprState = 'loading';
-    const msg = dprBtn('dpr-msg'), bar = dprBtn('dpr-bar'), go = dprBtn('dpr-load');
-    if (go) go.style.display = 'none';
-    if (bar) bar.style.display = '';
-    if (msg) msg.textContent = 'Loading the report…';
+  async function openDprTab() {
+    const tab = window.open('', '_blank');
+    if (tab) { try { tab.document.write(DPR_WAIT); tab.document.close(); } catch (e) { /* ignore */ } }
+    const say = (t) => { try { const el = tab && tab.document.getElementById('m'); if (el) el.textContent = t; } catch (e) { /* navigated away */ } };
+    const hand = (url) => {
+      if (tab) { tab.location = url; return; }
+      // The synchronous open was blocked. The bytes are cached now, so a second
+      // click opens instantly once pop-ups are allowed.
+      if (!window.open(url, '_blank', 'noopener')) {
+        alert('Your browser blocked the pop-up for the Project Overview. Allow pop-ups for this site, then click Project Overview again \u2014 it is already downloaded, so it will open straight away.');
+      }
+    };
     try {
+      if (dprUrl) { hand(dprUrl); return; }           // already downloaded this session
       const r = await authFetch('/api/report');
       if (!r.ok) {
-        throw new Error(r.status === 403 ? 'You do not have access to the project report.'
+        throw new Error(r.status === 403 ? 'You do not have access to the project overview.'
           : r.status === 401 ? 'Your session has expired — sign in again.'
-            : 'The report could not be loaded (' + r.status + ').');
+            : 'The project overview could not be loaded (' + r.status + ').');
       }
-      // Stream it so a 10 MB download shows real progress instead of hanging. The
-      // response is gzipped and fetch() inflates it transparently, so Content-Length
-      // would undercount — the server sends the real size separately.
+      // Stream it so the waiting tab shows real progress. The response is gzipped and
+      // fetch() inflates it transparently, so Content-Length would undercount.
       const total = +(r.headers.get('x-uncompressed-length') || r.headers.get('content-length') || 0);
       let blob;
       if (r.body && r.body.getReader && total) {
@@ -3973,63 +3943,30 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
           const { done, value } = await reader.read();
           if (done) break;
           parts.push(value); got += value.length;
-          const pct = Math.min(100, Math.round((got / total) * 100));
-          if (bar && bar.firstElementChild) bar.firstElementChild.style.width = pct + '%';
-          if (msg) msg.textContent = 'Loading the report… ' + pct + '%';
+          say('Loading the project overview… ' + Math.min(100, Math.round((got / total) * 100)) + '%');
         }
         blob = new Blob(parts, { type: 'text/html' });
       } else {
         blob = await r.blob();
       }
-      if (dprUrl) URL.revokeObjectURL(dprUrl);
       dprUrl = URL.createObjectURL(blob);
-      const f = document.createElement('iframe');
-      f.title = 'Tamakoshi V — Detailed Design Report';
-      f.setAttribute('allow', 'fullscreen');   // the report has its own 3D tour + fullscreen
-      f.allowFullscreen = true;
-      f.src = dprUrl;
-      stage.innerHTML = '';
-      stage.appendChild(f);
-      dprState = 'ready';
-      ['dpr-full', 'dpr-reload'].forEach((id) => { const b = dprBtn(id); if (b) b.disabled = false; });
-    } catch (e) {
-      dprState = 'error';
-      if (bar) bar.style.display = 'none';
-      if (msg) msg.textContent = String(e.message || e);
-      if (go) { go.style.display = ''; go.textContent = 'Try again'; }
+      hand(dprUrl);
+    } catch (err) {
+      const m = String(err.message || err);
+      say(m);
+      if (!tab) alert(m);
     }
-  }
-  // Opening the section triggers the load — but not on a phone, where 10 MB over
-  // mobile data should be an explicit choice.
-  function openDpr() {
-    if (dprState !== 'idle') return;
-    if (window.innerWidth <= 880) {
-      const go = dprBtn('dpr-load'); if (go) go.style.display = '';
-      const msg = dprBtn('dpr-msg');
-      if (msg) msg.textContent = 'Interactive explorer of the design report. About 10 MB — tap to load.';
-      return;
-    }
-    loadDpr();
   }
   document.addEventListener('click', (e) => {
-    const t = e.target.closest && e.target.closest('#dpr-load, #dpr-full, #dpr-reload');
-    if (!t) return;
-    if (t.id === 'dpr-load') return loadDpr();
-    if (t.id === 'dpr-full') { if (dprUrl) window.open(dprUrl, '_blank', 'noopener'); return; }
-    if (t.id === 'dpr-reload') {                 // re-pull, e.g. after the file is updated
-      const stage = dprBtn('dpr-stage');
-      if (stage && dprPh) stage.innerHTML = dprPh;
-      if (dprUrl) { URL.revokeObjectURL(dprUrl); dprUrl = null; }
-      ['dpr-full', 'dpr-reload'].forEach((id) => { const b = dprBtn(id); if (b) b.disabled = true; });
-      dprState = 'idle';
-      loadDpr();
-    }
+    if (e.target.closest && e.target.closest('#dpr-open')) openDprTab();
   });
 
   document.getElementById('nav').addEventListener('click', (e) => {
     const item = e.target.closest('.nav-item');
     if (!item) return;
     const v = item.dataset.v;
+    // The project overview lives in its own tab; leave the current section alone.
+    if (v === 'dpr' && canSee(v)) { openDprTab(); return; }
     document.querySelectorAll('.nav-item').forEach((n) => n.classList.remove('active'));
     item.classList.add('active');
     document.querySelectorAll('.view').forEach((s) => s.classList.remove('active'));
@@ -4041,7 +3978,6 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     }
     if (!canSee(v)) { document.getElementById('denied').classList.add('active'); return; }
     document.getElementById(v).classList.add('active');
-    if (v === 'dpr') openDpr();   // fetch the report the first time it is opened
     if (data) renderAll();
     setTimeout(() => Object.values(charts).forEach((c) => c.resize()), 60);
   });
