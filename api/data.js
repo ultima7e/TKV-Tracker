@@ -8,7 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const { workbookToBoth, workbookSheets } = require('../lib/workbook');
-const { parseTunnel, parseKpis, parseSCurve, parseFinance, parseManpower, parseIpc, parseFinanceDetail, parseClaims, parseExplosives, parseInsurance, parseFuel, parseClaimsRegister, parseTunnelExcavation, parseRsm, parseElectricity, parseMaterials } = require('../lib/parsers');
+const { parseTunnel, parseKpis, parseSCurve, parseFinance, parseManpower, parseIpc, parseFinanceDetail, parseClaims, parseExplosives, parseInsurance, parseFuel, parseClaimsRegister, parseTunnelExcavation, parseRsm, parseElectricity, parseMaterials, parseNcr } = require('../lib/parsers');
 const { parseXer } = require('../lib/xer');
 // Baked-in manpower snapshot (not fetched live). Optional — falls back gracefully.
 let manpowerData = null;
@@ -107,6 +107,9 @@ const ELEC_RE = /electric.*\.xlsx$/i;
 // register, mix designs, submission status, calibration). Rename-proof folder scan.
 const MAT_DIR = 'Shared Folder/Material Approval';
 const MAT_RE = /material approval.*\.xlsx$/i;
+// NCR register — it lives in the same ProgressTracker folder the payload already
+// scans, so it is picked out of that listing instead of costing another PROPFIND.
+const NCR_RE = /ncr.*status.*\.xlsx$/i;
 // Insurance register — its own Nutstore file. Repointed 2026-09-19 to the newer
 // maintained workbook (…/Insurance/Policy/insurance.xlsx); the old
 // …/Insurance/Insurance.xlsx was outdated (last touched Jul 2026).
@@ -307,8 +310,18 @@ function materialsFromBuffer(buffer) {
   }
 }
 
+function ncrFromBuffer(buffer) {
+  if (!buffer) return { missing: true, warnings: ['NCR workbook not available'] };
+  try {
+    const { matrices } = workbookToBoth(buffer);
+    return parseNcr(matrices);
+  } catch (e) {
+    return { missing: true, warnings: ['NCR parse failed: ' + String(e.message || e)] };
+  }
+}
+
 // Parse buffers + XER into the API payload (no generatedAt — added fresh each send).
-function assemble(buffers, xerText, delayXerText, source, claimsBuffer, explosivesBuffer, insuranceBuffer, fuelBuffer, claimsRegBuffer, tunnelExcBuffer, rsmBuffer, electricityBuffer, materialsBuffer) {
+function assemble(buffers, xerText, delayXerText, source, claimsBuffer, explosivesBuffer, insuranceBuffer, fuelBuffer, claimsRegBuffer, tunnelExcBuffer, rsmBuffer, electricityBuffer, materialsBuffer, ncrBuffer) {
   const sheets = {}, matrices = {};
   const skipWarnings = [];
   for (const buffer of buffers) {
@@ -362,6 +375,7 @@ function assemble(buffers, xerText, delayXerText, source, claimsBuffer, explosiv
     tunnelExc: tunnelExcFromBuffer(tunnelExcBuffer),
     electricity: electricityFromBuffer(electricityBuffer),
     materials: materialsFromBuffer(materialsBuffer),
+    ncr: ncrFromBuffer(ncrBuffer),
     schedule: { activities: schedule.activities, relationships: schedule.relationships, wbs: schedule.wbs },
     delaySchedule: { activities: delaySchedule.activities, relationships: delaySchedule.relationships, wbs: delaySchedule.wbs },
   };
@@ -432,6 +446,10 @@ async function buildPayload() {
     if (!entries.length) entries = process.env.NUTSTORE_FILE_PATH.split(';').map((p) => ({ path: p.trim(), mtime: '' })).filter((e) => e.path);
     // Drop any Nutstore file that Dropbox now supplies (Dropbox is the source of truth).
     entries = entries.filter((e) => !DBX_NAMEKEYS.has(normName(e.path.split('/').pop())));
+    // The NCR register shares this folder but is parsed in isolation — its sheet is a
+    // generic "Sheet1" that would collide inside the merged matrices.
+    const ncrFile = entries.find((e) => NCR_RE.test(e.path));
+    entries = entries.filter((e) => e !== ncrFile);
     entries.sort((a, b) => a.path.localeCompare(b.path));
     const xerMtime = (xerInfo[0] && xerInfo[0].mtime) || '';
     const delayXerMtime = (delayXerInfo[0] && delayXerInfo[0].mtime) || '';
@@ -453,13 +471,14 @@ async function buildPayload() {
       rsm: rsmDbx ? rsmDbx.etag : '',
       elec: elecPath + '|' + elecMtime,
       mat: matPath + '|' + matMtime,
+      ncr: ncrFile ? ncrFile.path + '|' + ncrFile.mtime : '',
     });
     if (payloadCache && payloadCache.sig === sig) { // nothing changed — reuse parsed payload
       payloadCache.ts = Date.now();
       return stamp(payloadCache.payload);
     }
 
-    const [nutBuffers, xerText, delayXerText, claimsBuffer, explosivesBuffer, insuranceBuffer, claimsRegBuffer, tunnelExcBuffer, electricityBuffer, materialsBuffer] = await Promise.all([
+    const [nutBuffers, xerText, delayXerText, claimsBuffer, explosivesBuffer, insuranceBuffer, claimsRegBuffer, tunnelExcBuffer, electricityBuffer, materialsBuffer, ncrBuffer] = await Promise.all([
       Promise.all(entries.map((e) => getBuffer(e.path, e.mtime, headers))),
       getXer(xerPath, xerMtime, headers),
       getXer(delayXerPath, delayXerMtime, headers),
@@ -470,9 +489,10 @@ async function buildPayload() {
       tunExcFile ? getBuffer(tunExcPath, tunExcMtime, headers).catch(() => null) : Promise.resolve(null),
       elecFile ? getBuffer(elecPath, elecMtime, headers).catch(() => null) : Promise.resolve(null),
       matFile ? getBuffer(matPath, matMtime, headers).catch(() => null) : Promise.resolve(null),
+      ncrFile ? getBuffer(ncrFile.path, ncrFile.mtime, headers).catch(() => null) : Promise.resolve(null),
     ]);
     const buffers = [...nutBuffers, ...dbx.filter((d) => d.buffer).map((d) => d.buffer)];
-    const payload = assemble(buffers, xerText, delayXerText, 'nutstore', claimsBuffer, explosivesBuffer, insuranceBuffer, fuelDbx && fuelDbx.buffer, claimsRegBuffer, tunnelExcBuffer, rsmDbx && rsmDbx.buffer, electricityBuffer, materialsBuffer);
+    const payload = assemble(buffers, xerText, delayXerText, 'nutstore', claimsBuffer, explosivesBuffer, insuranceBuffer, fuelDbx && fuelDbx.buffer, claimsRegBuffer, tunnelExcBuffer, rsmDbx && rsmDbx.buffer, electricityBuffer, materialsBuffer, ncrBuffer);
     payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
     const applied = await applyScheduleOverride(payload);
     if (!applied && schedCleared) payload.schedule = { activities: [], relationships: [], wbs: {}, cleared: true };
@@ -505,6 +525,7 @@ async function buildPayload() {
       && !/claims.*variations.*register\.xlsx$/i.test(f) // claims register likewise
       && !/explosive.*consumption.*.xlsx$/i.test(f)  // explosives workbook likewise
       && !MAT_RE.test(f)                             // material approvals likewise
+      && !NCR_RE.test(f)                             // NCR register likewise
       && !/^insurance\.xlsx$/i.test(f))             // insurance workbook likewise
     .map((f) => fs.readFileSync(path.join(dir, f)));
   const buffers = [...localBuffers, ...dbx.filter((d) => d.buffer).map((d) => d.buffer)];
@@ -527,7 +548,9 @@ async function buildPayload() {
   const electricityBuffer = elecLocal ? fs.readFileSync(path.join(dir, elecLocal)) : null;
   const matLocal = files.find((f) => MAT_RE.test(f));
   const materialsBuffer = matLocal ? fs.readFileSync(path.join(dir, matLocal)) : null;
-  const payload = assemble(buffers, readXer(baselineXf), readXer(delayXf), 'local-file', claimsBuffer, explosivesBuffer, insuranceBuffer, fuelDbx && fuelDbx.buffer, claimsRegBuffer, tunnelExcBuffer, rsmDbx && rsmDbx.buffer, electricityBuffer, materialsBuffer);
+  const ncrLocal = files.find((f) => NCR_RE.test(f));
+  const ncrBuffer = ncrLocal ? fs.readFileSync(path.join(dir, ncrLocal)) : null;
+  const payload = assemble(buffers, readXer(baselineXf), readXer(delayXf), 'local-file', claimsBuffer, explosivesBuffer, insuranceBuffer, fuelDbx && fuelDbx.buffer, claimsRegBuffer, tunnelExcBuffer, rsmDbx && rsmDbx.buffer, electricityBuffer, materialsBuffer, ncrBuffer);
   payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
   const applied = await applyScheduleOverride(payload);
   if (!applied && schedCleared) payload.schedule = { activities: [], relationships: [], wbs: {}, cleared: true };
