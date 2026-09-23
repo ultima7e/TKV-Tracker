@@ -3826,16 +3826,20 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       return;
     }
     const c = nd.counts || {};
+    // The sheet carries a closure-date column that is blank today; show it only
+    // once it holds something, so the table gains the column by itself.
+    const showClose = !!nd.hasClosure;
     const body = rows.map((r) => {
       const [lab, cls] = NCR_LABEL[r.state] || [r.status || '', 'neu'];
       return `<tr><td>${matEsc(r.no)}</td>
         <td class="mat-date">${r.date ? matDate(r.date) : matDash}</td>
         <td style="text-align:left">${matEsc(r.subject)}</td>
+        ${showClose ? `<td class="mat-date">${r.closure ? matDate(r.closure) : matDash}</td>` : ''}
         <td>${lab ? `<span class="badge ${cls}">${matEsc(lab)}</span>` : matDash}</td></tr>`;
     }).join('');
     el.innerHTML = `<h3>NCR Status <span class="mat-n" style="text-transform:none;letter-spacing:0">${c.total} total · ${c.open} open · ${c.submitted} submitted to close · ${c.closed} closed</span></h3>
       <div style="overflow-x:auto"><table class="tbl">
-      <thead><tr><th style="width:62px">NCR No.</th><th style="width:100px">Date</th><th style="text-align:left">Description</th><th style="width:150px">Status</th></tr></thead>
+      <thead><tr><th style="width:62px">NCR No.</th><th style="width:100px">Date</th><th style="text-align:left">Description</th>${showClose ? `<th style="width:110px">${matEsc(nd.closureLabel || 'Closure Date')}</th>` : ''}<th style="width:150px">Status</th></tr></thead>
       <tbody>${body}</tbody></table></div>`;
   }
 
