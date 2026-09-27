@@ -9,7 +9,7 @@
   const TOKEN_KEY = 'tkv_token';
   const SECTION_LABELS = { exec: 'Executive Summary', fin: 'Financial', sched: 'Schedule & Progress',
     tunnel: 'Tunnel', claims: 'Claims & Variations', inv: 'Inventory & Explosives', mat: 'Quality Control', ins: 'Insurance & Claims',
-    man: 'Manpower', rsm: "Employer's Facilities", equip: 'Equipment', safety: 'Safety',
+    man: 'Manpower', rsm: "Employer's Facilities", equip: 'Equipment',
     dpr: 'Project Overview' };
   const ALL_SECTIONS = Object.keys(SECTION_LABELS);
   // Same-origin (hosted) uses the session cookie; the standalone file adds a Bearer token.
