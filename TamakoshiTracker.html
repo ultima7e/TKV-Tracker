@@ -3413,8 +3413,11 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   const cvChip = (cat) => `<span class="cv-chip" style="background:${(CV_BASISCOL[cat] || '#8a8f98') + '22'};color:${CV_BASISCOL[cat] || '#556'}">${cat}</span>`;
   const CV_PREFIX = { claim: 'SoC-', variation: 'VAR-', pclaim: 'PC-', pvariation: 'PV-' };
   const cvItemLabel = (r) => (CV_PREFIX[r.kind] || '') + r.ref; // unique within a tab; also the row key
-  // Headline count = the highest ref number reached (so a skipped number — e.g. a
+  // Headline count for CLAIMS = the highest ref number reached (so a skipped number — e.g. a
   // missing SoC-9 — still reads as 11), never fewer than the actual rows.
+  // Variations are counted by ROW instead: their refs mix two series (VAR-n and
+  // VAR-SI-n for site instructions), so a max-of-refs would invent the missing
+  // VAR-1…VAR-8 and report 12 where the register holds 6.
   const cvRaised = (rows) => {
     const maxRef = (rows || []).reduce((m, r) => { const n = parseInt((String(r.ref).match(/\d+/) || [0])[0], 10) || 0; return n > m ? n : m; }, 0);
     return Math.max(maxRef, (rows || []).length);
@@ -3495,9 +3498,9 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     const totalLetters = rows.reduce((s, r) => s + r.letters.length, 0);
     const kpiCards = cfg.merge
       ? `${cvKpiCard('Potential Claims', cvRaised(cv.pclaims || []), 'no value yet', 'target', '#c2557a')}
-         ${cvKpiCard('Potential Variations', cvRaised(cv.pvariations || []), cvUsd(v.total), 'edit', '#7a6ad0')}
+         ${cvKpiCard('Potential Variations', (cv.pvariations || []).length, cvUsd(v.total), 'edit', '#7a6ad0')}
          ${cvKpiCard('Correspondence', totalLetters, 'letters logged', 'clock', '#2f6fd0')}`
-      : `${cvKpiCard(cfg.title + ' Raised', cvRaised(rows), cvUsd(v.total), 'scales', '#6b46c9')}
+      : `${cvKpiCard(cfg.title + ' Raised', kind === 'variations' ? rows.length : cvRaised(rows), cvUsd(v.total), 'scales', '#6b46c9')}
          ${cvKpiCard('Submitted Value', cvUsdShort(v.total), '', 'doc', '#1d8a63')}
          ${cvKpiCard('Approved Value', cvUsdShort(v.approved), '', 'check', '#2f6fd0')}
          ${cvKpiCard('Pending Value', cvUsdShort(v.pending), '', 'clock', '#e0952e')}`;
@@ -3580,12 +3583,12 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
     el.innerHTML =
       `<div class="cv-kpis">
         ${cvKpiCard('Total Claims', cvRaised(cv.claims), cvUsd(k.claimsValue), 'doc', '#2f6fd0')}
-        ${cvKpiCard('Variations', cvRaised(cv.variations), cvUsd(k.variationsValue), 'edit', '#6b46c9')}
+        ${cvKpiCard('Variations', cv.variations.length, cvUsd(k.variationsValue), 'edit', '#6b46c9')}
         ${cvKpiCard('Total Exposure', cvUsdShort(k.totalValue), cvUsd(k.totalValue), 'scales', '#1d8a63')}
         ${cvKpiCard('Approved Value', cvUsdShort(av.approved), 'determined / approved', 'check', '#1a9aa8')}
         ${cvKpiCard('Pending Value', cvUsdShort(av.pending), 'awaiting outcome', 'clock', '#e0952e')}
         ${cvKpiCard('Potential Claims', cv.pclaims ? cvRaised(cv.pclaims) : '–', 'in pipeline', 'target', '#c2557a')}
-        ${cvKpiCard('Potential Variations', cv.pvariations ? cvRaised(cv.pvariations) : '–', cvUsd(k.pVariationsValue), 'edit', '#7a6ad0')}
+        ${cvKpiCard('Potential Variations', cv.pvariations ? cv.pvariations.length : '–', cvUsd(k.pVariationsValue), 'edit', '#7a6ad0')}
        </div>
        <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
          <div class="card"><h3>Value by Contractual Basis <span class="muted" style="font-weight:600">· click a slice</span></h3><div id="cv-donut" class="chart" style="height:260px"></div>
