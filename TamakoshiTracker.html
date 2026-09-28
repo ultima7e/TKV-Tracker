@@ -549,6 +549,12 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .mat-groups .sched-tab{padding:7px 12px;font-size:12px}
 .mat-n{font-weight:600;opacity:.6;margin-left:2px}
 .mat-date{white-space:nowrap;color:#51637e;font-size:11.5px}
+/* ---- Contract milestones (Schedule & Progress → Milestones) ---- */
+.ms-tbl th{white-space:normal;line-height:1.3;vertical-align:bottom}
+.ms-tbl td{vertical-align:top}
+.ms-date{white-space:nowrap}
+.ms-left.neg{color:#b3261e;font-weight:700}
+.ms-note{font-size:11.5px;margin:-4px 0 10px}
 </style>
 </head>
 <body>
@@ -718,6 +724,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
         <div class="sched-tabs">
           <button class="sched-tab on" data-stab="schedule">Schedule</button>
           <button class="sched-tab" data-stab="delay">Delay &amp; Disruption</button>
+          <button class="sched-tab" data-stab="ms">Milestones</button>
         </div>
         <div class="stab-pane" id="stab-schedule">
         <div class="card">
@@ -750,6 +757,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
           </div>
         </div>
         </div>
+        <div class="stab-pane" id="stab-ms" hidden></div>
         <div class="stab-pane" id="stab-delay" hidden>
           <div class="card">
             <h3>Delay &amp; Disruption Events <span class="muted" id="dd-summary" style="font-weight:600">· —</span></h3>
@@ -3714,6 +3722,126 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   }
 
 
+  // ================= Contract Milestones (SCC 2.2 / SCC 41.2) =================
+  // Transcribed from the contract milestone tables. Every date there equals the
+  // Commencement Date (9 Jun 2024) + "completion in days after commencement", so only
+  // the day counts are stored and the dates are derived — they cannot drift apart.
+  // "No of Days Remaining" is counted from today, exactly as the source sheet's
+  // formula does (measured against the original milestone date).
+  const MS_COMMENCE = Date.UTC(2024, 5, 9);
+  // [no, activity, description, days, revised days]
+  const MS_SECTIONAL = [
+    [1, 'Activity No. B.', 'Mobilisation, Insurance, Site Installation and Facilities, Site Facilities and Services for the Employer and Contractor\'s use, Construction equipment, Material Testing Laboratories & Construction of Access Roads, Excavation of Access Tunnels and Adits, including Portals.', 409, 397],
+    [2, 'Activity No. D.', 'Completion of Headrace Tunnel (HRT)', 1119, 1382],
+    [3, 'Activity No. E.', 'Completion of Surge Tank, Valve Chamber, Pressure Shaft, High Pressure Shaft & Upstream Manifold including all equipment', 795, 1120],
+    [4, 'Activity No. F.', 'Construction of Powerhouse, Transformer Cavern including Galleries & Erection Service Bay & the Cable and Ventilation Tunnel (CVT), and Permanent Service Tunnels.', 1089, 1331],
+    [5, 'Activity No. G.', 'Construction of Outlet Structures and Downstream Power Waterways consisting of Manifolds and Tailrace Tunnel', 1078, 1231],
+    [6, 'Activity No. A.3', 'Commissioning of all Hydromechanical equipment & Power Waterways filled & tested, ready for Wet Testing of Turbines', 1242, 1382],
+    [7, '', 'Completion of all Works specified under this Contract, incl. testing & commissioning as specified, ready for handing over to Employer', 1403, 1403],
+  ];
+  // Section headings as strings; milestones as [no, description, days, revised days].
+  const MS_TABLE = [
+    'Site Mobilisation and Structures',
+    [1, 'Mobilisation of key personnel and main construction equipment. Construction of site installations, buildings, temporary access roads and site installation services.', 153, 179],
+    [2, 'Excavation of Adit I, Adit 2, Adit 3 and Adit 4 complete, including access roads and portals', 409, 397],
+    [3, 'Completion of structures at the Headworks, incl. excavation & support, and Phase 2-TS complete.', 328, 1069],
+    [4, 'Completion of Headrace Tunnel (HRT)', 1119, 1382],
+    [5, 'Completion of Surge Tank, including all equipment', 756, 564],
+    [6, 'Completion of Valve Chamber, including all equipment', 795, 860],
+    [7, 'Completion of Pressure Shaft, including steel lining', 739, 917],
+    [8, 'Completion of High- Pressure Tunnel, including steel', 635, 950],
+    [9, 'Completion of Upstream Manifolds', 308, 1120],
+    'Power Station',
+    [10, 'Completion of MAT (all branches)', 238, 768],
+    [11, 'Excavation to Machine Hall Floor', 228, 468],
+    [12, 'Excavation to final Elevation', 416, 633],
+    [13, 'Construction Crane operational', 243, 938],
+    [14, 'Stage I concrete complete for installation of draft tubes', 476, 723],
+    [15, 'Stage I concrete complete for installation of main crane', 671, 938],
+    'Power Station Unit 1 Block',
+    [16, 'Unit I Block Concrete up to Spiral Case', 537, 938],
+    [17, 'Stage 2 Concrete around Stay Ring Anchors', 569, 904],
+    [18, 'Unit I Block Concrete up to Machine Hall Floor', 868, 1218],
+    [19, 'Stage 3 Concrete complete', 965, 1331],
+    'Power Station Unit 2 Block',
+    [20, 'Unit 2 Block Concrete up to Spiral Case', 568, 1218],
+    [21, 'Stage 2 Concrete around Stay Ring Anchors', 600, 893],
+    [22, 'Unit 2 Block Concrete up to Machine Hall floor', 897, 1043],
+    [23, 'Stage 3 Concrete complete', 994, 1073],
+    'Power Station Unit 3 Block',
+    [24, 'Unit 3 Block Concrete up to Spiral Case', 600, 1218],
+    [25, 'Stage 3 Concrete around Stay Ring Anchors', 630, 913],
+    [26, 'Unit 3 Block Concrete up to Machine Hall Floor', 926, 1063],
+    [27, 'Stage 3 Concrete complete', 1023, 1093],
+    'Power Station Unit 4 Block',
+    [28, 'Stage 2 Concrete for Draft Tube up to Valve Floor', 583, 1218],
+    [29, 'Stage 2 Concrete around Draft Tube at Valve Floor', 1089, 1331],
+    'Transformer Cavern & Busducts',
+    [30, 'Excavation & Support Complete', 328, 382],
+    [31, 'Concrete Works Complete', 418, 1331],
+    'TVB',
+    [32, 'Concrete Works Complete', 245, 320],
+    [33, 'TOY 2 Complete', 395, 848],
+    [34, 'TOY 1 Complete', 485, 843],
+    'Outdoor Buildings',
+    // No contractual completion day in the table (the sheet shows the commencement
+    // date as a placeholder), so these carry revised dates only.
+    [35, 'Bypass Switching Station Complete', null, 561],
+    [36, 'Operation Building Complete', null, 1338],
+    'Downstream Structures',
+    [37, 'Completion of Downstream Manifolds', 690, 722],
+    [38, 'Completion of Tailrace Tunnel', 810, 972],
+    [39, 'Completion of Outlet Structure', 1078, 1231],
+    [40, 'Power Waterways filled & tested, ready for Wet Testing of Turbine', 1242, 1382],
+    [41, 'Completion of all Works specified under this Contract, incl. testing & commissioning as specified, ready for handing over to Employer', 1403, 1403],
+  ];
+  const msEsc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const msDash = '<span style="color:#a3b0c2">—</span>';
+  const msFmt = (days) => {
+    if (days == null) return msDash;
+    const d = new Date(MS_COMMENCE + days * 86400000);
+    return d.getUTCDate() + '-' + CV_MON[d.getUTCMonth()] + '-' + String(d.getUTCFullYear()).slice(2);
+  };
+  const msLeft = (days) => {
+    if (days == null) return null;
+    const n = new Date();
+    return Math.round((MS_COMMENCE + days * 86400000 - Date.UTC(n.getFullYear(), n.getMonth(), n.getDate())) / 86400000);
+  };
+  const msRow = (no, descHtml, days, rev) => {
+    const left = msLeft(days);
+    return `<tr><td>${no}</td><td style="text-align:left">${descHtml}</td>
+      <td>${days == null ? msDash : days}</td><td class="ms-date">${msFmt(days)}</td>
+      <td class="ms-left${left != null && left < 0 ? ' neg' : ''}">${left == null ? msDash : left}</td>
+      <td>${rev == null ? msDash : rev}</td><td class="ms-date">${msFmt(rev)}</td></tr>`;
+  };
+  const MS_HEAD = '<thead><tr><th style="width:62px">Milestone No.</th><th style="text-align:left">Description of Milestone</th>'
+    + '<th style="width:110px">Completion in days after Commencement</th><th style="width:96px">Milestone Date</th>'
+    + '<th style="width:86px">No of Days Remaining</th><th style="width:110px">Revised Completion days after Commencement</th>'
+    + '<th style="width:96px">Revised Milestone Date</th></tr></thead>';
+
+  // Re-rendered each time the tab opens, so "days remaining" is always today's.
+  function renderMilestones() {
+    const el = document.getElementById('stab-ms'); if (!el) return;
+    const n = new Date();
+    const today = n.getDate() + ' ' + CV_MON[n.getMonth()] + ' ' + n.getFullYear();
+    const sect = MS_SECTIONAL.map(([no, act, desc, d, r]) =>
+      msRow(no, (act ? `<b>${msEsc(act)}</b><br>` : '') + msEsc(desc), d, r)).join('');
+    const count = MS_TABLE.filter((r) => typeof r !== 'string').length;
+    const table = MS_TABLE.map((r) => (typeof r === 'string'
+      ? `<tr class="tbl-grp"><td colspan="7">${msEsc(r)}</td></tr>`
+      : msRow(r[0], msEsc(r[1]), r[2], r[3]))).join('');
+    el.innerHTML = `<div class="card">
+        <h3>Sectional Completion Milestones <span class="muted" style="font-weight:600">· SCC 2.2</span></h3>
+        <p class="muted ms-note">Commencement Date 9 Jun 2024 · days remaining counted to the milestone date from today (${today}); negative = past.</p>
+        <div style="overflow-x:auto"><table class="tbl ms-tbl">${MS_HEAD}<tbody>${sect}</tbody></table></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h3>Table of Completion Milestones <span class="muted" style="font-weight:600">· SCC 41.2 · ${count} intermediate milestones</span></h3>
+        <div style="overflow-x:auto"><table class="tbl ms-tbl">${MS_HEAD}<tbody>${table}</tbody></table></div>
+        <p class="muted ms-note" style="margin:10px 0 0">Milestones 35 and 36 have no contractual completion day in the table, so they carry revised dates only.</p>
+      </div>`;
+  }
+
   // ================= Quality Control =================
   // Two panels behind top-level tabs: Material Approvals (material groups as their
   // own tab row, each listing material / correspondence no. / status) and the NCR
@@ -3828,6 +3956,8 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
         document.getElementById('stab-schedule').hidden = which !== 'schedule';
         document.getElementById('stab-delay').hidden = which !== 'delay';
         if (which === 'delay') renderDelays();
+        const msPane = document.getElementById('stab-ms'); if (msPane) msPane.hidden = which !== 'ms';
+        if (which === 'ms') renderMilestones();
       }));
     }
     if (!invTabsWired) {
