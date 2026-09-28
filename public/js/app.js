@@ -2848,6 +2848,75 @@
     });
   }
 
+  // ================= Organogram (Manpower → Organogram) =================
+  // Staff organisation chart. Its data — roles, names, mobile numbers — is PERSONAL, so
+  // it arrives only through the authenticated /api/data payload (from Nutstore). It is
+  // never written into this file, which anyone can download without logging in.
+  let orgSig = '', manTabsWired = false;
+  const orgEsc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const orgTel = (p) => (p ? `<a class="org-t" href="tel:+977${orgEsc(p)}">${orgEsc(p)}</a>` : '');
+  const orgPerson = (p, cls) => (p ? `<div class="org-p${cls ? ' ' + cls : ''}" data-q="${orgEsc((p.role + ' ' + p.name + ' ' + (p.phone || '')).toLowerCase())}">
+      <div class="org-r">${orgEsc(p.role)}</div><div class="org-n">${orgEsc(p.name)}</div>${orgTel(p.phone)}</div>` : '');
+
+  function wireManTabs() {
+    if (manTabsWired) return; manTabsWired = true;
+    document.querySelectorAll('#man .sched-tab[data-mantab]').forEach((btn) => btn.addEventListener('click', () => {
+      const which = btn.dataset.mantab;
+      document.querySelectorAll('#man .sched-tab[data-mantab]').forEach((b) => b.classList.toggle('on', b === btn));
+      ['deploy', 'org'].forEach((k) => { const p = document.getElementById('mantab-' + k); if (p) p.hidden = k !== which; });
+    }));
+    // Search filters the rendered chart in place (no re-render, so typing keeps focus).
+    const pane = document.getElementById('mantab-org');
+    if (pane) pane.addEventListener('input', (e) => {
+      if (e.target.id !== 'org-q') return;
+      const q = e.target.value.trim().toLowerCase();
+      let shown = 0;
+      pane.querySelectorAll('.org-p').forEach((p) => {
+        const hit = !q || p.dataset.q.includes(q);
+        p.classList.toggle('org-hide', !hit); if (hit) shown++;
+      });
+      pane.querySelectorAll('.org-unit, .org-dept').forEach((b) => {
+        b.classList.toggle('org-hide', !!q && !b.querySelector('.org-p:not(.org-hide)'));
+      });
+      pane.querySelectorAll('.org-note, .org-empty').forEach((n) => n.classList.toggle('org-hide', !!q));
+      const none = pane.querySelector('.org-none'); if (none) none.hidden = shown > 0;
+    });
+  }
+
+  function renderOrganogram() {
+    wireManTabs();
+    const el = document.getElementById('org-panel'); if (!el) return;
+    const o = data && data.organogram;
+    if (!o || o.missing || !(o.departments || []).length) {
+      orgSig = '';
+      el.innerHTML = '<h3>Organization &amp; Personnel Chart</h3><p class="muted" style="font-size:12px">The organogram is not available yet.</p>';
+      return;
+    }
+    const sig = JSON.stringify(o); if (sig === orgSig) return;   // unchanged: keep any search in place
+    orgSig = sig;
+    const count = (o.top || []).length + o.departments.reduce((s, d) => s + (d.head ? 1 : 0)
+      + (d.units || []).reduce((u, x) => u + (x.lead ? 1 : 0) + (x.members || []).length, 0), 0);
+    const dept = (d) => `<div class="org-dept">
+        <div class="org-dname">${orgEsc(d.name)}</div>
+        ${orgPerson(d.head, 'head')}
+        ${d.note ? `<div class="org-note">${orgEsc(d.note)}</div>` : ''}
+        ${(d.units || []).map((u) => `<div class="org-unit">
+            ${u.title ? `<div class="org-utitle">${orgEsc(u.title)}</div>` : ''}
+            ${orgPerson(u.lead, 'lead')}${(u.members || []).map((m) => orgPerson(m)).join('')}
+            ${!u.lead && !(u.members || []).length ? '<div class="org-empty">No staff listed</div>' : ''}
+          </div>`).join('')}
+      </div>`;
+    el.innerHTML = `<div class="org-head">
+        <h3>Organization &amp; Personnel Chart <span class="muted" style="font-weight:600;text-transform:none;letter-spacing:0">· ${count} staff · ${o.departments.length} departments</span></h3>
+        <input class="mat-search" id="org-q" type="search" placeholder="Search name, role or phone…">
+      </div>
+      <div class="org-top">${(o.top || []).map((p) => orgPerson(p, 'top')).join('<div class="org-link"></div>')}</div>
+      <div class="org-link org-trunk"></div>
+      <div class="org-grid">${o.departments.map(dept).join('')}</div>
+      <p class="muted org-none" hidden style="font-size:12px;padding:10px 2px">No one matches that search.</p>`;
+  }
+
   // ================= Contract Milestones (SCC 2.2 / SCC 41.2) =================
   // Transcribed from the contract milestone tables. Every date there equals the
   // Commencement Date (9 Jun 2024) + "completion in days after commencement", so only
@@ -3085,6 +3154,7 @@
     renderWeekly();
     renderClaimsModule();
     renderMaterials();
+    renderOrganogram();
     renderSchedule();
     // Wire the Schedule/Delay sub-tabs once; render the delay view lazily on show.
     if (!schedTabsWired) {

@@ -327,11 +327,18 @@
         </div>
       </section>
       <section class="view" id="man">
+        <div class="sched-tabs">
+          <button class="sched-tab on" type="button" data-mantab="deploy">Manpower</button>
+          <button class="sched-tab" type="button" data-mantab="org">Organogram</button>
+        </div>
+        <div id="mantab-deploy">
         <div class="card" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
           <h3 style="margin:0">Manpower Deployment <span class="muted" style="font-weight:600">· data date <span id="mp-date">—</span></span></h3>
           <span class="badge neu" style="font-size:11px">SINOHYDRO · daily site count</span>
         </div>
         <div id="mp-panel"><p class="muted">Awaiting manpower data.</p></div>
+        </div>
+        <div id="mantab-org" hidden><div class="card" id="org-panel"></div></div>
       </section>
       <section class="view" id="rsm">
         <div class="card" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">

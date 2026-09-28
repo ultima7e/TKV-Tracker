@@ -609,3 +609,28 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .ms-date{white-space:nowrap}
 .ms-left.neg{color:#b3261e;font-weight:700}
 .ms-note{font-size:11.5px;margin:-4px 0 10px}
+/* ---- Organogram (Manpower → Organogram) ---- */
+.org-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.org-head h3{margin:0}
+.org-top{display:flex;flex-direction:column;align-items:center}
+.org-top .org-p{min-width:250px;text-align:center;border:1px solid var(--line);border-radius:10px;background:#f6f9fd}
+.org-top .org-p:first-child{background:var(--navy);border-color:var(--navy)}
+.org-top .org-p:first-child .org-r,.org-top .org-p:first-child .org-n,.org-top .org-p:first-child .org-t{color:#fff}
+.org-link{width:2px;height:14px;background:#c9d4e3;margin:0 auto}
+.org-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;align-items:start;
+  border-top:2px solid #c9d4e3;padding-top:14px}
+.org-dept{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.org-dname{background:#eaf1f9;color:var(--navy);font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.5px;padding:8px 12px}
+.org-p{padding:6px 12px;border-top:1px solid #f0f3f8}
+.org-p.head{background:#f6f9fd;border-top:0}
+.org-p.lead{background:#fbfcfe}
+.org-r{font-size:10.5px;color:var(--muted);font-weight:600;line-height:1.35}
+.org-n{font-size:12.5px;color:var(--ink);font-weight:700;line-height:1.35}
+.org-p.head .org-n,.org-p.lead .org-n{color:var(--navy)}
+.org-t{font-size:11px;color:var(--accent);text-decoration:none;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.org-t:hover{text-decoration:underline}
+.org-unit{border-top:1px solid var(--line)}
+.org-utitle{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#7b8aa0;padding:8px 12px 2px;background:#fbfcfe}
+.org-note{font-size:11px;color:#6b4b10;padding:6px 12px;background:#fff8ec;border-top:1px solid #f3dfb5}
+.org-empty{font-size:11px;color:#a3b0c2;padding:4px 12px 8px}
+.org-hide{display:none!important}

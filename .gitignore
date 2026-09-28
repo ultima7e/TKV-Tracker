@@ -35,3 +35,6 @@ data/Claims & Variations Register.xlsx
 # It is served from Nutstore via the auth-gated /api/report route — never commit it.
 Tamakoshi-V-Explorer.html
 public/dpr*.html
+
+# Staff organogram (names + phone numbers) — personal data; lives in Nutstore only.
+data/organogram.json

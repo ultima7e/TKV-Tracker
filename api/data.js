@@ -110,6 +110,11 @@ const MAT_RE = /material approval.*\.xlsx$/i;
 // NCR register — it lives in the same ProgressTracker folder the payload already
 // scans, so it is picked out of that listing instead of costing another PROPFIND.
 const NCR_RE = /ncr.*status.*\.xlsx$/i;
+// Staff organogram — structured data (roles, names, phone numbers) extracted from the
+// project Organization & Personnel Chart. It holds PERSONAL DATA, so it lives only in
+// Nutstore and reaches users through this authenticated endpoint — never the repo,
+// which is public, and never public/, which is served without a login.
+const ORG_PATH = 'Shared Folder/Organogram/organogram.json';
 // Insurance register — its own Nutstore file. Repointed 2026-09-19 to the newer
 // maintained workbook (…/Insurance/Policy/insurance.xlsx); the old
 // …/Insurance/Insurance.xlsx was outdated (last touched Jul 2026).
@@ -310,6 +315,17 @@ function materialsFromBuffer(buffer) {
   }
 }
 
+function orgFromBuffer(buffer) {
+  if (!buffer) return { missing: true, warnings: ['Organogram not available'] };
+  try {
+    const o = JSON.parse(buffer.toString('utf8'));
+    if (!o || !Array.isArray(o.departments)) throw new Error('unexpected shape');
+    return o;
+  } catch (e) {
+    return { missing: true, warnings: ['Organogram parse failed: ' + String(e.message || e)] };
+  }
+}
+
 function ncrFromBuffer(buffer) {
   if (!buffer) return { missing: true, warnings: ['NCR workbook not available'] };
   try {
@@ -321,7 +337,7 @@ function ncrFromBuffer(buffer) {
 }
 
 // Parse buffers + XER into the API payload (no generatedAt — added fresh each send).
-function assemble(buffers, xerText, delayXerText, source, claimsBuffer, explosivesBuffer, insuranceBuffer, fuelBuffer, claimsRegBuffer, tunnelExcBuffer, rsmBuffer, electricityBuffer, materialsBuffer, ncrBuffer) {
+function assemble(buffers, xerText, delayXerText, source, claimsBuffer, explosivesBuffer, insuranceBuffer, fuelBuffer, claimsRegBuffer, tunnelExcBuffer, rsmBuffer, electricityBuffer, materialsBuffer, ncrBuffer, orgBuffer) {
   const sheets = {}, matrices = {};
   const skipWarnings = [];
   for (const buffer of buffers) {
@@ -376,6 +392,7 @@ function assemble(buffers, xerText, delayXerText, source, claimsBuffer, explosiv
     electricity: electricityFromBuffer(electricityBuffer),
     materials: materialsFromBuffer(materialsBuffer),
     ncr: ncrFromBuffer(ncrBuffer),
+    organogram: orgFromBuffer(orgBuffer),
     schedule: { activities: schedule.activities, relationships: schedule.relationships, wbs: schedule.wbs },
     delaySchedule: { activities: delaySchedule.activities, relationships: delaySchedule.relationships, wbs: delaySchedule.wbs },
   };
@@ -397,7 +414,7 @@ async function buildPayload() {
 
     // Nutstore folder PROPFIND + both XER PROPFINDs + claims PROPFIND + Dropbox
     // fetches + the small schedule-override version marker, all parallel.
-    const [listing, xerInfo, delayXerInfo, claimsInfo, explInfo, insInfo, dbx, schedVer, baseVer, fuelDbx, cvInfo, schedCleared, tunExcInfo, rsmDbx, elecInfo, matInfo] = await Promise.all([
+    const [listing, xerInfo, delayXerInfo, claimsInfo, explInfo, insInfo, dbx, schedVer, baseVer, fuelDbx, cvInfo, schedCleared, tunExcInfo, rsmDbx, elecInfo, matInfo, orgInfo] = await Promise.all([
       propfind(DAV_BASE + encPath(dir) + '/', headers, 1),
       propfind(DAV_BASE + encPath(xerPath), headers, 0),
       propfind(DAV_BASE + encPath(delayXerPath), headers, 0),
@@ -414,6 +431,7 @@ async function buildPayload() {
       dbxFetch(RSM_DBX_URL).catch(() => null),
       propfind(DAV_BASE + encPath(ELEC_DIR) + '/', headers, 1).catch(() => []),
       propfind(DAV_BASE + encPath(MAT_DIR) + '/', headers, 1).catch(() => []),
+      propfind(DAV_BASE + encPath(ORG_PATH), headers, 0).catch(() => []),
     ]);
     const claimsMtime = (claimsInfo[0] && claimsInfo[0].mtime) || '';
     // Newest xlsx in the Explosive Record folder that matches the workbook name.
@@ -472,13 +490,14 @@ async function buildPayload() {
       elec: elecPath + '|' + elecMtime,
       mat: matPath + '|' + matMtime,
       ncr: ncrFile ? ncrFile.path + '|' + ncrFile.mtime : '',
+      org: ORG_PATH + '|' + (((orgInfo || [])[0] || {}).mtime || ''),
     });
     if (payloadCache && payloadCache.sig === sig) { // nothing changed — reuse parsed payload
       payloadCache.ts = Date.now();
       return stamp(payloadCache.payload);
     }
 
-    const [nutBuffers, xerText, delayXerText, claimsBuffer, explosivesBuffer, insuranceBuffer, claimsRegBuffer, tunnelExcBuffer, electricityBuffer, materialsBuffer, ncrBuffer] = await Promise.all([
+    const [nutBuffers, xerText, delayXerText, claimsBuffer, explosivesBuffer, insuranceBuffer, claimsRegBuffer, tunnelExcBuffer, electricityBuffer, materialsBuffer, ncrBuffer, orgBuffer] = await Promise.all([
       Promise.all(entries.map((e) => getBuffer(e.path, e.mtime, headers))),
       getXer(xerPath, xerMtime, headers),
       getXer(delayXerPath, delayXerMtime, headers),
@@ -490,9 +509,10 @@ async function buildPayload() {
       elecFile ? getBuffer(elecPath, elecMtime, headers).catch(() => null) : Promise.resolve(null),
       matFile ? getBuffer(matPath, matMtime, headers).catch(() => null) : Promise.resolve(null),
       ncrFile ? getBuffer(ncrFile.path, ncrFile.mtime, headers).catch(() => null) : Promise.resolve(null),
+      ((orgInfo || [])[0] || {}).mtime ? getBuffer(ORG_PATH, orgInfo[0].mtime, headers).catch(() => null) : Promise.resolve(null),
     ]);
     const buffers = [...nutBuffers, ...dbx.filter((d) => d.buffer).map((d) => d.buffer)];
-    const payload = assemble(buffers, xerText, delayXerText, 'nutstore', claimsBuffer, explosivesBuffer, insuranceBuffer, fuelDbx && fuelDbx.buffer, claimsRegBuffer, tunnelExcBuffer, rsmDbx && rsmDbx.buffer, electricityBuffer, materialsBuffer, ncrBuffer);
+    const payload = assemble(buffers, xerText, delayXerText, 'nutstore', claimsBuffer, explosivesBuffer, insuranceBuffer, fuelDbx && fuelDbx.buffer, claimsRegBuffer, tunnelExcBuffer, rsmDbx && rsmDbx.buffer, electricityBuffer, materialsBuffer, ncrBuffer, orgBuffer);
     payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
     const applied = await applyScheduleOverride(payload);
     if (!applied && schedCleared) payload.schedule = { activities: [], relationships: [], wbs: {}, cleared: true };
@@ -550,7 +570,9 @@ async function buildPayload() {
   const materialsBuffer = matLocal ? fs.readFileSync(path.join(dir, matLocal)) : null;
   const ncrLocal = files.find((f) => NCR_RE.test(f));
   const ncrBuffer = ncrLocal ? fs.readFileSync(path.join(dir, ncrLocal)) : null;
-  const payload = assemble(buffers, readXer(baselineXf), readXer(delayXf), 'local-file', claimsBuffer, explosivesBuffer, insuranceBuffer, fuelDbx && fuelDbx.buffer, claimsRegBuffer, tunnelExcBuffer, rsmDbx && rsmDbx.buffer, electricityBuffer, materialsBuffer, ncrBuffer);
+  const orgLocal = path.join(dir, 'organogram.json');
+  const orgBuffer = fs.existsSync(orgLocal) ? fs.readFileSync(orgLocal) : null;
+  const payload = assemble(buffers, readXer(baselineXf), readXer(delayXf), 'local-file', claimsBuffer, explosivesBuffer, insuranceBuffer, fuelDbx && fuelDbx.buffer, claimsRegBuffer, tunnelExcBuffer, rsmDbx && rsmDbx.buffer, electricityBuffer, materialsBuffer, ncrBuffer, orgBuffer);
   payload.warnings = [...payload.warnings, ...dbx.filter((d) => d.warning).map((d) => d.warning)];
   const applied = await applyScheduleOverride(payload);
   if (!applied && schedCleared) payload.schedule = { activities: [], relationships: [], wbs: {}, cleared: true };
