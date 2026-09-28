@@ -2946,8 +2946,10 @@
     + '<th style="width:96px">Revised Milestone Date</th></tr></thead>';
 
   // Re-rendered each time the tab opens, so "days remaining" is always today's.
+  let msDay = '';
   function renderMilestones() {
     const el = document.getElementById('stab-ms'); if (!el) return;
+    msDay = new Date().toDateString();
     const n = new Date();
     const today = n.getDate() + ' ' + CV_MON[n.getMonth()] + ' ' + n.getFullYear();
     const sect = MS_SECTIONAL.map(([no, act, desc, d, r]) =>
@@ -2967,6 +2969,16 @@
         <p class="muted ms-note" style="margin:10px 0 0">Milestones 35 and 36 have no contractual completion day in the table, so they carry revised dates only.</p>
       </div>`;
   }
+
+  // Keep "days remaining" current with no click: if the date changes while the
+  // tab is showing — past midnight, or the machine waking up the next morning —
+  // redraw it. Cheap: a date-string compare once a minute.
+  const msRollover = () => {
+    const p = document.getElementById('stab-ms');
+    if (p && !p.hidden && msDay && msDay !== new Date().toDateString()) renderMilestones();
+  };
+  setInterval(msRollover, 60000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') msRollover(); });
 
   // ================= Quality Control =================
   // Two panels behind top-level tabs: Material Approvals (material groups as their
