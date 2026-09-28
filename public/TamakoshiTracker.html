@@ -398,6 +398,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   .btn-refresh{padding:7px 13px}
   .btn-logout-m{display:inline-flex}
   .content{padding:14px}
+  .org-slider{top:-14px}
   /* Render code sets inline grid-template-columns (repeat(6,1fr) etc.), which beats
      a plain CSS rule — so force multi-column grids down to 2 with !important. */
   .kpis,
@@ -563,11 +564,17 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
 .org-top .org-p:first-child{background:var(--navy);border-color:var(--navy)}
 .org-top .org-p:first-child .org-r,.org-top .org-p:first-child .org-n,.org-top .org-p:first-child .org-t{color:#fff}
 .org-link{width:2px;height:14px;background:#c9d4e3;margin:0 auto}
-.org-grid{display:flex;gap:12px;align-items:flex-start;overflow:auto;max-height:calc(100vh - 150px);min-height:320px;overscroll-behavior-x:contain;border-top:2px solid #c9d4e3;padding:14px 2px 14px;scrollbar-width:thin;scrollbar-color:#b8c6d8 #eef2f7}
-.org-grid::-webkit-scrollbar{height:10px;width:10px}
-.org-grid::-webkit-scrollbar-track{background:#eef2f7;border-radius:6px}
-.org-grid::-webkit-scrollbar-thumb{background:#b8c6d8;border-radius:6px}
-.org-grid::-webkit-scrollbar-thumb:hover{background:#96a8bf}
+.org-grid{display:flex;gap:12px;align-items:flex-start;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;
+  border-top:2px solid #c9d4e3;padding:14px 2px 4px;scrollbar-width:none}
+.org-grid::-webkit-scrollbar{display:none}
+/* one horizontal slider for the row; sticky so it stays reachable beside long columns */
+.org-slider{position:sticky;top:-20px;z-index:2;overflow-x:auto;overflow-y:hidden;background:#fff;padding:6px 0;
+  scrollbar-width:auto;scrollbar-color:#8ea3bf #e6ecf4}
+.org-slider>div{height:1px}
+.org-slider::-webkit-scrollbar{height:12px}
+.org-slider::-webkit-scrollbar-track{background:#e6ecf4;border-radius:6px}
+.org-slider::-webkit-scrollbar-thumb{background:#8ea3bf;border-radius:6px}
+.org-slider::-webkit-scrollbar-thumb:hover{background:#6f86a6}
 .org-dept{flex:0 0 250px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
 .org-dname{background:#eaf1f9;color:var(--navy);font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.5px;padding:8px 12px}
 .org-p{padding:6px 12px;border-top:1px solid #f0f3f8}
@@ -3768,12 +3775,23 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
   const orgPerson = (p, cls) => (p ? `<div class="org-p${cls ? ' ' + cls : ''}" data-q="${orgEsc((p.role + ' ' + p.name + ' ' + (p.phone || '')).toLowerCase())}">
       <div class="org-r">${orgEsc(p.role)}</div><div class="org-n">${orgEsc(p.name)}</div>${orgTel(p.phone)}</div>` : '');
 
+  // The department row scrolls sideways; its slider mirrors the row's scroll width.
+  function orgSlider() {
+    const g = document.querySelector('#org-panel .org-grid'), sl = document.querySelector('#org-panel .org-slider');
+    if (!g || !sl) return;
+    sl.firstElementChild.style.width = g.scrollWidth + 'px';
+    sl.hidden = g.scrollWidth <= g.clientWidth + 1;
+    sl.scrollLeft = g.scrollLeft;
+  }
+
   function wireManTabs() {
     if (manTabsWired) return; manTabsWired = true;
+    window.addEventListener('resize', orgSlider);
     document.querySelectorAll('#man .sched-tab[data-mantab]').forEach((btn) => btn.addEventListener('click', () => {
       const which = btn.dataset.mantab;
       document.querySelectorAll('#man .sched-tab[data-mantab]').forEach((b) => b.classList.toggle('on', b === btn));
       ['deploy', 'org'].forEach((k) => { const p = document.getElementById('mantab-' + k); if (p) p.hidden = k !== which; });
+      orgSlider();
     }));
     // Search filters the rendered chart in place (no re-render, so typing keeps focus).
     const pane = document.getElementById('mantab-org');
@@ -3790,6 +3808,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       });
       pane.querySelectorAll('.org-note, .org-empty').forEach((n) => n.classList.toggle('org-hide', !!q));
       const none = pane.querySelector('.org-none'); if (none) none.hidden = shown > 0;
+      orgSlider();
     });
   }
 
@@ -3822,8 +3841,13 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--b
       </div>
       <div class="org-top">${(o.top || []).map((p) => orgPerson(p, 'top')).join('<div class="org-link"></div>')}</div>
       <div class="org-link org-trunk"></div>
+      <div class="org-slider" hidden><div></div></div>
       <div class="org-grid">${o.departments.map(dept).join('')}</div>
       <p class="muted org-none" hidden style="font-size:12px;padding:10px 2px">No one matches that search.</p>`;
+    const g = el.querySelector('.org-grid'), sl = el.querySelector('.org-slider');
+    sl.addEventListener('scroll', () => { if (g.scrollLeft !== sl.scrollLeft) g.scrollLeft = sl.scrollLeft; });
+    g.addEventListener('scroll', () => { if (sl.scrollLeft !== g.scrollLeft) sl.scrollLeft = g.scrollLeft; });
+    orgSlider();
   }
 
   // ================= Contract Milestones (SCC 2.2 / SCC 41.2) =================

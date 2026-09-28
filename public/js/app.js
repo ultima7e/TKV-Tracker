@@ -2859,12 +2859,23 @@
   const orgPerson = (p, cls) => (p ? `<div class="org-p${cls ? ' ' + cls : ''}" data-q="${orgEsc((p.role + ' ' + p.name + ' ' + (p.phone || '')).toLowerCase())}">
       <div class="org-r">${orgEsc(p.role)}</div><div class="org-n">${orgEsc(p.name)}</div>${orgTel(p.phone)}</div>` : '');
 
+  // The department row scrolls sideways; its slider mirrors the row's scroll width.
+  function orgSlider() {
+    const g = document.querySelector('#org-panel .org-grid'), sl = document.querySelector('#org-panel .org-slider');
+    if (!g || !sl) return;
+    sl.firstElementChild.style.width = g.scrollWidth + 'px';
+    sl.hidden = g.scrollWidth <= g.clientWidth + 1;
+    sl.scrollLeft = g.scrollLeft;
+  }
+
   function wireManTabs() {
     if (manTabsWired) return; manTabsWired = true;
+    window.addEventListener('resize', orgSlider);
     document.querySelectorAll('#man .sched-tab[data-mantab]').forEach((btn) => btn.addEventListener('click', () => {
       const which = btn.dataset.mantab;
       document.querySelectorAll('#man .sched-tab[data-mantab]').forEach((b) => b.classList.toggle('on', b === btn));
       ['deploy', 'org'].forEach((k) => { const p = document.getElementById('mantab-' + k); if (p) p.hidden = k !== which; });
+      orgSlider();
     }));
     // Search filters the rendered chart in place (no re-render, so typing keeps focus).
     const pane = document.getElementById('mantab-org');
@@ -2881,6 +2892,7 @@
       });
       pane.querySelectorAll('.org-note, .org-empty').forEach((n) => n.classList.toggle('org-hide', !!q));
       const none = pane.querySelector('.org-none'); if (none) none.hidden = shown > 0;
+      orgSlider();
     });
   }
 
@@ -2913,8 +2925,13 @@
       </div>
       <div class="org-top">${(o.top || []).map((p) => orgPerson(p, 'top')).join('<div class="org-link"></div>')}</div>
       <div class="org-link org-trunk"></div>
+      <div class="org-slider" hidden><div></div></div>
       <div class="org-grid">${o.departments.map(dept).join('')}</div>
       <p class="muted org-none" hidden style="font-size:12px;padding:10px 2px">No one matches that search.</p>`;
+    const g = el.querySelector('.org-grid'), sl = el.querySelector('.org-slider');
+    sl.addEventListener('scroll', () => { if (g.scrollLeft !== sl.scrollLeft) g.scrollLeft = sl.scrollLeft; });
+    g.addEventListener('scroll', () => { if (sl.scrollLeft !== g.scrollLeft) sl.scrollLeft = g.scrollLeft; });
+    orgSlider();
   }
 
   // ================= Contract Milestones (SCC 2.2 / SCC 41.2) =================
