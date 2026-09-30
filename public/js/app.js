@@ -871,21 +871,23 @@
     }
   });
 
-  // Map the sheet's casual status text to professional payment-cycle terms.
-  // Binary IPC status: a completed/paid certificate is "Settled"; anything else
-  // (submitted, remaining, certified-but-unpaid, blank) is "Under Review".
+  // IPC status shows exactly what the source workbook says (e.g. "Completed",
+  // "Remaining", "NPR 28,967.09 Rem.", "Under Review"). ipcStatusLabel only
+  // classifies that text so the badge gets a colour.
   function ipcStatusLabel(s) {
     const t = (s || '').toLowerCase();
     if (/reject/.test(t)) return 'Rejected';
     if (/settl|complete|paid/.test(t)) return 'Settled';
     if (/partial/.test(t)) return 'Partial';
-    if (/remain/.test(t)) return 'Remaining';
+    if (/remain|\brem\b/.test(t)) return 'Remaining';
     if (/submit/.test(t)) return 'Submitted';
     return 'Under Review';
   }
   // Badge colour per status: Settled green, Partial amber, Remaining/Rejected red,
   // Submitted neutral (awaiting certification).
   const ipcStatusClass = (label) => (label === 'Settled' ? 'ok' : label === 'Rejected' || label === 'Remaining' ? 'bad' : label === 'Submitted' ? 'neu' : 'warn');
+  // The sheet's own status text, escaped for HTML.
+  const ipcStatusText = (s) => String((s || '').trim() || '—').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   function renderIpc() {
     // Interim Payment Certificates only — the Advance Payment is a separate
@@ -915,7 +917,7 @@
       return `<tr class="${cls}">
         <td>${r.ipc}</td><td>${fmtDate(r.certifiedDate)}</td>
         <td>${usdM(r.netUSD)}</td><td>${nprM(r.netNPR)}</td>
-        <td>${lab}</td></tr>`;
+        <td>${ipcStatusText(r.status)}</td></tr>`;
     };
     $('#ipc-table').innerHTML = `
       <table class="tbl">
@@ -1325,7 +1327,7 @@
       const i = barIpcs[p.dataIndex];
       if (!i) return;
       const lbl = ipcStatusLabel(i.status);
-      const badge = `<span class="badge ${ipcStatusClass(lbl)}">${lbl}</span>`;
+      const badge = `<span class="badge ${ipcStatusClass(lbl)}">${ipcStatusText(i.status)}</span>`;
       const head = `<div style="text-align:left"><b>${i.ipc}</b>`
         + (i.certifiedDate ? ` <span class="muted">· certified ${i.certifiedDate}</span>` : '') + ` ${badge}`
         + `<br/><span class="muted">Received</span> <b>NPR ${nprM(i.receivedNPR)} M</b>`
@@ -1370,7 +1372,7 @@
             <td>${x.amountNPR ? nprM(x.amountNPR) + ' M' : '–'}</td></tr>`).join('')}
         </tbody>
       </table>`;
-    const statusBadge = (s) => { const l = ipcStatusLabel(s); return `<span class="badge ${ipcStatusClass(l)}">${l}</span>`; };
+    const statusBadge = (s) => { const l = ipcStatusLabel(s); return `<span class="badge ${ipcStatusClass(l)}">${ipcStatusText(s)}</span>`; };
     // Full accounting breakdown (taxable → net) shown when "Details" is toggled.
     const fUSD = (v) => (v ? '$ ' + (+v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '–');
     const fNPR = (v) => (v ? (+v).toLocaleString('en-US', { maximumFractionDigits: 0 }) : '–');
