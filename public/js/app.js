@@ -2416,6 +2416,7 @@
       document.querySelectorAll('#ins .sched-tab').forEach((b) => b.classList.toggle('on', b === btn));
       document.getElementById('itab-summary').hidden = w !== 'summary';
       document.getElementById('itab-claims').hidden = w !== 'claims';
+      document.getElementById('itab-bg').hidden = w !== 'bg';
     }));
     const filt = document.querySelector('#ins .ins-filter');
     if (filt) filt.addEventListener('click', (e) => { const b = e.target.closest('.ins-fbtn'); if (!b) return;
@@ -2431,9 +2432,38 @@
       const show = drow.hidden; drow.hidden = !show; row.classList.toggle('open', show);
     });
   }
+  // ---- Bank Guarantees (Insurance → Bank Guarantees). Live from the Guarantee
+  // Summary workbook; each instrument is listed as the sheet lists it (USD + NPR
+  // letters, then any amendment/renewal). Days left is worked out from Validity.
+  function renderGuarantees() {
+    const host = document.getElementById('bg-list'); if (!host) return;
+    const bg = data && data.guarantees;
+    if (!bg || bg.missing || !(bg.groups || []).length) { host.innerHTML = '<div class="muted" style="font-size:12px">No bank guarantee data available yet.</div>'; return; }
+    const fmt = (iso) => { if (!iso) return '–'; const d = new Date(iso + 'T00:00:00Z');
+      return d.getUTCDate() + ' ' + ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()] + ' ' + d.getUTCFullYear(); };
+    const money = (v, dp) => (v ? (+v).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp }) : '–');
+    const row = (r) => {
+      const days = insDaysLeft(r.validTill), s = insStatus(days);
+      const dtxt = days == null ? '–' : (days < 0 ? 'Expired' : days + ' d left');
+      return `<tr${days != null && days < 0 ? ' style="opacity:.6"' : ''}>
+        <td style="text-align:left"><b>${r.lgNo}</b>${r.amendment ? ` <span class="muted">· Amd. ${r.amendment}</span>` : ''}</td>
+        <td>${fmt(r.issueDate)}</td>
+        <td>${r.amount ? r.currency + ' ' + money(r.amount, 0) : '–'}</td>
+        <td>${fmt(r.validTill)}</td>
+        <td><span class="ins-days ${s.dcls}">${dtxt}</span></td>
+        <td>${money(r.paidUSD, 2)}</td>
+        <td style="text-align:left">${r.remarks || ''}</td></tr>`;
+    };
+    const body = bg.groups.map((g) => `<tr class="tbl-grp"><td colspan="7" style="text-align:left">${g.name}</td></tr>${g.rows.map(row).join('')}`).join('');
+    host.innerHTML = `<div style="overflow-x:auto"><table class="tbl" style="min-width:820px"><thead><tr>
+      <th style="text-align:left">Letter of Guarantee No.</th><th>Issued</th><th>Amount</th><th>Validity</th><th>Days to Expiry</th><th>Paid (USD)</th><th style="text-align:left">Remarks</th>
+      </tr></thead><tbody>${body}
+      <tr style="font-weight:800"><td style="text-align:left" colspan="5">Total Paid Amount</td><td>${money(bg.totalPaidUSD, 2)}</td><td></td></tr>
+      </tbody></table></div>`;
+  }
   function renderInsurance() {
     const tiles = document.getElementById('ins-tiles'); if (!tiles) return;
-    wireInsurance(); renderInsClaims();
+    wireInsurance(); renderInsClaims(); renderGuarantees();
     const ins = data && data.insurance;
     if (!ins || !ins.policies || !ins.policies.length) { tiles.innerHTML = '<div class="muted" style="font-size:12px">No insurance data available yet.</div>'; insPols = []; renderInsTable(); return; }
     insPols = ins.policies.map((p) => ({ ...p, daysLeft: insDaysLeft(p.validTill) }));

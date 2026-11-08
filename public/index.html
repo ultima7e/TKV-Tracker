@@ -304,6 +304,7 @@
         <div class="sched-tabs">
           <button class="sched-tab on" data-itab="summary">Insurance Summary</button>
           <button class="sched-tab" data-itab="claims">Insurance Claims</button>
+          <button class="sched-tab" data-itab="bg">Bank Guarantees</button>
         </div>
         <div class="stab-pane" id="itab-summary">
           <div id="ins-tiles" class="expl-summary"></div>
@@ -323,6 +324,11 @@
         <div class="stab-pane" id="itab-claims" hidden>
           <div class="card"><h3>Insurance Claims <span class="muted" style="font-weight:600">· active &amp; recent claims</span></h3>
             <div id="ins-claims"></div>
+          </div>
+        </div>
+        <div class="stab-pane" id="itab-bg" hidden>
+          <div class="card"><h3>Bank Guarantees <span class="muted" style="font-weight:600">· from the Guarantee Summary · days to expiry recalculated live</span></h3>
+            <div id="bg-list"></div>
           </div>
         </div>
       </section>
